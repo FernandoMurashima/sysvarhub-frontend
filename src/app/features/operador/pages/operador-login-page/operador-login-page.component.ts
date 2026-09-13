@@ -29,6 +29,7 @@ export class OperadorLoginPageComponent implements OnInit {
   errorMessage = '';
 
   ngOnInit(): void {
+    this.senha = '';
     queueMicrotask(() => this.codigoInput?.nativeElement.focus());
   }
 

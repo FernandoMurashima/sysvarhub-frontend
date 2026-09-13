@@ -31,7 +31,7 @@
       </article>
     </section>
 
-    <form class="login-card" (submit)="entrar($event)">
+    <form class="login-card" autocomplete="off" (submit)="entrar($event)">
       <header>
         <h1>Login do operador</h1>
         <span>{{ contexto()?.loja?.apelido || contexto()?.loja?.nome || 'Terminal pareado' }}</span>
@@ -41,9 +41,9 @@
         Operador
         <input
           #codigoInput
-          name="codigo"
+          name="operadorCodigoPdv"
           [(ngModel)]="codigo"
-          autocomplete="username"
+          autocomplete="off"
           [disabled]="carregando"
           (keydown.enter)="focarSenha($event)"
         />
@@ -53,10 +53,10 @@
         Credencial
         <input
           #senhaInput
-          name="senha"
+          name="operadorCredencialPdv"
           [(ngModel)]="senha"
           type="password"
-          autocomplete="current-password"
+          autocomplete="new-password"
           [disabled]="carregando"
           (keydown.enter)="entrar($event)"
         />

@@ -15,6 +15,8 @@ describe('OperadorLoginPageComponent', () => {
   let router: jasmine.SpyObj<Router>;
 
   beforeEach(async () => {
+    localStorage.clear();
+    sessionStorage.clear();
     operatorSession = jasmine.createSpyObj<OperatorSessionService>('OperatorSessionService', ['login']);
     router = jasmine.createSpyObj<Router>('Router', ['navigateByUrl']);
 
@@ -43,10 +45,37 @@ describe('OperadorLoginPageComponent', () => {
     expect(text).toContain('PDV-01');
   });
 
-  it('credencial e password', () => {
+  it('credencial continua type password', () => {
     const password = fixture.debugElement.query(By.css('input[type="password"]'));
 
     expect(password).toBeTruthy();
+  });
+
+  it('desabilita autocomplete geral do formulario', () => {
+    const form = fixture.debugElement.query(By.css('form.login-card'));
+
+    expect(form.nativeElement.getAttribute('autocomplete')).toBe('off');
+  });
+
+  it('campo operador nao usa autocomplete username', () => {
+    const operador = fixture.debugElement.query(By.css('input[name="operadorCodigoPdv"]'));
+
+    expect(operador).toBeTruthy();
+    expect(operador.nativeElement.getAttribute('autocomplete')).toBe('off');
+    expect(operador.nativeElement.getAttribute('autocomplete')).not.toBe('username');
+  });
+
+  it('credencial usa configuracao anti-autofill sem current-password', () => {
+    const credencial = fixture.debugElement.query(By.css('input[name="operadorCredencialPdv"]'));
+
+    expect(credencial).toBeTruthy();
+    expect(credencial.nativeElement.getAttribute('type')).toBe('password');
+    expect(credencial.nativeElement.getAttribute('autocomplete')).toBe('new-password');
+    expect(credencial.nativeElement.getAttribute('autocomplete')).not.toBe('current-password');
+  });
+
+  it('senha comeca vazia', () => {
+    expect(fixture.componentInstance.senha).toBe('');
   });
 
   it('envia codigo e senha e navega para pdv no sucesso', () => {
@@ -59,6 +88,8 @@ describe('OperadorLoginPageComponent', () => {
 
     expect(operatorSession.login).toHaveBeenCalledWith('caixa.barra', 'credencial-digitada');
     expect(component.senha).toBe('');
+    expect(localStorage.getItem('credencial-digitada')).toBeNull();
+    expect(sessionStorage.getItem('credencial-digitada')).toBeNull();
     expect(router.navigateByUrl).toHaveBeenCalledWith('/pdv');
   });
 
@@ -72,8 +103,22 @@ describe('OperadorLoginPageComponent', () => {
     fixture.detectChanges();
 
     expect(component.senha).toBe('');
+    expect(JSON.stringify(localStorage)).not.toContain('credencial-incorreta');
+    expect(JSON.stringify(sessionStorage)).not.toContain('credencial-incorreta');
     expect(fixture.nativeElement.textContent).toContain('Operador ou credencial inválidos.');
     expect(router.navigateByUrl).not.toHaveBeenCalled();
+  });
+
+  it('nenhum storage guarda a senha digitada', () => {
+    operatorSession.login.and.returnValue(of(false));
+    const component = fixture.componentInstance;
+
+    component.codigo = 'caixa.barra';
+    component.senha = 'senha-nao-persistida';
+    component.entrar(new Event('submit'));
+
+    expect(Object.values(localStorage).join(' ')).not.toContain('senha-nao-persistida');
+    expect(Object.values(sessionStorage).join(' ')).not.toContain('senha-nao-persistida');
   });
 
   it('nao contem chamadas ou textos de Central', () => {
