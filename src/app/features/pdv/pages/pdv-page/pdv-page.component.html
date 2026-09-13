@@ -1,26 +1,274 @@
-<main class="page pdv-page">
-  <section class="panel">
-    <div class="topbar">
+<section class="pdv-desktop">
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-mark">S</div>
       <div>
-        <p class="eyebrow">Operacao local</p>
-        <h1>PDV Sysvar Hub</h1>
+        <strong>sysvar</strong>
+        <span>SISTEMA DE AUTOMAÇÃO DE LOJAS</span>
       </div>
-      <a routerLink="/suporte" class="support-link">Suporte</a>
+      <b>PDV</b>
     </div>
 
-    <div class="summary-grid">
-      <article class="card">
-        <span>Loja</span>
-        <strong>{{ loja() }}</strong>
-      </article>
-      <article class="card">
-        <span>Caixa</span>
-        <strong>{{ caixa() }}</strong>
-      </article>
-      <article class="card">
-        <span>Terminal</span>
-        <strong>{{ terminal() }}</strong>
-      </article>
+    <div class="search">
+      <span>⌕</span>
+      <input
+        [(ngModel)]="busca"
+        (ngModelChange)="aoDigitarBusca()"
+        (keydown.enter)="aoEnterBusca($event)"
+        placeholder="Digite código, referência, descrição ou leia o código de barras..."
+      />
+      @if (busca.trim().length >= 2 && produtos.length) {
+        <div class="search-suggestions">
+          @for (produto of produtos.slice(0, 8); track produto.skuId) {
+            <button type="button" (click)="selecionarProduto(produto)">
+              <strong>{{ produto.descricao }}</strong>
+              <span>
+                Ref. {{ produto.referencia }} · {{ produto.cor }} / {{ produto.tamanho }} · Estoque:
+                {{ formatarQuantidade(produto.estoqueDisponivel) }}
+              </span>
+              @if (!produto.vendavel) {
+                <b>{{ motivos(produto) }}</b>
+              }
+            </button>
+          }
+        </div>
+      }
     </div>
-  </section>
-</main>
+
+    <div class="top-actions">
+      <span>NFC-e</span>
+      <a routerLink="/suporte" class="home-button">Suporte</a>
+      <span>TEF</span>
+      <div class="operator">
+        <div class="avatar">◯</div>
+        <div>
+          <strong>{{ caixa() }}</strong>
+          <small>{{ operador }}</small>
+        </div>
+      </div>
+      <div class="clock">
+        <strong>{{ hora }}</strong>
+        <small>{{ data }}</small>
+      </div>
+      <button type="button" (click)="abrirAtalho($event, 'resumo')">☰</button>
+    </div>
+  </header>
+
+  <main class="pdv-body">
+    <aside class="left-panel">
+      <div class="panel">
+        <h3>INFORMAÇÕES DA VENDA</h3>
+        <label>
+          Venda
+          <div class="select-like readonly-like">Venda ainda não iniciada</div>
+        </label>
+        <label>
+          Código do Cliente
+          <div class="select-like readonly-like">Consumidor final pendente</div>
+        </label>
+        <label>
+          Vendedor
+          <div class="select-like readonly-like">{{ vendedor }}</div>
+        </label>
+        <label>
+          Tabela de Preço
+          <div class="select-like readonly-like">{{ tabelaPreco }}</div>
+        </label>
+        <label>
+          Loja
+          <div class="select-like readonly-like">{{ loja() }}</div>
+        </label>
+        <label>
+          Caixa
+          <div class="select-like readonly-like">{{ caixa() }}</div>
+        </label>
+      </div>
+
+      <div class="panel shortcuts">
+        <h3>ATALHOS</h3>
+        <button type="button" (click)="abrirAtalho($event, 'cliente')">F2<br /><span>Cliente</span></button>
+        <button type="button" (click)="abrirAtalho($event, 'vendedor')">F3<br /><span>Vendedor</span></button>
+        <button type="button" (click)="abrirAtalho($event, 'resumo')">F4<br /><span>Resumo</span></button>
+        <button type="button" (click)="abrirAtalho($event, 'cancelar-item')">F5<br /><span>Cancelar Item</span></button>
+        <button type="button" (click)="abrirAtalho($event, 'cancelar-venda')">F6<br /><span>Cancelar Venda</span></button>
+        <button type="button" (click)="abrirAtalho($event, 'preco')">F7<br /><span>Consultar Preço</span></button>
+        <button type="button" (click)="abrirAtalho($event, 'despesa')">F8<br /><span>Despesa</span></button>
+        <button type="button" (click)="abrirAtalho($event, 'pagamentos')">F9<br /><span>Pagamentos</span></button>
+        <button type="button" (click)="abrirAtalho($event, 'fechamento')">F10<br /><span>Fechar Caixa</span></button>
+      </div>
+    </aside>
+
+    <section class="center-panel">
+      <section class="product-box">
+        <div class="box-head">
+          <h3>ITENS DE VENDA</h3>
+        </div>
+        <div class="items-grid">
+          <div class="items-header">
+            <span>#</span>
+            <span>CÓDIGO / EAN</span>
+            <span>PRODUTO</span>
+            <span>COR / TAM</span>
+            <span>QTD</span>
+            <span>UN</span>
+            <span>UNITÁRIO</span>
+            <span>DESC.</span>
+            <span>TOTAL</span>
+            <span>AÇÕES</span>
+          </div>
+          <div class="empty">Bipe ou digite um produto para iniciar a venda.</div>
+        </div>
+      </section>
+
+      <section class="bottom-totals">
+        <div class="subtotal-display">
+          <span>SUBTOTAL</span>
+          <strong>0,00</strong>
+        </div>
+        <div>
+          <span>TOTAL RECEBIDO</span>
+          <strong>0,00</strong>
+        </div>
+        <div>
+          <span>TROCO</span>
+          <strong>0,00</strong>
+        </div>
+      </section>
+    </section>
+
+    <aside class="right-panel">
+      <div class="sale-head">
+        <h3>PRODUTO SELECIONADO</h3>
+        <button type="button" (click)="limpar()">🗑 LIMPAR</button>
+      </div>
+
+      <div class="selected-product-photo">
+        <div class="photo-frame">
+          <img src="assets/logosysvar.png" alt="Sysvar" />
+        </div>
+        <strong>{{ produtoSelecionado?.descricao || 'Nenhum produto selecionado' }}</strong>
+        <span>{{ produtoSelecionado?.codigo || 'Aguardando bipagem' }}</span>
+        @if (produtoSelecionado) {
+          <small>{{ produtoSelecionado.vendavel ? '✓ Vendável' : 'Bloqueado' }}</small>
+          <em>
+            Ref. {{ produtoSelecionado.referencia }} · EAN {{ produtoSelecionado.ean13 || '-' }} ·
+            {{ produtoSelecionado.cor }} / {{ produtoSelecionado.tamanho }}
+          </em>
+          <em>Preço: {{ formatarPreco(produtoSelecionado.precoVenda) }}</em>
+          <em>Estoque na loja: {{ formatarQuantidade(produtoSelecionado.estoqueDisponivel) }}</em>
+          @if (!produtoSelecionado.vendavel) {
+            <em>{{ motivos(produtoSelecionado) }}</em>
+          }
+        }
+      </div>
+
+      <div class="discount">
+        <span>DESCONTO</span>
+        <button class="active" disabled>%</button>
+        <button disabled>R$</button>
+        <input type="number" value="0" disabled />
+      </div>
+
+      <div class="total-card">
+        <p><span>SUBTOTAL</span><strong>R$ 0,00</strong></p>
+        <p><span>DESCONTOS</span><strong>R$ 0,00</strong></p>
+        <p><span>ACRÉSCIMOS</span><strong>R$ 0,00</strong></p>
+        <p><span>PAGO</span><strong>R$ 0,00</strong></p>
+        <p><span>PENDENTE</span><strong>R$ 0,00</strong></p>
+        <div><span>TOTAL</span><strong>R$ 0,00</strong></div>
+      </div>
+
+      <div class="payment-entry">
+        <input type="number" min="0" placeholder="Valor" disabled />
+        <button type="button" (click)="abrirAtalho($event, 'pagamentos')">Adicionar pagamento</button>
+      </div>
+
+      <div class="payment-list">
+        <small>Nenhum pagamento adicionado.</small>
+      </div>
+
+      <div class="payments">
+        <button class="cash" type="button" (click)="abrirAtalho($event, 'pagamentos')"><span>▣</span>DINHEIRO</button>
+        <button class="card" type="button" (click)="abrirAtalho($event, 'pagamentos')"><span>▭</span>CARTÃO</button>
+        <button class="pix" type="button" (click)="abrirAtalho($event, 'pagamentos')"><span>▦</span>PIX</button>
+        <button class="exchange" type="button" (click)="abrirAtalho($event, 'pagamentos')"><span>↻</span>TROCA</button>
+        <button class="finish" type="button" (click)="tentarAdicionarProduto(produtoSelecionado)" [disabled]="!produtoSelecionado">
+          <span>✓</span>FINALIZAR
+        </button>
+      </div>
+      <small class="message">{{ mensagem }}</small>
+    </aside>
+  </main>
+
+  <footer>
+    <span>SYSVAR PDV · HUB LOCAL</span>
+    <span>Terminal {{ terminal() }} · Loja {{ loja() }} · Caixa {{ caixa() }}</span>
+    <span>Catálogo {{ catalogoVersao || '-' }} · {{ catalogoSincronizadoEm || 'sincronização não consultada' }}</span>
+    <b>HUB LOCAL</b>
+    <span>{{ empresa() }}</span>
+  </footer>
+
+  @if (mensagemAlerta) {
+    <div class="pdv-alert-backdrop">
+      <div class="pdv-alert">
+        <strong>{{ mensagemAlerta }}</strong>
+        <span>Pressione ENTER para continuar</span>
+      </div>
+    </div>
+  }
+
+  @if (modalAtalho) {
+    <div class="pdv-modal-backdrop">
+      <section class="pdv-modal">
+        <header>
+          <div>
+            @if (modalAtalho === 'preco') {
+              <strong>Consulta de Preço</strong>
+            } @else {
+              <strong>Recurso ainda não integrado ao Hub</strong>
+            }
+            <span>{{ data }} · {{ caixa() }}</span>
+          </div>
+          <button type="button" (click)="fecharAtalho()">Fechar</button>
+        </header>
+
+        @if (modalAtalho === 'preco') {
+          <div class="modal-search">
+            <input [(ngModel)]="buscaModal" (keydown.enter)="buscarPrecoAtalho()" placeholder="Digite código, referência, descrição ou EAN" />
+            <button type="button" (click)="buscarPrecoAtalho()">Buscar</button>
+          </div>
+
+          <div class="modal-table">
+            <div class="modal-price-row">
+              <span>Código / EAN</span>
+              <span>Produto</span>
+              <span>Cor / Tam</span>
+              <span>Estoque</span>
+              <span>Preço</span>
+            </div>
+            @for (produto of produtosPreco; track produto.skuId) {
+              <button type="button" class="modal-price-row" (click)="selecionarProduto(produto); fecharAtalho()">
+                <strong>{{ produto.codigo }}</strong>
+                <span>{{ produto.descricao }}</span>
+                <span>{{ produto.cor }} / {{ produto.tamanho }}</span>
+                <span>{{ formatarQuantidade(produto.estoqueDisponivel) }}</span>
+                <strong>{{ formatarPreco(produto.precoVenda) }}</strong>
+              </button>
+            }
+            @if (buscaModal && !produtosPreco.length) {
+              <p>Digite e pressione ENTER para consultar.</p>
+            }
+          </div>
+        } @else {
+          <div class="modal-confirm">
+            <strong>Recurso ainda não integrado ao Hub</strong>
+            <span>Esta etapa preserva a interface do PDV e conecta apenas o catálogo local.</span>
+            <div>
+              <button type="button" (click)="fecharAtalho()">Voltar</button>
+            </div>
+          </div>
+        }
+      </section>
+    </div>
+  }
+</section>
