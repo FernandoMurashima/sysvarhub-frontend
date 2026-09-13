@@ -23,7 +23,7 @@ export class PareamentoPageComponent {
   readonly errorMessage = signal<string | null>(null);
 
   readonly form = this.fb.nonNullable.group({
-    codigo_pareamento: ['', [Validators.required, Validators.minLength(3)]],
+    codigo: ['', [Validators.required, Validators.minLength(3)]],
     hostname: [''],
   });
 
@@ -37,21 +37,14 @@ export class PareamentoPageComponent {
     this.errorMessage.set(null);
 
     const payload = {
-      codigo_pareamento: this.form.controls.codigo_pareamento.value.trim(),
+      codigo: this.form.controls.codigo.value.trim(),
       hostname: this.form.controls.hostname.value.trim() || undefined,
     };
 
     this.hubTerminalService
       .parear(payload)
       .pipe(
-        switchMap((response) => {
-          if (response.contexto) {
-            this.terminalSession.definirContextoPareado(response.contexto);
-            return [response.contexto];
-          }
-
-          return this.terminalSession.carregarContexto();
-        }),
+        switchMap(() => this.terminalSession.carregarContexto()),
         finalize(() => this.loading.set(false)),
       )
       .subscribe({

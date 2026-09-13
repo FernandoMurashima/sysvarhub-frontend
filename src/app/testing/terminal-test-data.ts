@@ -2,10 +2,16 @@ import { CatalogoResponse } from '../core/models/catalogo.models';
 import { TerminalContexto } from '../core/models/terminal.models';
 
 export const terminalContextoStub: TerminalContexto = {
-  terminal: { id: 1, codigo: 'PDV-01', nome: 'PDV-01' },
-  caixa: { id: 7, codigo: 'CX-01', descricao: 'Caixa 01' },
-  loja: { id: 2, codigo: 'LJ-01', nome_loja: 'Filial 1' },
-  empresa: { id: 3, razao_social: 'Empresa Teste Ltda' },
+  terminal: {
+    uuid: 'terminal-uuid-ficticio',
+    codigo: 'PDV-01',
+    nome: 'PDV-01',
+    hostname: 'PDV-BARRA-01',
+    ativo: true,
+  },
+  caixa: { id: 7, codigo: 'CX-01', descricao: 'Caixa 01', ativo: true },
+  loja: { id: 2, nome: 'Loja Barra', apelido: 'Filial 1', estado: 'RJ' },
+  empresa: { id: 3, nome: 'Empresa Teste Ltda' },
 };
 
 export const catalogoResponseStub: CatalogoResponse = {

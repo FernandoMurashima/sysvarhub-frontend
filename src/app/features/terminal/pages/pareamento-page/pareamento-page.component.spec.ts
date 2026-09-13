@@ -42,16 +42,21 @@ describe('PareamentoPageComponent', () => {
   });
 
   it('pareia sem exibir token e direciona para pdv', () => {
-    hubTerminalService.parear.and.returnValue(of({ token: 'token-ficticio', contexto: terminalContextoStub }));
+    hubTerminalService.parear.and.returnValue(of({ token: 'token-ficticio', ...terminalContextoStub }));
+    terminalSession.carregarContexto.and.returnValue(of(terminalContextoStub));
 
-    component.form.setValue({ codigo_pareamento: 'ABC123', hostname: 'PDV-01' });
+    component.form.setValue({ codigo: 'XXXX-XXXX-XXXX', hostname: 'PDV-BARRA-01' });
     component.parear();
 
     expect(hubTerminalService.parear).toHaveBeenCalledWith({
-      codigo_pareamento: 'ABC123',
-      hostname: 'PDV-01',
+      codigo: 'XXXX-XXXX-XXXX',
+      hostname: 'PDV-BARRA-01',
     });
-    expect(terminalSession.definirContextoPareado).toHaveBeenCalledWith(terminalContextoStub);
+    expect(hubTerminalService.parear.calls.mostRecent().args[0]).not.toEqual(
+      jasmine.objectContaining({ codigo_pareamento: jasmine.any(String) }),
+    );
+    expect(terminalSession.carregarContexto).toHaveBeenCalled();
+    expect(terminalSession.definirContextoPareado).not.toHaveBeenCalled();
     expect(router.navigateByUrl).toHaveBeenCalledWith('/pdv');
     expect(fixture.nativeElement.textContent).not.toContain('token-ficticio');
   });

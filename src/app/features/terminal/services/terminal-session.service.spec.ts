@@ -80,10 +80,59 @@ describe('TerminalSessionService', () => {
     service.bootstrap().subscribe(() => {
       const contexto = service.contexto();
 
+      expect(contexto?.terminal.uuid).toBe('terminal-uuid-ficticio');
       expect(contexto?.terminal.codigo).toBe('PDV-01');
-      expect(contexto?.caixa.codigo).toBe('CX-01');
-      expect(contexto?.loja.nome_loja).toBe('Filial 1');
-      expect(contexto?.empresa.razao_social).toBe('Empresa Teste Ltda');
+      expect(contexto?.terminal.nome).toBe('PDV-01');
+      expect(contexto?.terminal.hostname).toBe('PDV-BARRA-01');
+      expect(contexto?.terminal.ativo).toBeTrue();
+      expect(contexto?.caixa?.codigo).toBe('CX-01');
+      expect(contexto?.loja.apelido).toBe('Filial 1');
+      expect(contexto?.loja.estado).toBe('RJ');
+      expect(contexto?.empresa.nome).toBe('Empresa Teste Ltda');
+      done();
+    });
+  });
+
+  it('contexto carregado com token presente continua valido sem nova requisicao', (done) => {
+    credentialStore.hasToken.and.returnValue(true);
+    hubTerminalService.contexto.and.returnValue(of(terminalContextoStub));
+
+    service.bootstrap().subscribe(() => {
+      hubTerminalService.contexto.calls.reset();
+
+      service.bootstrap().subscribe((valid) => {
+        expect(valid).toBeTrue();
+        expect(service.status()).toBe('contexto-carregado');
+        expect(hubTerminalService.contexto).not.toHaveBeenCalled();
+        done();
+      });
+    });
+  });
+
+  it('contexto carregado com token removido deixa de ser valido', (done) => {
+    credentialStore.hasToken.and.returnValue(true);
+    hubTerminalService.contexto.and.returnValue(of(terminalContextoStub));
+
+    service.bootstrap().subscribe(() => {
+      credentialStore.hasToken.and.returnValue(false);
+
+      service.bootstrap().subscribe((valid) => {
+        expect(valid).toBeFalse();
+        expect(service.contexto()).toBeNull();
+        expect(service.status()).toBe('nao-pareado');
+        expect(credentialStore.clearToken).toHaveBeenCalled();
+        done();
+      });
+    });
+  });
+
+  it('aceita contexto com caixa null', (done) => {
+    credentialStore.hasToken.and.returnValue(true);
+    hubTerminalService.contexto.and.returnValue(of({ ...terminalContextoStub, caixa: null }));
+
+    service.bootstrap().subscribe((valid) => {
+      expect(valid).toBeTrue();
+      expect(service.contexto()?.caixa).toBeNull();
       done();
     });
   });

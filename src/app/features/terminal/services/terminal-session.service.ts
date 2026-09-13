@@ -1,6 +1,6 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { computed, inject, Injectable, signal } from '@angular/core';
-import { catchError, map, Observable, of, tap } from 'rxjs';
+import { catchError, finalize, map, Observable, of, tap } from 'rxjs';
 
 import { TERMINAL_CREDENTIAL_STORE } from '../../../core/auth/terminal-credential-store';
 import { TerminalContexto, TerminalSessionStatus } from '../../../core/models/terminal.models';
@@ -20,13 +20,13 @@ export class TerminalSessionService {
   readonly hasValidSession = computed(() => this.statusSignal() === 'contexto-carregado');
 
   bootstrap(): Observable<boolean> {
-    if (this.statusSignal() === 'contexto-carregado') {
-      return of(true);
-    }
-
     if (!this.credentialStore.hasToken()) {
       this.clearSession('nao-pareado');
       return of(false);
+    }
+
+    if (this.statusSignal() === 'contexto-carregado' && this.contextoSignal()) {
+      return of(true);
     }
 
     if (!this.bootstrapRequest$) {
@@ -46,7 +46,7 @@ export class TerminalSessionService {
           this.statusSignal.set('erro');
           return of(false);
         }),
-        tap(() => {
+        finalize(() => {
           this.bootstrapRequest$ = null;
         }),
       );

@@ -10,6 +10,7 @@ describe('terminalAuthInterceptor', () => {
   let http: HttpClient;
   let httpMock: HttpTestingController;
   let credentialStore: jasmine.SpyObj<TerminalCredentialStore>;
+  let router: jasmine.SpyObj<Router>;
 
   beforeEach(() => {
     credentialStore = jasmine.createSpyObj<TerminalCredentialStore>('TerminalCredentialStore', [
@@ -18,13 +19,14 @@ describe('terminalAuthInterceptor', () => {
       'clearToken',
       'hasToken',
     ]);
+    router = jasmine.createSpyObj<Router>('Router', ['navigateByUrl']);
 
     TestBed.configureTestingModule({
       providers: [
         provideHttpClient(withInterceptors([terminalAuthInterceptor])),
         provideHttpClientTesting(),
         { provide: TERMINAL_CREDENTIAL_STORE, useValue: credentialStore },
-        { provide: Router, useValue: jasmine.createSpyObj<Router>('Router', ['navigateByUrl']) },
+        { provide: Router, useValue: router },
       ],
     });
 
@@ -72,5 +74,27 @@ describe('terminalAuthInterceptor', () => {
 
     expect(request.request.headers.has('Authorization')).toBeFalse();
     request.flush({});
+  });
+
+  it('401 remove token e redireciona para pareamento', () => {
+    credentialStore.getToken.and.returnValue('token-ficticio');
+
+    http.get('/api/terminal/contexto/').subscribe({ error: () => undefined });
+    const request = httpMock.expectOne('/api/terminal/contexto/');
+    request.flush({}, { status: 401, statusText: 'Unauthorized' });
+
+    expect(credentialStore.clearToken).toHaveBeenCalled();
+    expect(router.navigateByUrl).toHaveBeenCalledWith('/pareamento');
+  });
+
+  it('403 remove token e redireciona para pareamento', () => {
+    credentialStore.getToken.and.returnValue('token-ficticio');
+
+    http.post('/api/terminal/heartbeat/', { hostname: 'PDV-BARRA-01' }).subscribe({ error: () => undefined });
+    const request = httpMock.expectOne('/api/terminal/heartbeat/');
+    request.flush({}, { status: 403, statusText: 'Forbidden' });
+
+    expect(credentialStore.clearToken).toHaveBeenCalled();
+    expect(router.navigateByUrl).toHaveBeenCalledWith('/pareamento');
   });
 });

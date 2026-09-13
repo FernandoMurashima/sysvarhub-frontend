@@ -33,31 +33,68 @@ describe('HubTerminalService', () => {
 
   afterEach(() => httpMock.verify());
 
-  it('pareamento usa endpoint correto e persiste credencial pela abstracao', () => {
-    service.parear({ codigo_pareamento: 'ABC123', hostname: 'PDV-01' }).subscribe();
+  it('pareamento usa endpoint correto, contrato real e persiste credencial pela abstracao', (done) => {
+    service.parear({ codigo: 'XXXX-XXXX-XXXX', hostname: 'PDV-BARRA-01' }).subscribe((response) => {
+      expect(response.token).toBe('token-ficticio');
+      expect(response.terminal.uuid).toBe('terminal-uuid-ficticio');
+      expect(response.caixa?.codigo).toBe('CX-01');
+      expect(response.loja.apelido).toBe('Filial 1');
+      expect(response.empresa.nome).toBe('Empresa Teste Ltda');
+      done();
+    });
 
     const request = httpMock.expectOne('/api/terminal/parear/');
     expect(request.request.method).toBe('POST');
-    expect(request.request.body).toEqual({ codigo_pareamento: 'ABC123', hostname: 'PDV-01' });
-    request.flush({ token: 'token-ficticio' });
+    expect(request.request.body).toEqual({ codigo: 'XXXX-XXXX-XXXX', hostname: 'PDV-BARRA-01' });
+    expect(request.request.body.codigo_pareamento).toBeUndefined();
+    request.flush({ token: 'token-ficticio', ...terminalContextoStub });
 
     expect(credentialStore.setToken).toHaveBeenCalledWith('token-ficticio');
   });
 
-  it('contexto usa endpoint correto', () => {
-    service.contexto().subscribe();
+  it('contexto usa endpoint correto e contrato real', (done) => {
+    service.contexto().subscribe((contexto) => {
+      expect(contexto.terminal.uuid).toBe('terminal-uuid-ficticio');
+      expect(contexto.terminal.codigo).toBe('PDV-01');
+      expect(contexto.terminal.nome).toBe('PDV-01');
+      expect(contexto.terminal.hostname).toBe('PDV-BARRA-01');
+      expect(contexto.terminal.ativo).toBeTrue();
+      expect(contexto.caixa?.ativo).toBeTrue();
+      expect(contexto.loja.apelido).toBe('Filial 1');
+      expect(contexto.loja.estado).toBe('RJ');
+      done();
+    });
 
     const request = httpMock.expectOne('/api/terminal/contexto/');
     expect(request.request.method).toBe('GET');
     request.flush(terminalContextoStub);
   });
 
-  it('heartbeat usa endpoint correto', () => {
-    service.heartbeat({ status: 'online' }).subscribe();
+  it('contexto aceita caixa null', (done) => {
+    service.contexto().subscribe((contexto) => {
+      expect(contexto.caixa).toBeNull();
+      done();
+    });
+
+    const request = httpMock.expectOne('/api/terminal/contexto/');
+    request.flush({ ...terminalContextoStub, caixa: null });
+  });
+
+  it('heartbeat usa endpoint correto e contrato real', (done) => {
+    service.heartbeat({ hostname: 'PDV-BARRA-01' }).subscribe((response) => {
+      expect(response.status).toBe('ok');
+      expect(response.terminal_uuid).toBe('terminal-uuid-ficticio');
+      expect(response.servidor_em).toBe('2026-09-13T10:20:00Z');
+      done();
+    });
 
     const request = httpMock.expectOne('/api/terminal/heartbeat/');
     expect(request.request.method).toBe('POST');
-    expect(request.request.body).toEqual({ status: 'online' });
-    request.flush({ ok: true });
+    expect(request.request.body).toEqual({ hostname: 'PDV-BARRA-01' });
+    request.flush({
+      status: 'ok',
+      terminal_uuid: 'terminal-uuid-ficticio',
+      servidor_em: '2026-09-13T10:20:00Z',
+    });
   });
 });

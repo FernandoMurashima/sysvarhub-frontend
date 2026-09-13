@@ -14,7 +14,7 @@ export class PdvPageComponent {
   private readonly terminalSession = inject(TerminalSessionService);
 
   readonly contexto = this.terminalSession.contexto;
-  readonly loja = computed(() => this.contexto()?.loja.nome_loja ?? this.contexto()?.loja.nome ?? '-');
-  readonly caixa = computed(() => this.contexto()?.caixa.descricao ?? this.contexto()?.caixa.codigo ?? '-');
-  readonly terminal = computed(() => this.contexto()?.terminal.nome ?? this.contexto()?.terminal.codigo ?? '-');
+  readonly loja = computed(() => this.contexto()?.loja.apelido || this.contexto()?.loja.nome || '-');
+  readonly caixa = computed(() => this.contexto()?.caixa?.descricao ?? '-');
+  readonly terminal = computed(() => this.contexto()?.terminal.nome || this.contexto()?.terminal.codigo || '-');
 }

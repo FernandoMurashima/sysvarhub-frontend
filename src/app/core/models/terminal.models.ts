@@ -6,55 +6,58 @@ export type TerminalSessionStatus =
   | 'erro';
 
 export interface HubTerminal {
-  id?: number;
-  codigo?: string;
-  nome?: string;
-  hostname?: string;
+  uuid: string;
+  codigo: string;
+  nome: string;
+  hostname: string;
+  ativo: boolean;
 }
 
 export interface HubEmpresa {
-  id?: number;
-  nome?: string;
-  razao_social?: string;
+  id: number;
+  nome: string;
 }
 
 export interface HubLoja {
-  id?: number;
-  codigo?: string;
-  nome?: string;
-  nome_loja?: string;
+  id: number;
+  nome: string;
+  apelido: string;
+  estado: string;
 }
 
 export interface HubCaixa {
-  id?: number;
-  codigo?: string;
-  descricao?: string;
-  nome?: string;
+  id: number;
+  codigo: string;
+  descricao: string;
+  ativo: boolean;
 }
 
 export interface TerminalContexto {
   terminal: HubTerminal;
-  caixa: HubCaixa;
+  caixa: HubCaixa | null;
   loja: HubLoja;
   empresa: HubEmpresa;
 }
 
 export interface PareamentoRequest {
-  codigo_pareamento: string;
+  codigo: string;
   hostname?: string;
 }
 
 export interface PareamentoResponse {
   token: string;
-  contexto?: TerminalContexto;
+  terminal: HubTerminal;
+  caixa: HubCaixa | null;
+  loja: HubLoja;
+  empresa: HubEmpresa;
 }
 
 export interface HeartbeatRequest {
-  status?: string;
-  versao_app?: string;
+  hostname?: string;
 }
 
 export interface HeartbeatResponse {
-  ok: boolean;
-  recebido_em?: string;
+  status: 'ok';
+  terminal_uuid: string;
+  servidor_em: string;
 }

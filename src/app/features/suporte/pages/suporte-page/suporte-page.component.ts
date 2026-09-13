@@ -24,10 +24,10 @@ export class SuportePageComponent {
   readonly catalogo = signal<CatalogoResponse | null>(null);
   readonly catalogoError = signal<string | null>(null);
 
-  readonly loja = computed(() => this.contexto()?.loja.nome_loja ?? this.contexto()?.loja.nome ?? '-');
-  readonly empresa = computed(() => this.contexto()?.empresa.razao_social ?? this.contexto()?.empresa.nome ?? '-');
-  readonly caixa = computed(() => this.contexto()?.caixa.descricao ?? this.contexto()?.caixa.codigo ?? '-');
-  readonly terminal = computed(() => this.contexto()?.terminal.nome ?? this.contexto()?.terminal.codigo ?? '-');
+  readonly loja = computed(() => this.contexto()?.loja.apelido || this.contexto()?.loja.nome || '-');
+  readonly empresa = computed(() => this.contexto()?.empresa.nome ?? '-');
+  readonly caixa = computed(() => this.contexto()?.caixa?.descricao ?? '-');
+  readonly terminal = computed(() => this.contexto()?.terminal.nome || this.contexto()?.terminal.codigo || '-');
 
   readonly form = this.fb.nonNullable.group({
     q: [''],
