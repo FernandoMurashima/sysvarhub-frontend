@@ -57,6 +57,21 @@ describe('operatorSessionInterceptor', () => {
     logout.flush({});
   });
 
+  it('envia header em endpoints de caixa', () => {
+    sessionStore.getToken.and.returnValue('sessao-operador-ficticia');
+
+    http.get('/api/terminal/caixa/status/').subscribe();
+    http.post('/api/terminal/caixa/abrir/', {}).subscribe();
+
+    const status = httpMock.expectOne('/api/terminal/caixa/status/');
+    const abrir = httpMock.expectOne('/api/terminal/caixa/abrir/');
+
+    expect(status.request.headers.get('X-Sysvar-Operador-Session')).toBe('sessao-operador-ficticia');
+    expect(abrir.request.headers.get('X-Sysvar-Operador-Session')).toBe('sessao-operador-ficticia');
+    status.flush({});
+    abrir.flush({});
+  });
+
   it('nao envia header em pareamento nem URL externa', () => {
     sessionStore.getToken.and.returnValue('sessao-operador-ficticia');
 

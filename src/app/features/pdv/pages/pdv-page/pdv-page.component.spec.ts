@@ -4,7 +4,10 @@ import { Router } from '@angular/router';
 import { RouterTestingModule } from '@angular/router/testing';
 import { of } from 'rxjs';
 
+import { SessaoCaixaHubResumo } from '../../../../core/models/caixa.models';
+import { CaixaSessionService } from '../../../caixa/services/caixa-session.service';
 import { OperatorSessionService } from '../../../operador/services/operator-session.service';
+import { sessaoCaixaAbertaStub } from '../../../../testing/terminal-test-data';
 import { PdvCatalogoConsulta, PdvProdutoConsulta } from '../../models/pdv-produto-consulta.model';
 import { PdvHubFacade } from '../../services/pdv-hub.facade';
 import { PdvPageComponent } from './pdv-page.component';
@@ -63,6 +66,9 @@ describe('PdvPageComponent', () => {
   let fixture: ComponentFixture<PdvPageComponent>;
   let facade: jasmine.SpyObj<PdvHubFacade>;
   let operatorSession: jasmine.SpyObj<OperatorSessionService>;
+  let caixaSession: jasmine.SpyObj<CaixaSessionService>;
+  let caixaStatusSignal = signal<'inicializando' | 'fechado' | 'aberto' | 'erro'>('aberto');
+  let sessaoCaixaSignal = signal<SessaoCaixaHubResumo | null>(sessaoCaixaAbertaStub);
   let router: Router;
 
   function catalogo(itens: PdvProdutoConsulta[]): PdvCatalogoConsulta {
@@ -96,12 +102,21 @@ describe('PdvPageComponent', () => {
       }).asReadonly(),
     });
     operatorSession.logout.and.returnValue(of(true));
+    caixaStatusSignal = signal<'inicializando' | 'fechado' | 'aberto' | 'erro'>('aberto');
+    sessaoCaixaSignal = signal(sessaoCaixaAbertaStub);
+    caixaSession = jasmine.createSpyObj<CaixaSessionService>('CaixaSessionService', ['bootstrap', 'abrir'], {
+      status: caixaStatusSignal.asReadonly(),
+      sessao: sessaoCaixaSignal.asReadonly(),
+    });
+    caixaSession.bootstrap.and.returnValue(of(true));
+    caixaSession.abrir.and.returnValue(of({ ok: true }));
 
     await TestBed.configureTestingModule({
       imports: [PdvPageComponent, RouterTestingModule.withRoutes([{ path: 'operador', component: EmptyRouteComponent }])],
       providers: [
         { provide: PdvHubFacade, useValue: facade },
         { provide: OperatorSessionService, useValue: operatorSession },
+        { provide: CaixaSessionService, useValue: caixaSession },
       ],
     }).compileComponents();
 
@@ -127,6 +142,14 @@ describe('PdvPageComponent', () => {
     expect(text).toContain('Filial 1');
     expect(text).toContain('Caixa 01');
     expect(text).toContain('PDV-01');
+  });
+
+  it('consulta status do caixa ao entrar e mostra caixa aberto', () => {
+    const text = fixture.nativeElement.textContent;
+
+    expect(caixaSession.bootstrap).toHaveBeenCalled();
+    expect(text).toContain('CAIXA ABERTO');
+    expect(text).toContain('Fundo R$ 100,00');
   });
 
   it('mostra operador real sem fallback hardcoded', () => {
@@ -193,7 +216,7 @@ describe('PdvPageComponent', () => {
     expect(text).toContain('Calça Jeans Reta Aurora');
     expect(text).toContain('7892701000013');
     expect(text).toContain('199,90');
-    expect(text).toContain('Venda será habilitada após abertura do caixa');
+    expect(text).toContain('Caixa aberto. Integração da venda será habilitada na próxima etapa.');
     expect(component.carrinho.length).toBe(0);
   });
 
@@ -205,6 +228,53 @@ describe('PdvPageComponent', () => {
     expect(operatorSession.logout).toHaveBeenCalled();
     expect(router.navigateByUrl).toHaveBeenCalledWith('/operador');
     expect(component.carrinho.length).toBe(0);
+  });
+
+  it('fechado mostra modal bloqueante com contexto e abre caixa', () => {
+    caixaStatusSignal.set('fechado');
+    sessaoCaixaSignal.set(null);
+    fixture.detectChanges();
+    const component = fixture.componentInstance;
+
+    expect(fixture.nativeElement.textContent).toContain('ABERTURA DE CAIXA');
+    expect(fixture.nativeElement.textContent).toContain('Filial 1');
+    expect(fixture.nativeElement.textContent).toContain('Caixa 01');
+    expect(fixture.nativeElement.textContent).toContain('PDV-01');
+    expect(fixture.nativeElement.textContent).toContain('Juliana Rocha');
+
+    component.valorAbertura = '100,00';
+    component.abrirCaixa(new Event('submit'));
+
+    expect(caixaSession.abrir).toHaveBeenCalledWith('100.00');
+  });
+
+  it('modal mostra erro 400 e loading de abertura', () => {
+    caixaStatusSignal.set('fechado');
+    sessaoCaixaSignal.set(null);
+    caixaSession.abrir.and.returnValue(of({ ok: false, detail: 'Valor de abertura inválido.' }));
+    const component = fixture.componentInstance;
+
+    component.valorAbertura = '100,00';
+    component.abrirCaixa(new Event('submit'));
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.textContent).toContain('Valor de abertura inválido.');
+  });
+
+  it('aberto nao mostra modal de abertura', () => {
+    caixaStatusSignal.set('aberto');
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.textContent).not.toContain('ABERTURA DE CAIXA');
+  });
+
+  it('F10 nao chama fechamento de caixa', () => {
+    const component = fixture.componentInstance;
+
+    component.atalhoF10(new KeyboardEvent('keydown', { key: 'F10' }));
+
+    expect(component.modalAtalho).toBe('fechamento');
+    expect(caixaSession.abrir).not.toHaveBeenCalled();
   });
 
   it('ENTER com resultado exato seleciona produto', () => {

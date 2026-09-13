@@ -9,6 +9,7 @@ const AUTHENTICATED_TERMINAL_PATH = '/api/terminal/';
 const PAIRING_PATH = '/api/terminal/parear/';
 const OPERATOR_CONTEXT_PATH = '/api/terminal/operador/contexto/';
 const OPERATOR_LOGOUT_PATH = '/api/terminal/operador/logout/';
+const OPERATOR_SCOPED_PATHS = [OPERATOR_CONTEXT_PATH, OPERATOR_LOGOUT_PATH, '/api/terminal/caixa/'];
 
 export const terminalAuthInterceptor: HttpInterceptorFn = (req, next) => {
   const credentialStore = inject(TERMINAL_CREDENTIAL_STORE);
@@ -23,7 +24,7 @@ export const terminalAuthInterceptor: HttpInterceptorFn = (req, next) => {
       ? req.clone({ setHeaders: { Authorization: `Terminal ${token}` } })
       : req;
   const shouldInvalidateTerminalOnAuthError =
-    isAuthenticatedTerminalRequest && req.url !== OPERATOR_CONTEXT_PATH && req.url !== OPERATOR_LOGOUT_PATH;
+    isAuthenticatedTerminalRequest && !OPERATOR_SCOPED_PATHS.some((path) => req.url.startsWith(path));
 
   return next(request).pipe(
     catchError((error: unknown) => {

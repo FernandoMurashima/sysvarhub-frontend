@@ -132,4 +132,27 @@ describe('terminalAuthInterceptor', () => {
     expect(credentialStore.clearToken).not.toHaveBeenCalled();
     expect(router.navigateByUrl).not.toHaveBeenCalled();
   });
+
+  it('401 em endpoint de caixa nao limpa Terminal', () => {
+    credentialStore.getToken.and.returnValue('token-ficticio');
+
+    http.get('/api/terminal/caixa/status/').subscribe({ error: () => undefined });
+    const request = httpMock.expectOne('/api/terminal/caixa/status/');
+    request.flush({}, { status: 401, statusText: 'Unauthorized' });
+
+    expect(request.request.headers.get('Authorization')).toBe('Terminal token-ficticio');
+    expect(credentialStore.clearToken).not.toHaveBeenCalled();
+    expect(router.navigateByUrl).not.toHaveBeenCalled();
+  });
+
+  it('401 no login do operador pode limpar Terminal', () => {
+    credentialStore.getToken.and.returnValue('token-ficticio');
+
+    http.post('/api/terminal/operador/login/', {}).subscribe({ error: () => undefined });
+    const request = httpMock.expectOne('/api/terminal/operador/login/');
+    request.flush({}, { status: 401, statusText: 'Unauthorized' });
+
+    expect(credentialStore.clearToken).toHaveBeenCalled();
+    expect(router.navigateByUrl).toHaveBeenCalledWith('/pareamento');
+  });
 });

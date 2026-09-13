@@ -67,6 +67,28 @@
           <div class="select-like readonly-like">Venda ainda não iniciada</div>
         </label>
         <label>
+          Caixa Local
+          <div class="select-like readonly-like caixa-state" [class.open]="caixaStatus() === 'aberto'">
+            @if (caixaStatus() === 'inicializando') {
+              Consultando caixa local...
+            } @else if (caixaStatus() === 'aberto') {
+              CAIXA ABERTO
+            } @else if (caixaStatus() === 'fechado') {
+              CAIXA FECHADO
+            } @else {
+              Falha ao consultar caixa
+            }
+          </div>
+        </label>
+        @if (sessaoCaixa()) {
+          <label>
+            Abertura
+            <div class="select-like readonly-like">
+              {{ formatarDataHora(sessaoCaixa()?.abertoEm) }} · Fundo {{ formatarMoeda(sessaoCaixa()?.valorAbertura) }}
+            </div>
+          </label>
+        }
+        <label>
           Código do Cliente
           <div class="select-like readonly-like">Consumidor final pendente</div>
         </label>
@@ -218,6 +240,48 @@
         <strong>{{ mensagemAlerta }}</strong>
         <span>Pressione ENTER para continuar</span>
       </div>
+    </div>
+  }
+
+  @if (caixaStatus() === 'fechado') {
+    <div class="pdv-modal-backdrop caixa-opening-backdrop">
+      <section class="pdv-modal caixa-opening-modal">
+        <header>
+          <div>
+            <strong>ABERTURA DE CAIXA</strong>
+            <span>{{ data }} · {{ caixa() }}</span>
+          </div>
+        </header>
+
+        <form class="caixa-opening-form" (submit)="abrirCaixa($event)">
+          <div class="opening-context">
+            <article><span>Loja</span><strong>{{ loja() }}</strong></article>
+            <article><span>Caixa</span><strong>{{ caixa() }}</strong></article>
+            <article><span>Terminal</span><strong>{{ terminal() }}</strong></article>
+            <article><span>Operador</span><strong>{{ operador()?.nome }}</strong><small>{{ operador()?.codigo }}</small></article>
+          </div>
+
+          <label>
+            Valor de abertura / Fundo de troco
+            <input
+              name="valorAbertura"
+              [(ngModel)]="valorAbertura"
+              inputmode="decimal"
+              autocomplete="off"
+              [disabled]="abrindoCaixa"
+              (focus)="selecionarValorAbertura($event)"
+            />
+          </label>
+
+          @if (erroAbertura) {
+            <p class="opening-error">{{ erroAbertura }}</p>
+          }
+
+          <button type="submit" [disabled]="abrindoCaixa">
+            {{ abrindoCaixa ? 'Abrindo...' : 'Abrir Caixa' }}
+          </button>
+        </form>
+      </section>
     </div>
   }
 

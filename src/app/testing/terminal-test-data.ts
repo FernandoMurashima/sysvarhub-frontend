@@ -1,4 +1,5 @@
 import { CatalogoResponse } from '../core/models/catalogo.models';
+import { CaixaStatusResponse, SessaoCaixaHubResumo } from '../core/models/caixa.models';
 import { OperadorContextoResponse, OperadorLoginResponse } from '../core/models/operador.models';
 import { TerminalContexto } from '../core/models/terminal.models';
 
@@ -73,4 +74,29 @@ export const operadorContextoResponseStub: OperadorContextoResponse = {
     ultimaAtividadeEm: '2026-09-13T10:35:00',
   },
   operador: operadorLoginResponseStub.operador,
+};
+
+export const sessaoCaixaAbertaStub: SessaoCaixaHubResumo = {
+  uuid: 'sessao-caixa-uuid',
+  status: 'ABERTO',
+  valorAbertura: '100.00',
+  abertoEm: '2026-09-13T12:00:00',
+  fechadoEm: null,
+  caixa: { id: 29, codigo: 'CX-BARRA', descricao: 'Caixa Loja Barra', ativo: true },
+  terminalAbertura: { uuid: 'terminal-uuid-ficticio', codigo: 'PDV-01', nome: 'PDV 01' },
+  operadorAbertura: operadorLoginResponseStub.operador,
+  terminalFechamento: null,
+  operadorFechamento: null,
+};
+
+export const caixaStatusFechadoStub: CaixaStatusResponse = {
+  caixa: { id: 29, codigo: 'CX-BARRA', descricao: 'Caixa Loja Barra', ativo: true },
+  aberto: false,
+  sessao: null,
+};
+
+export const caixaStatusAbertoStub: CaixaStatusResponse = {
+  caixa: sessaoCaixaAbertaStub.caixa,
+  aberto: true,
+  sessao: sessaoCaixaAbertaStub,
 };

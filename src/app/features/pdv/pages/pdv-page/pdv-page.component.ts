@@ -1,8 +1,10 @@
-import { Component, HostListener, inject, OnDestroy } from '@angular/core';
+import { Component, HostListener, inject, OnDestroy, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { Subscription } from 'rxjs';
 
+import { CaixaSessionService } from '../../../caixa/services/caixa-session.service';
+import { normalizarValorAbertura } from '../../../caixa/services/caixa-valor.parser';
 import { OperatorSessionService } from '../../../operador/services/operator-session.service';
 import { PdvProdutoConsulta } from '../../models/pdv-produto-consulta.model';
 import { PdvHubFacade } from '../../services/pdv-hub.facade';
@@ -25,9 +27,10 @@ type PdvAtalho =
   templateUrl: './pdv-page.component.html',
   styleUrl: './pdv-page.component.scss',
 })
-export class PdvPageComponent implements OnDestroy {
+export class PdvPageComponent implements OnInit, OnDestroy {
   readonly facade = inject(PdvHubFacade);
   private readonly operatorSession = inject(OperatorSessionService);
+  private readonly caixaSession = inject(CaixaSessionService);
   private readonly router = inject(Router);
 
   busca = '';
@@ -43,6 +46,9 @@ export class PdvPageComponent implements OnDestroy {
   tabelaPreco = '-';
   catalogoVersao: number | null = null;
   catalogoSincronizadoEm: string | null = null;
+  valorAbertura = '0,00';
+  erroAbertura = '';
+  abrindoCaixa = false;
   readonly vendedor = '-';
   private buscaTimer: ReturnType<typeof setTimeout> | null = null;
   private buscaSubscription: Subscription | null = null;
@@ -52,6 +58,12 @@ export class PdvPageComponent implements OnDestroy {
   readonly terminal = this.facade.terminal;
   readonly empresa = this.facade.empresa;
   readonly operador = this.operatorSession.operador;
+  readonly caixaStatus = this.caixaSession.status;
+  readonly sessaoCaixa = this.caixaSession.sessao;
+
+  ngOnInit(): void {
+    this.caixaSession.bootstrap().subscribe();
+  }
 
   get hora(): string {
     return new Intl.DateTimeFormat('pt-BR', { hour: '2-digit', minute: '2-digit' }).format(new Date());
@@ -134,13 +146,15 @@ export class PdvPageComponent implements OnDestroy {
   selecionarProduto(produto: PdvProdutoConsulta): void {
     this.produtoSelecionado = produto;
     this.mensagem = produto.vendavel
-      ? 'Produto selecionado para consulta. Venda será habilitada após abertura do caixa.'
+      ? this.mensagemVendaPendente()
       : `Produto bloqueado: ${this.motivos(produto)}`;
   }
 
   tentarAdicionarProduto(produto: PdvProdutoConsulta | null): void {
     if (produto) this.selecionarProduto(produto);
-    this.mensagem = 'Operação de venda será habilitada após abertura do caixa.';
+    this.mensagem = this.caixaStatus() === 'aberto'
+      ? 'Caixa aberto. Integração da venda será habilitada na próxima etapa.'
+      : 'Operação de venda será habilitada após abertura do caixa.';
   }
 
   limpar(): void {
@@ -169,6 +183,34 @@ export class PdvPageComponent implements OnDestroy {
     this.modalAtalho = '';
     this.buscaModal = '';
     this.produtosPreco = [];
+  }
+
+  selecionarValorAbertura(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    input.select();
+  }
+
+  abrirCaixa(event?: Event): void {
+    event?.preventDefault();
+    if (this.abrindoCaixa) return;
+
+    const valor = normalizarValorAbertura(this.valorAbertura);
+    if (!valor) {
+      this.erroAbertura = 'Valor de abertura inválido.';
+      return;
+    }
+
+    this.abrindoCaixa = true;
+    this.erroAbertura = '';
+    this.caixaSession.abrir(valor).subscribe((resultado) => {
+      this.abrindoCaixa = false;
+      if (!resultado.ok) {
+        this.erroAbertura = resultado.detail || 'Falha de comunicação com o Hub local.';
+        return;
+      }
+      this.valorAbertura = '0,00';
+      this.mensagem = 'Caixa aberto. Integração da venda será habilitada na próxima etapa.';
+    });
   }
 
   trocarOperador(): void {
@@ -208,6 +250,18 @@ export class PdvPageComponent implements OnDestroy {
     const numero = Number(valor);
     if (Number.isNaN(numero)) return valor;
     return numero.toLocaleString('pt-BR', { maximumFractionDigits: 3 });
+  }
+
+  formatarDataHora(valor: string | null | undefined): string {
+    if (!valor) return '-';
+    return new Intl.DateTimeFormat('pt-BR', { hour: '2-digit', minute: '2-digit' }).format(new Date(valor));
+  }
+
+  formatarMoeda(valor: string | null | undefined): string {
+    if (!valor) return 'R$ 0,00';
+    const normalizado = valor.replace(',', '.');
+    const [inteiro, decimal = '00'] = normalizado.split('.');
+    return `R$ ${Number(inteiro).toLocaleString('pt-BR')},${decimal.padEnd(2, '0').slice(0, 2)}`;
   }
 
   motivos(produto: PdvProdutoConsulta): string {
@@ -255,5 +309,11 @@ export class PdvPageComponent implements OnDestroy {
     this.tabelaPreco = tabela || '-';
     this.catalogoVersao = versao;
     this.catalogoSincronizadoEm = sincronizadoEm;
+  }
+
+  private mensagemVendaPendente(): string {
+    return this.caixaStatus() === 'aberto'
+      ? 'Caixa aberto. Integração da venda será habilitada na próxima etapa.'
+      : 'Produto selecionado para consulta. Venda será habilitada após abertura do caixa.';
   }
 }
