@@ -3,9 +3,11 @@ import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { Subscription } from 'rxjs';
 
+import { VendaItemHubResumo } from '../../../../core/models/venda.models';
 import { CaixaSessionService } from '../../../caixa/services/caixa-session.service';
 import { normalizarValorAbertura } from '../../../caixa/services/caixa-valor.parser';
 import { OperatorSessionService } from '../../../operador/services/operator-session.service';
+import { VendaSessionService } from '../../../venda/services/venda-session.service';
 import { PdvProdutoConsulta } from '../../models/pdv-produto-consulta.model';
 import { PdvHubFacade } from '../../services/pdv-hub.facade';
 
@@ -31,6 +33,7 @@ export class PdvPageComponent implements OnInit, OnDestroy {
   readonly facade = inject(PdvHubFacade);
   private readonly operatorSession = inject(OperatorSessionService);
   private readonly caixaSession = inject(CaixaSessionService);
+  private readonly vendaSession = inject(VendaSessionService);
   private readonly router = inject(Router);
 
   busca = '';
@@ -39,6 +42,8 @@ export class PdvPageComponent implements OnInit, OnDestroy {
   produtosPreco: PdvProdutoConsulta[] = [];
   produtoSelecionado: PdvProdutoConsulta | null = null;
   carrinho: PdvProdutoConsulta[] = [];
+  itemSelecionadoUuid: string | null = null;
+  itemOperandoUuid: string | null = null;
   mensagem = '';
   mensagemAlerta = '';
   modalAtalho: PdvAtalho | '' = '';
@@ -60,9 +65,18 @@ export class PdvPageComponent implements OnInit, OnDestroy {
   readonly operador = this.operatorSession.operador;
   readonly caixaStatus = this.caixaSession.status;
   readonly sessaoCaixa = this.caixaSession.sessao;
+  readonly vendaStatus = this.vendaSession.status;
+  readonly venda = this.vendaSession.venda;
+  readonly vendaLoading = this.vendaSession.loadingOperacao;
 
   ngOnInit(): void {
-    this.caixaSession.bootstrap().subscribe();
+    this.caixaSession.bootstrap().subscribe((aberto) => {
+      if (aberto) {
+        this.vendaSession.bootstrap().subscribe();
+      } else {
+        this.vendaSession.limparEstado();
+      }
+    });
   }
 
   get hora(): string {
@@ -151,10 +165,8 @@ export class PdvPageComponent implements OnInit, OnDestroy {
   }
 
   tentarAdicionarProduto(produto: PdvProdutoConsulta | null): void {
-    if (produto) this.selecionarProduto(produto);
-    this.mensagem = this.caixaStatus() === 'aberto'
-      ? 'Caixa aberto. Integração da venda será habilitada na próxima etapa.'
-      : 'Operação de venda será habilitada após abertura do caixa.';
+    if (!produto) return;
+    this.adicionarProduto(produto);
   }
 
   limpar(): void {
@@ -172,6 +184,35 @@ export class PdvPageComponent implements OnInit, OnDestroy {
       this.modalAtalho = 'preco';
       this.buscaModal = this.busca;
       this.produtosPreco = this.produtos;
+      return;
+    }
+
+    if (atalho === 'cancelar-item') {
+      const item = this.venda()?.itens.find((linha) => linha.uuid === this.itemSelecionadoUuid);
+      if (!item) {
+        this.mensagem = 'Selecione um item para cancelar.';
+        return;
+      }
+      this.removerItem(item);
+      return;
+    }
+
+    if (atalho === 'cancelar-venda') {
+      if (!this.venda()) {
+        this.mensagem = 'Nenhuma venda em andamento.';
+        return;
+      }
+      this.modalAtalho = 'cancelar-venda';
+      return;
+    }
+
+    if (atalho === 'pagamentos') {
+      this.mensagem = 'Pagamento será habilitado na próxima etapa.';
+      return;
+    }
+
+    if (atalho === 'fechamento') {
+      this.mensagem = 'Fechamento de caixa será integrado em etapa posterior.';
       return;
     }
 
@@ -209,7 +250,8 @@ export class PdvPageComponent implements OnInit, OnDestroy {
         return;
       }
       this.valorAbertura = '0,00';
-      this.mensagem = 'Caixa aberto. Integração da venda será habilitada na próxima etapa.';
+      this.mensagem = 'Caixa aberto. Venda local pronta para bipagem.';
+      this.vendaSession.bootstrap().subscribe();
     });
   }
 
@@ -264,8 +306,66 @@ export class PdvPageComponent implements OnInit, OnDestroy {
     return `R$ ${Number(inteiro).toLocaleString('pt-BR')},${decimal.padEnd(2, '0').slice(0, 2)}`;
   }
 
+  totalDescontos(): string {
+    const venda = this.venda();
+    if (!venda) return '0.00';
+    const descontoItens = Number(venda.descontoItens || '0');
+    const descontoGeral = Number(venda.descontoGeral || '0');
+    return (descontoItens + descontoGeral).toFixed(2);
+  }
+
   motivos(produto: PdvProdutoConsulta): string {
     return produto.motivosBloqueio.length ? produto.motivosBloqueio.join(', ') : '-';
+  }
+
+  codigoItemVenda(item: VendaItemHubResumo): string {
+    return item.ean13 || item.codigoItemRef || item.referencia || '-';
+  }
+
+  selecionarItemVenda(item: VendaItemHubResumo): void {
+    this.itemSelecionadoUuid = item.uuid;
+  }
+
+  aumentarItem(item: VendaItemHubResumo): void {
+    this.alterarQuantidadeItem(item, item.quantidade + 1);
+  }
+
+  diminuirItem(item: VendaItemHubResumo): void {
+    if (item.quantidade <= 1) {
+      this.mensagem = 'Use remover para excluir item com quantidade 1.';
+      return;
+    }
+    this.alterarQuantidadeItem(item, item.quantidade - 1);
+  }
+
+  alterarQuantidadeItem(item: VendaItemHubResumo, quantidade: number): void {
+    this.itemOperandoUuid = item.uuid;
+    this.vendaSession.alterarQuantidade(item.uuid, quantidade).subscribe((resultado) => {
+      this.itemOperandoUuid = null;
+      this.tratarResultadoOperacao(resultado, 'Quantidade atualizada.');
+    });
+  }
+
+  removerItem(item: VendaItemHubResumo): void {
+    this.itemOperandoUuid = item.uuid;
+    this.vendaSession.removerItem(item.uuid).subscribe((resultado) => {
+      this.itemOperandoUuid = null;
+      if (this.itemSelecionadoUuid === item.uuid) this.itemSelecionadoUuid = null;
+      this.tratarResultadoOperacao(resultado, 'Item removido.');
+    });
+  }
+
+  cancelarVendaConfirmada(): void {
+    this.vendaSession.cancelarVenda().subscribe((resultado) => {
+      this.fecharAtalho();
+      if (resultado.ok) {
+        this.itemSelecionadoUuid = null;
+        this.produtoSelecionado = null;
+        this.mensagem = 'Venda cancelada.';
+        return;
+      }
+      this.tratarResultadoOperacao(resultado, 'Venda cancelada.');
+    });
   }
 
   private consultarProdutos(termo: string, selecionarExato = false): void {
@@ -281,8 +381,9 @@ export class PdvPageComponent implements OnInit, OnDestroy {
           const exato = this.encontrarProdutoExato(termo, resultado.itens);
           if (exato) {
             this.selecionarProduto(exato);
-            this.produtos = [];
-            this.busca = '';
+            if (exato.vendavel) {
+              this.adicionarProduto(exato);
+            }
           }
         }
       },
@@ -313,7 +414,42 @@ export class PdvPageComponent implements OnInit, OnDestroy {
 
   private mensagemVendaPendente(): string {
     return this.caixaStatus() === 'aberto'
-      ? 'Caixa aberto. Integração da venda será habilitada na próxima etapa.'
+      ? 'Produto selecionado. Pressione ENTER no código exato ou use Adicionar.'
       : 'Produto selecionado para consulta. Venda será habilitada após abertura do caixa.';
+  }
+
+  private adicionarProduto(produto: PdvProdutoConsulta): void {
+    this.produtoSelecionado = produto;
+    if (this.caixaStatus() !== 'aberto') {
+      this.mensagem = 'Operação de venda será habilitada após abertura do caixa.';
+      return;
+    }
+    if (!produto.vendavel) {
+      this.mensagem = `Produto bloqueado: ${this.motivos(produto)}`;
+      return;
+    }
+
+    this.vendaSession.adicionarItem(produto.skuId, 1).subscribe((resultado) => {
+      this.tratarResultadoOperacao(resultado, 'Item adicionado.');
+      if (resultado.ok) {
+        this.produtos = [];
+        this.busca = '';
+      }
+    });
+  }
+
+  private tratarResultadoOperacao(resultado: { ok: boolean; detail?: string; estoqueDisponivel?: string }, sucesso: string): void {
+    if (resultado.ok) {
+      this.mensagem = sucesso;
+      return;
+    }
+    if (resultado.detail === 'Saldo disponível insuficiente.' && resultado.estoqueDisponivel) {
+      this.mensagem = `Saldo disponível insuficiente. Disponível para nova inclusão: ${this.formatarQuantidade(resultado.estoqueDisponivel)}.`;
+      return;
+    }
+    if (resultado.detail === 'Caixa não está aberto.') {
+      this.caixaSession.bootstrap().subscribe();
+    }
+    this.mensagem = resultado.detail || 'Falha de comunicação com o Hub local.';
   }
 }

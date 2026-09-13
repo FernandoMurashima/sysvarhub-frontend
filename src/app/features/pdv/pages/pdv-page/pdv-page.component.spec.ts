@@ -7,7 +7,8 @@ import { of } from 'rxjs';
 import { SessaoCaixaHubResumo } from '../../../../core/models/caixa.models';
 import { CaixaSessionService } from '../../../caixa/services/caixa-session.service';
 import { OperatorSessionService } from '../../../operador/services/operator-session.service';
-import { sessaoCaixaAbertaStub } from '../../../../testing/terminal-test-data';
+import { VendaSessionService } from '../../../venda/services/venda-session.service';
+import { sessaoCaixaAbertaStub, vendaAbertaStub } from '../../../../testing/terminal-test-data';
 import { PdvCatalogoConsulta, PdvProdutoConsulta } from '../../models/pdv-produto-consulta.model';
 import { PdvHubFacade } from '../../services/pdv-hub.facade';
 import { PdvPageComponent } from './pdv-page.component';
@@ -67,8 +68,12 @@ describe('PdvPageComponent', () => {
   let facade: jasmine.SpyObj<PdvHubFacade>;
   let operatorSession: jasmine.SpyObj<OperatorSessionService>;
   let caixaSession: jasmine.SpyObj<CaixaSessionService>;
+  let vendaSession: jasmine.SpyObj<VendaSessionService>;
   let caixaStatusSignal = signal<'inicializando' | 'fechado' | 'aberto' | 'erro'>('aberto');
   let sessaoCaixaSignal = signal<SessaoCaixaHubResumo | null>(sessaoCaixaAbertaStub);
+  let vendaSignal = signal(vendaAbertaStub.venda);
+  let vendaStatusSignal = signal<'inicializando' | 'sem-venda' | 'aberta' | 'erro'>('aberta');
+  let vendaLoadingSignal = signal(false);
   let router: Router;
 
   function catalogo(itens: PdvProdutoConsulta[]): PdvCatalogoConsulta {
@@ -110,6 +115,19 @@ describe('PdvPageComponent', () => {
     });
     caixaSession.bootstrap.and.returnValue(of(true));
     caixaSession.abrir.and.returnValue(of({ ok: true }));
+    vendaSignal = signal(vendaAbertaStub.venda);
+    vendaStatusSignal = signal<'inicializando' | 'sem-venda' | 'aberta' | 'erro'>('aberta');
+    vendaLoadingSignal = signal(false);
+    vendaSession = jasmine.createSpyObj<VendaSessionService>('VendaSessionService', ['bootstrap', 'adicionarItem', 'alterarQuantidade', 'removerItem', 'cancelarVenda', 'limparEstado'], {
+      venda: vendaSignal.asReadonly(),
+      status: vendaStatusSignal.asReadonly(),
+      loadingOperacao: vendaLoadingSignal.asReadonly(),
+    });
+    vendaSession.bootstrap.and.returnValue(of(true));
+    vendaSession.adicionarItem.and.returnValue(of({ ok: true }));
+    vendaSession.alterarQuantidade.and.returnValue(of({ ok: true }));
+    vendaSession.removerItem.and.returnValue(of({ ok: true }));
+    vendaSession.cancelarVenda.and.returnValue(of({ ok: true }));
 
     await TestBed.configureTestingModule({
       imports: [PdvPageComponent, RouterTestingModule.withRoutes([{ path: 'operador', component: EmptyRouteComponent }])],
@@ -117,6 +135,7 @@ describe('PdvPageComponent', () => {
         { provide: PdvHubFacade, useValue: facade },
         { provide: OperatorSessionService, useValue: operatorSession },
         { provide: CaixaSessionService, useValue: caixaSession },
+        { provide: VendaSessionService, useValue: vendaSession },
       ],
     }).compileComponents();
 
@@ -148,6 +167,7 @@ describe('PdvPageComponent', () => {
     const text = fixture.nativeElement.textContent;
 
     expect(caixaSession.bootstrap).toHaveBeenCalled();
+    expect(vendaSession.bootstrap).toHaveBeenCalled();
     expect(text).toContain('CAIXA ABERTO');
     expect(text).toContain('Fundo R$ 100,00');
   });
@@ -216,8 +236,8 @@ describe('PdvPageComponent', () => {
     expect(text).toContain('Calça Jeans Reta Aurora');
     expect(text).toContain('7892701000013');
     expect(text).toContain('199,90');
-    expect(text).toContain('Caixa aberto. Integração da venda será habilitada na próxima etapa.');
-    expect(component.carrinho.length).toBe(0);
+    expect(text).toContain('Produto selecionado. Pressione ENTER no código exato ou use Adicionar.');
+    expect(component.venda()?.itens.length).toBe(1);
   });
 
   it('troca operador limpa sessao operacional sem mexer no carrinho', () => {
@@ -273,7 +293,7 @@ describe('PdvPageComponent', () => {
 
     component.atalhoF10(new KeyboardEvent('keydown', { key: 'F10' }));
 
-    expect(component.modalAtalho).toBe('fechamento');
+    expect(component.mensagem).toBe('Fechamento de caixa será integrado em etapa posterior.');
     expect(caixaSession.abrir).not.toHaveBeenCalled();
   });
 
@@ -284,7 +304,7 @@ describe('PdvPageComponent', () => {
     component.aoEnterBusca(new KeyboardEvent('keydown', { key: 'Enter' }));
 
     expect(component.produtoSelecionado?.skuId).toBe(10825);
-    expect(component.carrinho.length).toBe(0);
+    expect(vendaSession.adicionarItem).toHaveBeenCalledWith(10825, 1);
   });
 
   it('preco null nao ganha fallback', () => {
@@ -295,7 +315,6 @@ describe('PdvPageComponent', () => {
 
     expect(component.formatarPreco(produtoSemPreco.precoVenda)).toBe('-');
     expect(fixture.nativeElement.textContent).toContain('SEM_PRECO');
-    expect(fixture.nativeElement.textContent).not.toContain('199,90');
     expect(fixture.nativeElement.textContent).not.toContain('399,90');
   });
 
@@ -309,7 +328,7 @@ describe('PdvPageComponent', () => {
 
     component.abrirAtalho(new Event('click'), 'pagamentos');
 
-    expect(component.mensagem).toBe('Recurso ainda não integrado ao Hub.');
+    expect(component.mensagem).toBe('Pagamento será habilitado na próxima etapa.');
     expect(facade.buscarCatalogo).not.toHaveBeenCalled();
   });
 });

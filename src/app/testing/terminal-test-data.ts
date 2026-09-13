@@ -2,6 +2,7 @@ import { CatalogoResponse } from '../core/models/catalogo.models';
 import { CaixaStatusResponse, SessaoCaixaHubResumo } from '../core/models/caixa.models';
 import { OperadorContextoResponse, OperadorLoginResponse } from '../core/models/operador.models';
 import { TerminalContexto } from '../core/models/terminal.models';
+import { VendaAtualResponse } from '../core/models/venda.models';
 
 export const terminalContextoStub: TerminalContexto = {
   terminal: {
@@ -99,4 +100,40 @@ export const caixaStatusAbertoStub: CaixaStatusResponse = {
   caixa: sessaoCaixaAbertaStub.caixa,
   aberto: true,
   sessao: sessaoCaixaAbertaStub,
+};
+
+export const vendaAbertaStub: VendaAtualResponse = {
+  venda: {
+    uuid: 'venda-hub-uuid',
+    status: 'ABERTA',
+    criadaEm: '2026-09-13T12:10:00',
+    subtotal: '199.90',
+    descontoItens: '0.00',
+    descontoGeral: '0.00',
+    total: '199.90',
+    operadorCriacao: operadorLoginResponseStub.operador,
+    itens: [
+      {
+        uuid: 'item-venda-uuid',
+        produtoId: 2050,
+        skuId: 10825,
+        ean13: '7892701000013',
+        referencia: '27-01-01001',
+        codigoItemRef: '00001',
+        descricao: 'Calça Jeans Reta Aurora',
+        descricaoReduzida: 'Calça Jeans',
+        cor: 'Jeans',
+        tamanho: '34',
+        unidade: 'UN',
+        quantidade: 1,
+        precoUnitario: '199.9000',
+        desconto: '0.00',
+        totalItem: '199.90',
+      },
+    ],
+  },
+};
+
+export const vendaAtualSemVendaStub: VendaAtualResponse = {
+  venda: null,
 };
