@@ -1,5 +1,6 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { TestBed } from '@angular/core/testing';
+import { Router } from '@angular/router';
 import { of, throwError } from 'rxjs';
 
 import { caixaStatusAbertoStub, caixaStatusFechadoStub, sessaoCaixaAbertaStub } from '../../../testing/terminal-test-data';
@@ -11,20 +12,31 @@ describe('CaixaSessionService', () => {
   let service: CaixaSessionService;
   let hubCaixaService: jasmine.SpyObj<HubCaixaService>;
   let operatorSession: jasmine.SpyObj<OperatorSessionService>;
+  let router: jasmine.SpyObj<Router>;
 
   beforeEach(() => {
     hubCaixaService = jasmine.createSpyObj<HubCaixaService>('HubCaixaService', ['status', 'abrir', 'fechar']);
     operatorSession = jasmine.createSpyObj<OperatorSessionService>('OperatorSessionService', ['invalidarSessao']);
+    router = jasmine.createSpyObj<Router>('Router', ['navigateByUrl']);
+    router.navigateByUrl.and.resolveTo(true);
 
     TestBed.configureTestingModule({
       providers: [
         CaixaSessionService,
         { provide: HubCaixaService, useValue: hubCaixaService },
         { provide: OperatorSessionService, useValue: operatorSession },
+        { provide: Router, useValue: router },
       ],
     });
     service = TestBed.inject(CaixaSessionService);
   });
+
+  function carregarEstadoAberto(): void {
+    hubCaixaService.status.and.returnValue(of(caixaStatusAbertoStub));
+    service.carregarStatus().subscribe();
+    expect(service.status()).toBe('aberto');
+    hubCaixaService.status.calls.reset();
+  }
 
   it('fechado muda status para fechado', (done) => {
     hubCaixaService.status.and.returnValue(of(caixaStatusFechadoStub));
@@ -83,6 +95,7 @@ describe('CaixaSessionService', () => {
       expect(resultado.ok).toBeTrue();
       expect(service.status()).toBe('aberto');
       expect(service.sessao()?.valorAbertura).toBe('100.00');
+      expect(router.navigateByUrl).not.toHaveBeenCalled();
       done();
     });
   });
@@ -97,16 +110,69 @@ describe('CaixaSessionService', () => {
       expect(resultado.ok).toBeFalse();
       expect(resultado.detail).toBe('Valor de abertura inválido.');
       expect(operatorSession.invalidarSessao).not.toHaveBeenCalled();
+      expect(router.navigateByUrl).not.toHaveBeenCalled();
       done();
     });
   });
 
-  it('401 invalida somente operador', (done) => {
+  it('401 em carregarStatus invalida operador, limpa caixa e navega para operador', (done) => {
+    carregarEstadoAberto();
     hubCaixaService.status.and.returnValue(throwError(() => new HttpErrorResponse({ status: 401 })));
 
     service.carregarStatus().subscribe(() => {
       expect(operatorSession.invalidarSessao).toHaveBeenCalled();
       expect(service.status()).toBe('inicializando');
+      expect(service.caixa()).toBeNull();
+      expect(service.sessao()).toBeNull();
+      expect(router.navigateByUrl).toHaveBeenCalledOnceWith('/operador');
+      expect(router.navigateByUrl).not.toHaveBeenCalledWith('/pareamento');
+      done();
+    });
+  });
+
+  it('403 em carregarStatus invalida operador, limpa caixa e navega para operador', (done) => {
+    carregarEstadoAberto();
+    hubCaixaService.status.and.returnValue(throwError(() => new HttpErrorResponse({ status: 403 })));
+
+    service.carregarStatus().subscribe(() => {
+      expect(operatorSession.invalidarSessao).toHaveBeenCalled();
+      expect(service.status()).toBe('inicializando');
+      expect(service.caixa()).toBeNull();
+      expect(service.sessao()).toBeNull();
+      expect(router.navigateByUrl).toHaveBeenCalledOnceWith('/operador');
+      expect(router.navigateByUrl).not.toHaveBeenCalledWith('/pareamento');
+      done();
+    });
+  });
+
+  it('401 em abrir invalida somente operador e navega para operador', (done) => {
+    carregarEstadoAberto();
+    hubCaixaService.abrir.and.returnValue(throwError(() => new HttpErrorResponse({ status: 401 })));
+
+    service.abrir('100.00').subscribe((resultado) => {
+      expect(resultado.ok).toBeFalse();
+      expect(operatorSession.invalidarSessao).toHaveBeenCalled();
+      expect(service.status()).toBe('inicializando');
+      expect(service.caixa()).toBeNull();
+      expect(service.sessao()).toBeNull();
+      expect(router.navigateByUrl).toHaveBeenCalledOnceWith('/operador');
+      expect(router.navigateByUrl).not.toHaveBeenCalledWith('/pareamento');
+      done();
+    });
+  });
+
+  it('403 em abrir invalida somente operador e navega para operador', (done) => {
+    carregarEstadoAberto();
+    hubCaixaService.abrir.and.returnValue(throwError(() => new HttpErrorResponse({ status: 403 })));
+
+    service.abrir('100.00').subscribe((resultado) => {
+      expect(resultado.ok).toBeFalse();
+      expect(operatorSession.invalidarSessao).toHaveBeenCalled();
+      expect(service.status()).toBe('inicializando');
+      expect(service.caixa()).toBeNull();
+      expect(service.sessao()).toBeNull();
+      expect(router.navigateByUrl).toHaveBeenCalledOnceWith('/operador');
+      expect(router.navigateByUrl).not.toHaveBeenCalledWith('/pareamento');
       done();
     });
   });
@@ -116,6 +182,8 @@ describe('CaixaSessionService', () => {
 
     service.carregarStatus().subscribe(() => {
       expect(service.status()).toBe('erro');
+      expect(operatorSession.invalidarSessao).not.toHaveBeenCalled();
+      expect(router.navigateByUrl).not.toHaveBeenCalled();
       done();
     });
   });

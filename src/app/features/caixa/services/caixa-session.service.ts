@@ -1,5 +1,6 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { inject, Injectable, signal } from '@angular/core';
+import { Router } from '@angular/router';
 import { catchError, map, Observable, of, tap } from 'rxjs';
 
 import { CaixaHubResumo, CaixaSessionStatus, mapSessaoCaixa, SessaoCaixaHubResumo } from '../../../core/models/caixa.models';
@@ -15,6 +16,7 @@ export interface CaixaAbrirResultado {
 export class CaixaSessionService {
   private readonly hubCaixaService = inject(HubCaixaService);
   private readonly operatorSession = inject(OperatorSessionService);
+  private readonly router = inject(Router);
 
   private readonly statusSignal = signal<CaixaSessionStatus>('inicializando');
   private readonly caixaSignal = signal<CaixaHubResumo | null>(null);
@@ -63,8 +65,7 @@ export class CaixaSessionService {
 
   private tratarErroStatus(error: unknown): Observable<boolean> {
     if (this.isAuthenticationError(error)) {
-      this.operatorSession.invalidarSessao();
-      this.limparEstado();
+      this.tratarSessaoOperadorExpirada();
       return of(false);
     }
 
@@ -79,8 +80,7 @@ export class CaixaSessionService {
     }
 
     if (this.isAuthenticationError(error)) {
-      this.operatorSession.invalidarSessao();
-      this.limparEstado();
+      this.tratarSessaoOperadorExpirada();
       return of({ ok: false, detail: 'Sessão de operador expirada.' });
     }
 
@@ -94,5 +94,11 @@ export class CaixaSessionService {
 
   private isAuthenticationError(error: unknown): boolean {
     return error instanceof HttpErrorResponse && (error.status === 401 || error.status === 403);
+  }
+
+  private tratarSessaoOperadorExpirada(): void {
+    this.operatorSession.invalidarSessao();
+    this.limparEstado();
+    void this.router.navigateByUrl('/operador');
   }
 }
