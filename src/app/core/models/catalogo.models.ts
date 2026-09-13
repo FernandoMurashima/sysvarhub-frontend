@@ -2,18 +2,23 @@ export type DecimalString = string;
 
 export interface CatalogoCor {
   id: number | null;
-  descricao: string | null;
+  descricao: string;
 }
 
 export interface CatalogoTamanho {
   id: number | null;
-  descricao: string | null;
+  descricao: string;
 }
 
 export interface CatalogoUnidade {
   id: number | null;
-  codigo: string | null;
-  descricao: string | null;
+  codigo: string;
+  descricao: string;
+}
+
+export interface CatalogoTabelaPreco {
+  codigo: string;
+  nome: string;
 }
 
 export interface CatalogoItem {
@@ -22,15 +27,15 @@ export interface CatalogoItem {
   tipo_produto: string;
   referencia: string;
   descricao: string;
-  descricao_reduzida: string | null;
+  descricao_reduzida: string;
   ean13: string | null;
-  codigo_item_ref: string | null;
-  cor: CatalogoCor | null;
-  tamanho: CatalogoTamanho | null;
-  unidade: CatalogoUnidade | null;
-  preco: DecimalString;
+  codigo_item_ref: string;
+  cor: CatalogoCor;
+  tamanho: CatalogoTamanho;
+  unidade: CatalogoUnidade;
+  preco: DecimalString | null;
   preco_promocional: DecimalString | null;
-  preco_venda: DecimalString;
+  preco_venda: DecimalString | null;
   estoque_fisico: DecimalString;
   reserva: DecimalString;
   estoque_disponivel: DecimalString;
@@ -40,10 +45,10 @@ export interface CatalogoItem {
 }
 
 export interface CatalogoResponse {
-  catalogo_versao: string | number | null;
+  catalogo_versao: number | null;
   catalogo_sincronizado_em: string | null;
-  tabela_preco: string | null;
-  q: string | null;
+  tabela_preco: CatalogoTabelaPreco;
+  q: string;
   total: number;
   limit: number;
   itens: CatalogoItem[];

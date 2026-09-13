@@ -15,25 +15,28 @@ export const terminalContextoStub: TerminalContexto = {
 };
 
 export const catalogoResponseStub: CatalogoResponse = {
-  catalogo_versao: '2026-09-13T10:00:00',
+  catalogo_versao: 1,
   catalogo_sincronizado_em: '2026-09-13T10:01:00',
-  tabela_preco: 'Varejo',
+  tabela_preco: {
+    codigo: 'PADRAO',
+    nome: 'Tabela Padrão',
+  },
   q: '7892701000013',
   total: 1,
-  limit: 20,
+  limit: 40,
   itens: [
     {
       produto_id: 2050,
       sku_id: 10825,
-      tipo_produto: 'PRODUTO',
+      tipo_produto: '1',
       referencia: '27-01-01001',
-      descricao: 'Calca Jeans Reta Aurora',
-      descricao_reduzida: 'Calca Aurora',
+      descricao: 'Calça Jeans Reta Aurora',
+      descricao_reduzida: 'Calça Jeans Reta Aurora',
       ean13: '7892701000013',
-      codigo_item_ref: '27-01-01001-34',
-      cor: { id: 1, descricao: 'Jeans' },
-      tamanho: { id: 34, descricao: '34' },
-      unidade: { id: 1, codigo: 'UN', descricao: 'Unidade' },
+      codigo_item_ref: '00001',
+      cor: { id: 113, descricao: 'Jeans' },
+      tamanho: { id: 147, descricao: '34' },
+      unidade: { id: 47, codigo: 'UN', descricao: 'Un' },
       preco: '199.9000',
       preco_promocional: null,
       preco_venda: '199.9000',
@@ -42,7 +45,7 @@ export const catalogoResponseStub: CatalogoResponse = {
       estoque_disponivel: '4.000',
       vendavel: true,
       motivos_bloqueio: [],
-      fiscal: {},
+      fiscal: { ncm: '62034200' },
     },
   ],
 };

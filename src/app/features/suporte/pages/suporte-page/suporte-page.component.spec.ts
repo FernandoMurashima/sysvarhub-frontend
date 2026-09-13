@@ -52,9 +52,39 @@ describe('SuportePageComponent', () => {
     fixture.detectChanges();
 
     expect(catalogoService.buscar).toHaveBeenCalledWith('7892701000013', 20);
+    expect(fixture.nativeElement.textContent).toContain('Tabela: PADRAO - Tabela Padrão');
     expect(fixture.nativeElement.textContent).toContain('27-01-01001');
     expect(fixture.nativeElement.textContent).toContain('199.9000');
     expect(fixture.nativeElement.textContent).toContain('4.000');
     expect(fixture.nativeElement.textContent).toContain('Sim');
+  });
+
+  it('mostra hifen quando preco de venda vier null', () => {
+    catalogoService.buscar.and.returnValue(
+      of({
+        ...catalogoResponseStub,
+        itens: [
+          {
+            ...catalogoResponseStub.itens[0],
+            preco: null,
+            preco_promocional: null,
+            preco_venda: null,
+            vendavel: false,
+            motivos_bloqueio: ['SEM_PRECO'],
+          },
+        ],
+      }),
+    );
+
+    component.form.setValue({ q: '7892701000013', limit: 20 });
+    component.pesquisar();
+    fixture.detectChanges();
+
+    const text = fixture.nativeElement.textContent;
+    expect(text).toContain('Tabela: PADRAO - Tabela Padrão');
+    expect(text).toContain('SEM_PRECO');
+    expect(text).toContain('Nao');
+    expect(text).toContain('-');
+    expect(text).not.toContain('null');
   });
 });

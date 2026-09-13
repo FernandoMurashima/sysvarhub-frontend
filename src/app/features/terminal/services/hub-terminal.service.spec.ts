@@ -37,6 +37,10 @@ describe('HubTerminalService', () => {
     service.parear({ codigo: 'XXXX-XXXX-XXXX', hostname: 'PDV-BARRA-01' }).subscribe((response) => {
       expect(response.token).toBe('token-ficticio');
       expect(response.terminal.uuid).toBe('terminal-uuid-ficticio');
+      expect(response.terminal.codigo).toBe('PDV-01');
+      expect(response.terminal.nome).toBe('PDV-01');
+      expect('hostname' in response.terminal).toBeFalse();
+      expect('ativo' in response.terminal).toBeFalse();
       expect(response.caixa?.codigo).toBe('CX-01');
       expect(response.loja.apelido).toBe('Filial 1');
       expect(response.empresa.nome).toBe('Empresa Teste Ltda');
@@ -47,7 +51,17 @@ describe('HubTerminalService', () => {
     expect(request.request.method).toBe('POST');
     expect(request.request.body).toEqual({ codigo: 'XXXX-XXXX-XXXX', hostname: 'PDV-BARRA-01' });
     expect(request.request.body.codigo_pareamento).toBeUndefined();
-    request.flush({ token: 'token-ficticio', ...terminalContextoStub });
+    request.flush({
+      token: 'token-ficticio',
+      terminal: {
+        uuid: 'terminal-uuid-ficticio',
+        codigo: 'PDV-01',
+        nome: 'PDV-01',
+      },
+      caixa: terminalContextoStub.caixa,
+      loja: terminalContextoStub.loja,
+      empresa: terminalContextoStub.empresa,
+    });
 
     expect(credentialStore.setToken).toHaveBeenCalledWith('token-ficticio');
   });

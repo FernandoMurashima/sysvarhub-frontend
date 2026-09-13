@@ -13,6 +13,12 @@ export interface HubTerminal {
   ativo: boolean;
 }
 
+export interface HubTerminalPareamento {
+  uuid: string;
+  codigo: string;
+  nome: string;
+}
+
 export interface HubEmpresa {
   id: number;
   nome: string;
@@ -46,7 +52,7 @@ export interface PareamentoRequest {
 
 export interface PareamentoResponse {
   token: string;
-  terminal: HubTerminal;
+  terminal: HubTerminalPareamento;
   caixa: HubCaixa | null;
   loja: HubLoja;
   empresa: HubEmpresa;

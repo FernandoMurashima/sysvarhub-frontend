@@ -66,11 +66,6 @@ export class TerminalSessionService {
     );
   }
 
-  definirContextoPareado(contexto: TerminalContexto): void {
-    this.contextoSignal.set(contexto);
-    this.statusSignal.set('contexto-carregado');
-  }
-
   invalidarSessao(): void {
     this.clearSession('nao-pareado');
   }

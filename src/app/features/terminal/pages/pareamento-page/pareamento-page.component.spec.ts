@@ -17,10 +17,7 @@ describe('PareamentoPageComponent', () => {
 
   beforeEach(async () => {
     hubTerminalService = jasmine.createSpyObj<HubTerminalService>('HubTerminalService', ['parear']);
-    terminalSession = jasmine.createSpyObj<TerminalSessionService>('TerminalSessionService', [
-      'definirContextoPareado',
-      'carregarContexto',
-    ]);
+    terminalSession = jasmine.createSpyObj<TerminalSessionService>('TerminalSessionService', ['carregarContexto']);
     router = jasmine.createSpyObj<Router>('Router', ['navigateByUrl']);
 
     await TestBed.configureTestingModule({
@@ -42,7 +39,19 @@ describe('PareamentoPageComponent', () => {
   });
 
   it('pareia sem exibir token e direciona para pdv', () => {
-    hubTerminalService.parear.and.returnValue(of({ token: 'token-ficticio', ...terminalContextoStub }));
+    hubTerminalService.parear.and.returnValue(
+      of({
+        token: 'token-ficticio',
+        terminal: {
+          uuid: 'terminal-uuid-ficticio',
+          codigo: 'PDV-01',
+          nome: 'PDV-01',
+        },
+        caixa: terminalContextoStub.caixa,
+        loja: terminalContextoStub.loja,
+        empresa: terminalContextoStub.empresa,
+      }),
+    );
     terminalSession.carregarContexto.and.returnValue(of(terminalContextoStub));
 
     component.form.setValue({ codigo: 'XXXX-XXXX-XXXX', hostname: 'PDV-BARRA-01' });
@@ -56,7 +65,6 @@ describe('PareamentoPageComponent', () => {
       jasmine.objectContaining({ codigo_pareamento: jasmine.any(String) }),
     );
     expect(terminalSession.carregarContexto).toHaveBeenCalled();
-    expect(terminalSession.definirContextoPareado).not.toHaveBeenCalled();
     expect(router.navigateByUrl).toHaveBeenCalledWith('/pdv');
     expect(fixture.nativeElement.textContent).not.toContain('token-ficticio');
   });

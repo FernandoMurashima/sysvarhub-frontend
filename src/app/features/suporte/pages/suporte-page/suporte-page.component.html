@@ -39,7 +39,7 @@
         <div class="catalog-meta">
           <span>Versao: {{ resultado.catalogo_versao || '-' }}</span>
           <span>Sincronizacao: {{ resultado.catalogo_sincronizado_em || '-' }}</span>
-          <span>Tabela: {{ resultado.tabela_preco || '-' }}</span>
+          <span>Tabela: {{ resultado.tabela_preco.codigo }} - {{ resultado.tabela_preco.nome }}</span>
           <span>Total: {{ resultado.total }}</span>
         </div>
 
@@ -64,9 +64,9 @@
                   <td>{{ item.referencia }}</td>
                   <td>{{ item.descricao }}</td>
                   <td>{{ item.ean13 || '-' }}</td>
-                  <td>{{ item.cor?.descricao || '-' }}</td>
-                  <td>{{ item.tamanho?.descricao || '-' }}</td>
-                  <td>{{ item.preco_venda }}</td>
+                  <td>{{ item.cor.descricao || '-' }}</td>
+                  <td>{{ item.tamanho.descricao || '-' }}</td>
+                  <td>{{ item.preco_venda || '-' }}</td>
                   <td>{{ item.estoque_disponivel }}</td>
                   <td>{{ item.vendavel ? 'Sim' : 'Nao' }}</td>
                   <td>{{ item.motivos_bloqueio.join(', ') || '-' }}</td>
