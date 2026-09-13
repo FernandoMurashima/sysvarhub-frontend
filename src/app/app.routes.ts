@@ -9,7 +9,6 @@ export const routes: Routes = [
   {
     path: '',
     pathMatch: 'full',
-    canActivate: [terminalSessionGuard],
     redirectTo: 'pdv',
   },
   {
