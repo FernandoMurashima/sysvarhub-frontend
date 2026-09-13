@@ -1,0 +1,26 @@
+<main class="page pdv-page">
+  <section class="panel">
+    <div class="topbar">
+      <div>
+        <p class="eyebrow">Operacao local</p>
+        <h1>PDV Sysvar Hub</h1>
+      </div>
+      <a routerLink="/suporte" class="support-link">Suporte</a>
+    </div>
+
+    <div class="summary-grid">
+      <article class="card">
+        <span>Loja</span>
+        <strong>{{ loja() }}</strong>
+      </article>
+      <article class="card">
+        <span>Caixa</span>
+        <strong>{{ caixa() }}</strong>
+      </article>
+      <article class="card">
+        <span>Terminal</span>
+        <strong>{{ terminal() }}</strong>
+      </article>
+    </div>
+  </section>
+</main>

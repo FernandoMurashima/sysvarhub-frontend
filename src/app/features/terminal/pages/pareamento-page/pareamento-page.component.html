@@ -1,0 +1,31 @@
+<main class="page pairing-page">
+  <section class="pairing-card card">
+    <div class="header">
+      <p class="eyebrow">Sysvar Hub</p>
+      <h1>Pareamento do terminal</h1>
+      <p class="muted">Vincule este equipamento ao Hub local da loja para iniciar a operacao.</p>
+    </div>
+
+    <form [formGroup]="form" (ngSubmit)="parear()" class="form">
+      <div class="field">
+        <label for="codigo_pareamento">Codigo de pareamento</label>
+        <input id="codigo_pareamento" type="text" formControlName="codigo_pareamento" autocomplete="off" />
+      </div>
+
+      <div class="field">
+        <label for="hostname">Nome do equipamento</label>
+        <input id="hostname" type="text" formControlName="hostname" autocomplete="off" />
+      </div>
+
+      @if (errorMessage()) {
+        <p class="error" role="alert">{{ errorMessage() }}</p>
+      }
+
+      <div class="actions">
+        <button class="primary-button" type="submit" [disabled]="loading()">
+          {{ loading() ? 'Pareando...' : 'Parear terminal' }}
+        </button>
+      </div>
+    </form>
+  </section>
+</main>

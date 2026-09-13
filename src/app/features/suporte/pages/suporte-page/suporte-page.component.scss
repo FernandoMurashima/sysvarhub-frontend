@@ -1,0 +1,86 @@
+.support-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.eyebrow,
+h1 {
+  margin: 0;
+}
+
+.eyebrow {
+  color: #0f766e;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.status-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.status-grid .card {
+  display: grid;
+  gap: 6px;
+  padding: 16px;
+}
+
+.status-grid span {
+  color: #607080;
+  font-weight: 700;
+}
+
+.catalog-card {
+  display: grid;
+  gap: 18px;
+}
+
+.catalog-form {
+  display: grid;
+  grid-template-columns: 1fr 120px auto;
+  align-items: end;
+  gap: 12px;
+}
+
+.catalog-meta {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  color: #34495e;
+  font-weight: 600;
+}
+
+.table-wrap {
+  overflow-x: auto;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 980px;
+}
+
+th,
+td {
+  border-bottom: 1px solid #d9e0e7;
+  padding: 10px;
+  text-align: left;
+  vertical-align: top;
+}
+
+th {
+  color: #34495e;
+  font-size: 0.85rem;
+}
+
+@media (max-width: 920px) {
+  .status-grid,
+  .catalog-form {
+    grid-template-columns: 1fr;
+  }
+}

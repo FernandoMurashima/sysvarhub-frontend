@@ -1,0 +1,81 @@
+<main class="page support-page">
+  <section class="panel">
+    <div class="support-header">
+      <div>
+        <p class="eyebrow">Suporte local</p>
+        <h1>Diagnostico do terminal</h1>
+      </div>
+      <a href="/pdv">Voltar ao PDV</a>
+    </div>
+
+    <div class="status-grid">
+      <article class="card"><span>Terminal</span><strong>{{ terminal() }}</strong></article>
+      <article class="card"><span>Loja</span><strong>{{ loja() }}</strong></article>
+      <article class="card"><span>Empresa</span><strong>{{ empresa() }}</strong></article>
+      <article class="card"><span>Caixa</span><strong>{{ caixa() }}</strong></article>
+      <article class="card"><span>Conexao Hub</span><strong>{{ status() }}</strong></article>
+    </div>
+
+    <section class="card catalog-card">
+      <form [formGroup]="form" (ngSubmit)="pesquisar()" class="catalog-form">
+        <div class="field">
+          <label for="q">Pesquisar catalogo</label>
+          <input id="q" type="search" formControlName="q" placeholder="Referencia, descricao ou EAN" />
+        </div>
+        <div class="field compact">
+          <label for="limit">Limite</label>
+          <input id="limit" type="number" min="1" max="100" formControlName="limit" />
+        </div>
+        <button class="primary-button" type="submit" [disabled]="loadingCatalogo()">
+          {{ loadingCatalogo() ? 'Pesquisando...' : 'Pesquisar' }}
+        </button>
+      </form>
+
+      @if (catalogoError()) {
+        <p class="error" role="alert">{{ catalogoError() }}</p>
+      }
+
+      @if (catalogo(); as resultado) {
+        <div class="catalog-meta">
+          <span>Versao: {{ resultado.catalogo_versao || '-' }}</span>
+          <span>Sincronizacao: {{ resultado.catalogo_sincronizado_em || '-' }}</span>
+          <span>Tabela: {{ resultado.tabela_preco || '-' }}</span>
+          <span>Total: {{ resultado.total }}</span>
+        </div>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Referencia</th>
+                <th>Descricao</th>
+                <th>EAN</th>
+                <th>Cor</th>
+                <th>Tamanho</th>
+                <th>Preco venda</th>
+                <th>Estoque disp.</th>
+                <th>Vendavel</th>
+                <th>Bloqueios</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (item of resultado.itens; track item.sku_id) {
+                <tr>
+                  <td>{{ item.referencia }}</td>
+                  <td>{{ item.descricao }}</td>
+                  <td>{{ item.ean13 || '-' }}</td>
+                  <td>{{ item.cor?.descricao || '-' }}</td>
+                  <td>{{ item.tamanho?.descricao || '-' }}</td>
+                  <td>{{ item.preco_venda }}</td>
+                  <td>{{ item.estoque_disponivel }}</td>
+                  <td>{{ item.vendavel ? 'Sim' : 'Nao' }}</td>
+                  <td>{{ item.motivos_bloqueio.join(', ') || '-' }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+    </section>
+  </section>
+</main>
