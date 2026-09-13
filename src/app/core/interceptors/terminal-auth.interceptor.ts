@@ -7,6 +7,8 @@ import { TERMINAL_CREDENTIAL_STORE } from '../auth/terminal-credential-store';
 
 const AUTHENTICATED_TERMINAL_PATH = '/api/terminal/';
 const PAIRING_PATH = '/api/terminal/parear/';
+const OPERATOR_CONTEXT_PATH = '/api/terminal/operador/contexto/';
+const OPERATOR_LOGOUT_PATH = '/api/terminal/operador/logout/';
 
 export const terminalAuthInterceptor: HttpInterceptorFn = (req, next) => {
   const credentialStore = inject(TERMINAL_CREDENTIAL_STORE);
@@ -20,11 +22,13 @@ export const terminalAuthInterceptor: HttpInterceptorFn = (req, next) => {
     isAuthenticatedTerminalRequest && token
       ? req.clone({ setHeaders: { Authorization: `Terminal ${token}` } })
       : req;
+  const shouldInvalidateTerminalOnAuthError =
+    isAuthenticatedTerminalRequest && req.url !== OPERATOR_CONTEXT_PATH && req.url !== OPERATOR_LOGOUT_PATH;
 
   return next(request).pipe(
     catchError((error: unknown) => {
       if (
-        isAuthenticatedTerminalRequest &&
+        shouldInvalidateTerminalOnAuthError &&
         error instanceof HttpErrorResponse &&
         (error.status === 401 || error.status === 403)
       ) {

@@ -1,0 +1,74 @@
+<main class="operator-login">
+  <section class="login-shell">
+    <div class="brand">
+      <div class="brand-mark">S</div>
+      <div>
+        <strong>sysvar</strong>
+        <span>HUB LOCAL</span>
+      </div>
+    </div>
+
+    <section class="terminal-context">
+      <article>
+        <span>Sysvar</span>
+        <strong>{{ contexto()?.empresa?.nome || '-' }}</strong>
+      </article>
+      <article>
+        <span>PDV</span>
+        <strong>{{ contexto()?.terminal?.nome || contexto()?.terminal?.codigo || '-' }}</strong>
+      </article>
+      <article>
+        <span>Loja</span>
+        <strong>{{ contexto()?.loja?.nome || '-' }}</strong>
+      </article>
+      <article>
+        <span>Caixa</span>
+        <strong>{{ contexto()?.caixa?.descricao || contexto()?.caixa?.codigo || '-' }}</strong>
+      </article>
+      <article>
+        <span>Terminal</span>
+        <strong>{{ contexto()?.terminal?.codigo || '-' }}</strong>
+      </article>
+    </section>
+
+    <form class="login-card" (submit)="entrar($event)">
+      <header>
+        <h1>Login do operador</h1>
+        <span>{{ contexto()?.loja?.apelido || contexto()?.loja?.nome || 'Terminal pareado' }}</span>
+      </header>
+
+      <label>
+        Operador
+        <input
+          #codigoInput
+          name="codigo"
+          [(ngModel)]="codigo"
+          autocomplete="username"
+          [disabled]="carregando"
+          (keydown.enter)="focarSenha($event)"
+        />
+      </label>
+
+      <label>
+        Credencial
+        <input
+          #senhaInput
+          name="senha"
+          [(ngModel)]="senha"
+          type="password"
+          autocomplete="current-password"
+          [disabled]="carregando"
+          (keydown.enter)="entrar($event)"
+        />
+      </label>
+
+      @if (errorMessage) {
+        <p class="error">{{ errorMessage }}</p>
+      }
+
+      <button type="submit" [disabled]="carregando">
+        {{ carregando ? 'Entrando...' : 'Entrar' }}
+      </button>
+    </form>
+  </section>
+</main>

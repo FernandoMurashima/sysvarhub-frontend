@@ -97,4 +97,39 @@ describe('terminalAuthInterceptor', () => {
     expect(credentialStore.clearToken).toHaveBeenCalled();
     expect(router.navigateByUrl).toHaveBeenCalledWith('/pareamento');
   });
+
+  it('400 no login do operador nao limpa Terminal', () => {
+    credentialStore.getToken.and.returnValue('token-ficticio');
+
+    http.post('/api/terminal/operador/login/', {}).subscribe({ error: () => undefined });
+    const request = httpMock.expectOne('/api/terminal/operador/login/');
+    request.flush({ detail: 'Operador ou credencial inválidos.' }, { status: 400, statusText: 'Bad Request' });
+
+    expect(request.request.headers.get('Authorization')).toBe('Terminal token-ficticio');
+    expect(credentialStore.clearToken).not.toHaveBeenCalled();
+    expect(router.navigateByUrl).not.toHaveBeenCalled();
+  });
+
+  it('401 no contexto do operador nao limpa Terminal', () => {
+    credentialStore.getToken.and.returnValue('token-ficticio');
+
+    http.get('/api/terminal/operador/contexto/').subscribe({ error: () => undefined });
+    const request = httpMock.expectOne('/api/terminal/operador/contexto/');
+    request.flush({}, { status: 401, statusText: 'Unauthorized' });
+
+    expect(request.request.headers.get('Authorization')).toBe('Terminal token-ficticio');
+    expect(credentialStore.clearToken).not.toHaveBeenCalled();
+    expect(router.navigateByUrl).not.toHaveBeenCalled();
+  });
+
+  it('403 no logout do operador nao limpa Terminal', () => {
+    credentialStore.getToken.and.returnValue('token-ficticio');
+
+    http.post('/api/terminal/operador/logout/', {}).subscribe({ error: () => undefined });
+    const request = httpMock.expectOne('/api/terminal/operador/logout/');
+    request.flush({}, { status: 403, statusText: 'Forbidden' });
+
+    expect(credentialStore.clearToken).not.toHaveBeenCalled();
+    expect(router.navigateByUrl).not.toHaveBeenCalled();
+  });
 });

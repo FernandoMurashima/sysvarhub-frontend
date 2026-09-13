@@ -1,8 +1,9 @@
 import { Component, HostListener, inject, OnDestroy } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { RouterLink } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { Subscription } from 'rxjs';
 
+import { OperatorSessionService } from '../../../operador/services/operator-session.service';
 import { PdvProdutoConsulta } from '../../models/pdv-produto-consulta.model';
 import { PdvHubFacade } from '../../services/pdv-hub.facade';
 
@@ -26,6 +27,8 @@ type PdvAtalho =
 })
 export class PdvPageComponent implements OnDestroy {
   readonly facade = inject(PdvHubFacade);
+  private readonly operatorSession = inject(OperatorSessionService);
+  private readonly router = inject(Router);
 
   busca = '';
   buscaModal = '';
@@ -40,7 +43,6 @@ export class PdvPageComponent implements OnDestroy {
   tabelaPreco = '-';
   catalogoVersao: number | null = null;
   catalogoSincronizadoEm: string | null = null;
-  readonly operador = 'Operador não identificado';
   readonly vendedor = '-';
   private buscaTimer: ReturnType<typeof setTimeout> | null = null;
   private buscaSubscription: Subscription | null = null;
@@ -49,6 +51,7 @@ export class PdvPageComponent implements OnDestroy {
   readonly caixa = this.facade.caixa;
   readonly terminal = this.facade.terminal;
   readonly empresa = this.facade.empresa;
+  readonly operador = this.operatorSession.operador;
 
   get hora(): string {
     return new Intl.DateTimeFormat('pt-BR', { hour: '2-digit', minute: '2-digit' }).format(new Date());
@@ -166,6 +169,12 @@ export class PdvPageComponent implements OnDestroy {
     this.modalAtalho = '';
     this.buscaModal = '';
     this.produtosPreco = [];
+  }
+
+  trocarOperador(): void {
+    this.operatorSession.logout().subscribe(() => {
+      void this.router.navigateByUrl('/operador');
+    });
   }
 
   buscarPrecoAtalho(): void {

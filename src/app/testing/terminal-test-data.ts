@@ -1,4 +1,5 @@
 import { CatalogoResponse } from '../core/models/catalogo.models';
+import { OperadorContextoResponse, OperadorLoginResponse } from '../core/models/operador.models';
 import { TerminalContexto } from '../core/models/terminal.models';
 
 export const terminalContextoStub: TerminalContexto = {
@@ -48,4 +49,28 @@ export const catalogoResponseStub: CatalogoResponse = {
       fiscal: { ncm: '62034200' },
     },
   ],
+};
+
+export const operadorLoginResponseStub: OperadorLoginResponse = {
+  sessaoToken: 'sessao-operador-ficticia',
+  sessao: {
+    uuid: 'sessao-operador-uuid',
+    iniciadaEm: '2026-09-13T10:30:00',
+  },
+  operador: {
+    usuarioId: 99,
+    codigo: 'caixa.barra',
+    nome: 'Juliana Rocha',
+    tipo: 'Caixa',
+    perfil: { id: 4, nome: 'Operador de Caixa' },
+  },
+};
+
+export const operadorContextoResponseStub: OperadorContextoResponse = {
+  sessao: {
+    uuid: 'sessao-operador-uuid',
+    iniciadaEm: '2026-09-13T10:30:00',
+    ultimaAtividadeEm: '2026-09-13T10:35:00',
+  },
+  operador: operadorLoginResponseStub.operador,
 };

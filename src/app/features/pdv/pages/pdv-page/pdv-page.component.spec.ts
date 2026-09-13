@@ -1,8 +1,10 @@
 import { ComponentFixture, fakeAsync, TestBed, tick } from '@angular/core/testing';
-import { signal } from '@angular/core';
+import { Component, signal } from '@angular/core';
+import { Router } from '@angular/router';
 import { RouterTestingModule } from '@angular/router/testing';
 import { of } from 'rxjs';
 
+import { OperatorSessionService } from '../../../operador/services/operator-session.service';
 import { PdvCatalogoConsulta, PdvProdutoConsulta } from '../../models/pdv-produto-consulta.model';
 import { PdvHubFacade } from '../../services/pdv-hub.facade';
 import { PdvPageComponent } from './pdv-page.component';
@@ -51,9 +53,17 @@ const produtoSemPreco: PdvProdutoConsulta = {
   motivosBloqueio: ['SEM_PRECO'],
 };
 
+@Component({
+  standalone: true,
+  template: '',
+})
+class EmptyRouteComponent {}
+
 describe('PdvPageComponent', () => {
   let fixture: ComponentFixture<PdvPageComponent>;
   let facade: jasmine.SpyObj<PdvHubFacade>;
+  let operatorSession: jasmine.SpyObj<OperatorSessionService>;
+  let router: Router;
 
   function catalogo(itens: PdvProdutoConsulta[]): PdvCatalogoConsulta {
     return {
@@ -76,12 +86,27 @@ describe('PdvPageComponent', () => {
       empresa: signal('Empresa Teste Ltda').asReadonly(),
     });
     facade.buscarCatalogo.and.returnValue(of(catalogo([produtoVendavel])));
+    operatorSession = jasmine.createSpyObj<OperatorSessionService>('OperatorSessionService', ['logout'], {
+      operador: signal({
+        usuarioId: 99,
+        codigo: 'caixa.barra',
+        nome: 'Juliana Rocha',
+        tipo: 'Caixa',
+        perfil: null,
+      }).asReadonly(),
+    });
+    operatorSession.logout.and.returnValue(of(true));
 
     await TestBed.configureTestingModule({
-      imports: [PdvPageComponent, RouterTestingModule],
-      providers: [{ provide: PdvHubFacade, useValue: facade }],
+      imports: [PdvPageComponent, RouterTestingModule.withRoutes([{ path: 'operador', component: EmptyRouteComponent }])],
+      providers: [
+        { provide: PdvHubFacade, useValue: facade },
+        { provide: OperatorSessionService, useValue: operatorSession },
+      ],
     }).compileComponents();
 
+    router = TestBed.inject(Router);
+    spyOn(router, 'navigateByUrl').and.resolveTo(true);
     fixture = TestBed.createComponent(PdvPageComponent);
     fixture.detectChanges();
   });
@@ -104,10 +129,12 @@ describe('PdvPageComponent', () => {
     expect(text).toContain('PDV-01');
   });
 
-  it('nao mostra fallback FERNANDO nem tabela VAREJO hardcoded', () => {
+  it('mostra operador real sem fallback hardcoded', () => {
     const text = fixture.nativeElement.textContent;
 
-    expect(text).toContain('Operador não identificado');
+    expect(text).toContain('Juliana Rocha');
+    expect(text).toContain('caixa.barra');
+    expect(text).not.toContain('Operador não identificado');
     expect(text).not.toContain('FERNANDO');
     expect(text).not.toContain('VAREJO');
   });
@@ -167,6 +194,16 @@ describe('PdvPageComponent', () => {
     expect(text).toContain('7892701000013');
     expect(text).toContain('199,90');
     expect(text).toContain('Venda será habilitada após abertura do caixa');
+    expect(component.carrinho.length).toBe(0);
+  });
+
+  it('troca operador limpa sessao operacional sem mexer no carrinho', () => {
+    const component = fixture.componentInstance;
+
+    component.trocarOperador();
+
+    expect(operatorSession.logout).toHaveBeenCalled();
+    expect(router.navigateByUrl).toHaveBeenCalledWith('/operador');
     expect(component.carrinho.length).toBe(0);
   });
 

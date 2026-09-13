@@ -43,9 +43,13 @@
         <div class="avatar">◯</div>
         <div>
           <strong>{{ caixa() }}</strong>
-          <small>{{ operador }}</small>
+          <small>{{ operador()?.nome }}</small>
+          @if (operador()?.codigo) {
+            <em>{{ operador()?.codigo }}</em>
+          }
         </div>
       </div>
+      <button class="switch-operator" type="button" (click)="trocarOperador()">Trocar operador</button>
       <div class="clock">
         <strong>{{ hora }}</strong>
         <small>{{ data }}</small>
