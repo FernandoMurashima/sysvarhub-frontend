@@ -1,7 +1,7 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { inject, Injectable, signal } from '@angular/core';
 import { Router } from '@angular/router';
-import { catchError, map, Observable, of, tap } from 'rxjs';
+import { catchError, map, Observable, of, tap, throwError } from 'rxjs';
 
 import { VendaHubResumo, VendaSessionStatus } from '../../../core/models/venda.models';
 import { AdicionarPagamentoRequest, FormasPagamentoResponse } from '../../../core/models/pagamento.models';
@@ -72,7 +72,14 @@ export class VendaSessionService {
   }
 
   listarFormasPagamento(): Observable<FormasPagamentoResponse> {
-    return this.hubVendaService.listarFormasPagamento();
+    return this.hubVendaService.listarFormasPagamento().pipe(
+      catchError((error: unknown) => {
+        if (this.isAuthenticationError(error)) {
+          this.tratarSessaoOperadorExpirada();
+        }
+        return throwError(() => error);
+      }),
+    );
   }
 
   adicionarPagamento(vendaUuid: string, formaPagamentoId: number, valor: string, autorizacao = ''): Observable<VendaOperacaoResultado> {

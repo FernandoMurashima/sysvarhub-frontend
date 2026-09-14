@@ -3,6 +3,7 @@ import { TestBed } from '@angular/core/testing';
 import { Router } from '@angular/router';
 import { of, throwError } from 'rxjs';
 
+import { FormasPagamentoResponse } from '../../../core/models/pagamento.models';
 import { vendaAbertaStub, vendaAtualSemVendaStub } from '../../../testing/terminal-test-data';
 import { OperatorSessionService } from '../../operador/services/operator-session.service';
 import { HubVendaService } from './hub-venda.service';
@@ -15,7 +16,14 @@ describe('VendaSessionService', () => {
   let router: jasmine.SpyObj<Router>;
 
   beforeEach(() => {
-    hubVendaService = jasmine.createSpyObj<HubVendaService>('HubVendaService', ['atual', 'adicionarItem', 'alterarQuantidade', 'removerItem', 'cancelar']);
+    hubVendaService = jasmine.createSpyObj<HubVendaService>('HubVendaService', [
+      'atual',
+      'adicionarItem',
+      'alterarQuantidade',
+      'removerItem',
+      'cancelar',
+      'listarFormasPagamento',
+    ]);
     operatorSession = jasmine.createSpyObj<OperatorSessionService>('OperatorSessionService', ['invalidarSessao']);
     router = jasmine.createSpyObj<Router>('Router', ['navigateByUrl']);
     router.navigateByUrl.and.resolveTo(true);
@@ -104,6 +112,83 @@ describe('VendaSessionService', () => {
         expect(service.venda()).toEqual(vendaAbertaStub.venda);
         done();
       });
+    });
+  });
+
+  it('listarFormasPagamento retorna formas com sucesso', (done) => {
+    const formas: FormasPagamentoResponse = {
+      versao: 1,
+      sincronizadoEm: '2026-09-14T12:00:00Z',
+      formas: [
+        {
+          id: 1,
+          retaguardaId: 10,
+          codigo: 'DIN',
+          descricao: 'Dinheiro',
+          tipo: 'DINHEIRO',
+          tefHabilitado: false,
+          numParcelas: 1,
+          parcelas: [],
+        },
+      ],
+    };
+    hubVendaService.listarFormasPagamento.and.returnValue(of(formas));
+
+    service.listarFormasPagamento().subscribe((resultado) => {
+      expect(resultado).toEqual(formas);
+      expect(operatorSession.invalidarSessao).not.toHaveBeenCalled();
+      expect(router.navigateByUrl).not.toHaveBeenCalled();
+      done();
+    });
+  });
+
+  it('listarFormasPagamento com 401 invalida operador, limpa estado e navega operador sem desparear terminal', (done) => {
+    hubVendaService.adicionarItem.and.returnValue(of(vendaAbertaStub));
+    hubVendaService.listarFormasPagamento.and.returnValue(throwError(() => new HttpErrorResponse({ status: 401 })));
+
+    service.adicionarItem(10825).subscribe(() => {
+      service.listarFormasPagamento().subscribe({
+        error: () => {
+          expect(operatorSession.invalidarSessao).toHaveBeenCalled();
+          expect(service.status()).toBe('sem-venda');
+          expect(service.venda()).toBeNull();
+          expect(router.navigateByUrl).toHaveBeenCalledOnceWith('/operador');
+          expect(router.navigateByUrl).not.toHaveBeenCalledWith('/pareamento');
+          done();
+        },
+      });
+    });
+  });
+
+  it('listarFormasPagamento com 403 invalida operador, limpa estado e navega operador sem desparear terminal', (done) => {
+    hubVendaService.adicionarItem.and.returnValue(of(vendaAbertaStub));
+    hubVendaService.listarFormasPagamento.and.returnValue(throwError(() => new HttpErrorResponse({ status: 403 })));
+
+    service.adicionarItem(10825).subscribe(() => {
+      service.listarFormasPagamento().subscribe({
+        error: () => {
+          expect(operatorSession.invalidarSessao).toHaveBeenCalled();
+          expect(service.status()).toBe('sem-venda');
+          expect(service.venda()).toBeNull();
+          expect(router.navigateByUrl).toHaveBeenCalledOnceWith('/operador');
+          expect(router.navigateByUrl).not.toHaveBeenCalledWith('/pareamento');
+          done();
+        },
+      });
+    });
+  });
+
+  it('listarFormasPagamento propaga erro nao-auth sem invalidar operador', (done) => {
+    const erro = new HttpErrorResponse({ status: 500 });
+    hubVendaService.listarFormasPagamento.and.returnValue(throwError(() => erro));
+
+    service.listarFormasPagamento().subscribe({
+      error: (resultado) => {
+        expect(resultado).toBe(erro);
+        expect(operatorSession.invalidarSessao).not.toHaveBeenCalled();
+        expect(router.navigateByUrl).not.toHaveBeenCalled();
+        done();
+      },
     });
   });
 
