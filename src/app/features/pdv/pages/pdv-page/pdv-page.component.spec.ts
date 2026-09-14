@@ -336,4 +336,44 @@ describe('PdvPageComponent', () => {
     expect(vendaSession.listarFormasPagamento).toHaveBeenCalled();
     expect(facade.buscarCatalogo).not.toHaveBeenCalled();
   });
+
+  it('remove entrada redundante lateral de adicionar pagamento e preserva atalhos de pagamento', () => {
+    const host: HTMLElement = fixture.nativeElement;
+    const text = host.textContent || '';
+
+    expect(host.querySelector('.payment-entry')).toBeNull();
+    expect(host.querySelector('.right-panel input[placeholder="Valor"]')).toBeNull();
+    expect(text).not.toContain('Adicionar pagamento');
+    expect(text).toContain('F9');
+    ['DINHEIRO', 'CARTÃO', 'PIX', 'OUTRAS', 'FINALIZAR'].forEach((rotulo) => {
+      expect(text).toContain(rotulo);
+    });
+  });
+
+  it('mantem mensagem operacional em regiao propria acima dos botoes de pagamento', () => {
+    const component = fixture.componentInstance;
+    component.mensagem = 'Venda finalizada com sucesso. Troco: R$ 10,10.';
+    fixture.detectChanges();
+    const host: HTMLElement = fixture.nativeElement;
+    const mensagem = host.querySelector('.operational-message');
+    const pagamentos = host.querySelector('.payments');
+
+    expect(mensagem?.textContent).toContain('Venda finalizada com sucesso. Troco: R$ 10,10.');
+    expect(mensagem?.compareDocumentPosition(pagamentos as Node) || 0).toBeTruthy();
+    expect((mensagem?.compareDocumentPosition(pagamentos as Node) || 0) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('mantem Suporte no header fora do grupo NFC-e e TEF', () => {
+    const host: HTMLElement = fixture.nativeElement;
+    const indicadores = host.querySelector('.operation-indicators');
+    const suporte = host.querySelector('.top-actions .home-button');
+    const topActions = host.querySelector('.top-actions');
+
+    expect(indicadores?.textContent).toContain('NFC-e');
+    expect(indicadores?.textContent).toContain('TEF');
+    expect(indicadores?.textContent).not.toContain('Suporte');
+    expect(suporte?.textContent).toContain('Suporte');
+    expect(suporte?.tagName.toLowerCase()).toBe('a');
+    expect(topActions?.textContent).toContain('Suporte');
+  });
 });

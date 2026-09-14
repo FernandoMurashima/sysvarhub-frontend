@@ -36,9 +36,10 @@
     </div>
 
     <div class="top-actions">
-      <span>NFC-e</span>
-      <a routerLink="/suporte" class="home-button">Suporte</a>
-      <span>TEF</span>
+      <div class="operation-indicators" aria-label="Indicadores operacionais">
+        <span>NFC-e</span>
+        <span>TEF</span>
+      </div>
       <div class="operator">
         <div class="avatar">◯</div>
         <div>
@@ -50,6 +51,7 @@
         </div>
       </div>
       <button class="switch-operator" type="button" (click)="trocarOperador()">Trocar operador</button>
+      <a routerLink="/suporte" class="home-button">Suporte</a>
       <div class="clock">
         <strong>{{ hora }}</strong>
         <small>{{ data }}</small>
@@ -239,11 +241,6 @@
         <div><span>TOTAL</span><strong>{{ formatarMoeda(venda()?.total) }}</strong></div>
       </div>
 
-      <div class="payment-entry">
-        <input placeholder="Valor" [value]="formatarMoeda(venda()?.pendente)" disabled />
-        <button type="button" (click)="abrirAtalho($event, 'pagamentos')">Adicionar pagamento</button>
-      </div>
-
       <div class="payment-list">
         @if (venda()?.pagamentos?.length) {
           @for (pagamento of venda()?.pagamentos || []; track pagamento.uuid) {
@@ -258,6 +255,12 @@
         }
       </div>
 
+      <div class="operational-message" aria-live="polite">
+        @if (mensagem) {
+          <small>{{ mensagem }}</small>
+        }
+      </div>
+
       <div class="payments">
         <button class="cash" type="button" (click)="abrirPagamentos('DINHEIRO', $event)"><span>▣</span>DINHEIRO</button>
         <button class="card" type="button" (click)="abrirPagamentos('CARTAO', $event)"><span>▭</span>CARTÃO</button>
@@ -267,7 +270,6 @@
           <span>✓</span>FINALIZAR
         </button>
       </div>
-      <small class="message">{{ mensagem }}</small>
     </aside>
   </main>
 
