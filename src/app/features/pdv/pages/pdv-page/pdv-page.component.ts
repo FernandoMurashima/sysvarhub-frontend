@@ -7,7 +7,7 @@ import { ClienteHubResumo, formatarDocumentoCliente } from '../../../../core/mod
 import { FormaPagamento } from '../../../../core/models/pagamento.models';
 import { VendaClienteResumo, VendaItemHubResumo } from '../../../../core/models/venda.models';
 import { CaixaSessionService } from '../../../caixa/services/caixa-session.service';
-import { HubClienteService } from '../../../cliente/services/hub-cliente.service';
+import { ClienteSessionExpiredError, ClienteSessionService } from '../../../cliente/services/cliente-session.service';
 import { normalizarValorAbertura } from '../../../caixa/services/caixa-valor.parser';
 import { OperatorSessionService } from '../../../operador/services/operator-session.service';
 import { VendaSessionService } from '../../../venda/services/venda-session.service';
@@ -38,7 +38,7 @@ export class PdvPageComponent implements OnInit, OnDestroy {
   private readonly operatorSession = inject(OperatorSessionService);
   private readonly caixaSession = inject(CaixaSessionService);
   private readonly vendaSession = inject(VendaSessionService);
-  private readonly hubClienteService = inject(HubClienteService);
+  private readonly clienteSession = inject(ClienteSessionService);
   private readonly router = inject(Router);
 
   busca = '';
@@ -692,13 +692,18 @@ export class PdvPageComponent implements OnInit, OnDestroy {
     this.clientesSubscription?.unsubscribe();
     this.carregandoClientes = true;
     this.erroClientes = '';
-    this.clientesSubscription = this.hubClienteService.listar(termo).subscribe({
+    this.clientesSubscription = this.clienteSession.listar(termo).subscribe({
       next: (resultado) => {
         this.clientesEncontrados = resultado.clientes;
         this.clienteListaSelecionado = resultado.clientes[0] || null;
         this.carregandoClientes = false;
       },
-      error: () => {
+      error: (error: unknown) => {
+        if (error instanceof ClienteSessionExpiredError) {
+          this.modalAtalho = '';
+          this.limparEstadoClienteModal();
+          return;
+        }
         this.clientesEncontrados = [];
         this.clienteListaSelecionado = null;
         this.carregandoClientes = false;

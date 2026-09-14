@@ -2,12 +2,12 @@ import { ComponentFixture, fakeAsync, TestBed, tick } from '@angular/core/testin
 import { Component, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { RouterTestingModule } from '@angular/router/testing';
-import { of } from 'rxjs';
+import { of, throwError } from 'rxjs';
 
 import { SessaoCaixaHubResumo } from '../../../../core/models/caixa.models';
 import { ClienteHubResumo } from '../../../../core/models/cliente.models';
 import { CaixaSessionService } from '../../../caixa/services/caixa-session.service';
-import { HubClienteService } from '../../../cliente/services/hub-cliente.service';
+import { ClienteSessionExpiredError, ClienteSessionService } from '../../../cliente/services/cliente-session.service';
 import { OperatorSessionService } from '../../../operador/services/operator-session.service';
 import { VendaSessionService } from '../../../venda/services/venda-session.service';
 import { sessaoCaixaAbertaStub, vendaAbertaStub } from '../../../../testing/terminal-test-data';
@@ -88,7 +88,7 @@ describe('PdvPageComponent', () => {
   let fixture: ComponentFixture<PdvPageComponent>;
   let facade: jasmine.SpyObj<PdvHubFacade>;
   let operatorSession: jasmine.SpyObj<OperatorSessionService>;
-  let hubClienteService: jasmine.SpyObj<HubClienteService>;
+  let clienteSession: jasmine.SpyObj<ClienteSessionService>;
   let caixaSession: jasmine.SpyObj<CaixaSessionService>;
   let vendaSession: jasmine.SpyObj<VendaSessionService>;
   let caixaStatusSignal = signal<'inicializando' | 'fechado' | 'aberto' | 'erro'>('aberto');
@@ -129,8 +129,8 @@ describe('PdvPageComponent', () => {
       }).asReadonly(),
     });
     operatorSession.logout.and.returnValue(of(true));
-    hubClienteService = jasmine.createSpyObj<HubClienteService>('HubClienteService', ['listar']);
-    hubClienteService.listar.and.returnValue(of({
+    clienteSession = jasmine.createSpyObj<ClienteSessionService>('ClienteSessionService', ['listar']);
+    clienteSession.listar.and.returnValue(of({
       clientesVersao: 1,
       clientesSincronizadoEm: '2026-09-14T10:00:00',
       q: '',
@@ -171,7 +171,7 @@ describe('PdvPageComponent', () => {
       providers: [
         { provide: PdvHubFacade, useValue: facade },
         { provide: OperatorSessionService, useValue: operatorSession },
-        { provide: HubClienteService, useValue: hubClienteService },
+        { provide: ClienteSessionService, useValue: clienteSession },
         { provide: CaixaSessionService, useValue: caixaSession },
         { provide: VendaSessionService, useValue: vendaSession },
       ],
@@ -378,7 +378,7 @@ describe('PdvPageComponent', () => {
     fixture.detectChanges();
 
     expect(component.modalAtalho).toBe('cliente');
-    expect(hubClienteService.listar).toHaveBeenCalledWith('');
+    expect(clienteSession.listar).toHaveBeenCalledWith('');
     expect(fixture.nativeElement.textContent).toContain('CLIENTE · F2');
     expect(fixture.nativeElement.textContent).toContain('Maria Silva');
     expect(fixture.nativeElement.textContent).not.toContain('Recurso ainda não integrado ao Hub');
@@ -387,16 +387,39 @@ describe('PdvPageComponent', () => {
   it('busca cliente com debounce', fakeAsync(() => {
     const component = fixture.componentInstance;
     component.abrirCliente();
-    hubClienteService.listar.calls.reset();
+    clienteSession.listar.calls.reset();
 
     component.buscaCliente = 'maria';
     component.aoDigitarBuscaCliente();
     tick(249);
-    expect(hubClienteService.listar).not.toHaveBeenCalled();
+    expect(clienteSession.listar).not.toHaveBeenCalled();
     tick(1);
 
-    expect(hubClienteService.listar).toHaveBeenCalledWith('maria');
+    expect(clienteSession.listar).toHaveBeenCalledWith('maria');
   }));
+
+  it('erro comum em F2 mostra falha local', () => {
+    clienteSession.listar.and.returnValue(throwError(() => new Error('rede')));
+    const component = fixture.componentInstance;
+
+    component.abrirCliente();
+    fixture.detectChanges();
+
+    expect(component.erroClientes).toBe('Falha de comunicação com o Hub local.');
+    expect(fixture.nativeElement.textContent).toContain('Falha de comunicação com o Hub local.');
+  });
+
+  it('sessao expirada em F2 limpa modal sem erro generico', () => {
+    clienteSession.listar.and.returnValue(throwError(() => new ClienteSessionExpiredError()));
+    const component = fixture.componentInstance;
+
+    component.abrirCliente();
+    fixture.detectChanges();
+
+    expect(component.modalAtalho).toBe('');
+    expect(component.erroClientes).toBe('');
+    expect(fixture.nativeElement.textContent).not.toContain('Falha de comunicação com o Hub local.');
+  });
 
   it('inativo e bloqueado aparecem mas nao podem confirmar', () => {
     const component = fixture.componentInstance;
