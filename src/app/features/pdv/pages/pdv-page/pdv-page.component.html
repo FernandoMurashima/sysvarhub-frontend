@@ -149,27 +149,29 @@
             <span>AÇÕES</span>
           </div>
           @for (item of venda()?.itens || []; track item.uuid; let indice = $index) {
-            <button
-              type="button"
+            <div
               class="sale-row"
+              role="button"
+              tabindex="0"
               [class.selected]="itemSelecionadoUuid === item.uuid"
               (click)="selecionarItemVenda(item)"
+              (keydown.enter)="selecionarItemVenda(item)"
             >
               <span class="line-number">{{ indice + 1 }}</span>
               <span class="code-cell"><strong>{{ codigoItemVenda(item) }}</strong><small>{{ item.codigoItemRef || item.referencia }}</small></span>
               <span class="product-cell"><strong>{{ item.descricao }}</strong><small>{{ item.referencia }}</small></span>
               <span class="variant-cell"><strong>{{ item.cor || '-' }}</strong><small>{{ item.tamanho || '-' }}</small></span>
               <span class="quantity-stepper">
-                <button type="button" [disabled]="itemOperandoUuid === item.uuid" (click)="diminuirItem(item); $event.stopPropagation()">-</button>
+                <button type="button" [disabled]="itemOperandoUuid === item.uuid || temPagamentoAtivo()" (click)="diminuirItem(item); $event.stopPropagation()">-</button>
                 <input [value]="item.quantidade" readonly />
-                <button type="button" [disabled]="itemOperandoUuid === item.uuid" (click)="aumentarItem(item); $event.stopPropagation()">+</button>
+                <button type="button" [disabled]="itemOperandoUuid === item.uuid || temPagamentoAtivo()" (click)="aumentarItem(item); $event.stopPropagation()">+</button>
               </span>
               <span>{{ item.unidade }}</span>
               <span>{{ formatarMoeda(item.precoUnitario) }}</span>
               <span>{{ formatarMoeda(item.desconto) }}</span>
               <span class="row-total">{{ formatarMoeda(item.totalItem) }}</span>
-              <span><button class="remove-line" type="button" [disabled]="itemOperandoUuid === item.uuid" (click)="removerItem(item); $event.stopPropagation()">×</button></span>
-            </button>
+              <span><button class="remove-line" type="button" [disabled]="itemOperandoUuid === item.uuid || temPagamentoAtivo()" (click)="removerItem(item); $event.stopPropagation()">×</button></span>
+            </div>
           }
           @if (!venda()) {
             <div class="empty">Bipe ou digite um produto para iniciar a venda.</div>
@@ -186,11 +188,11 @@
         </div>
         <div>
           <span>TOTAL RECEBIDO</span>
-          <strong>0,00</strong>
+          <strong>{{ formatarMoeda(venda()?.totalPago) }}</strong>
         </div>
         <div>
           <span>TROCO</span>
-          <strong>0,00</strong>
+          <strong>{{ formatarMoeda(venda()?.troco) }}</strong>
         </div>
       </section>
     </section>
@@ -232,26 +234,36 @@
         <p><span>SUBTOTAL</span><strong>{{ formatarMoeda(venda()?.subtotal) }}</strong></p>
         <p><span>DESCONTOS</span><strong>{{ formatarMoeda(totalDescontos()) }}</strong></p>
         <p><span>ACRÉSCIMOS</span><strong>R$ 0,00</strong></p>
-        <p><span>PAGO</span><strong>R$ 0,00</strong></p>
-        <p><span>PENDENTE</span><strong>{{ formatarMoeda(venda()?.total) }}</strong></p>
+        <p><span>PAGO</span><strong>{{ formatarMoeda(venda()?.totalPago) }}</strong></p>
+        <p><span>PENDENTE</span><strong>{{ formatarMoeda(venda()?.pendente) }}</strong></p>
         <div><span>TOTAL</span><strong>{{ formatarMoeda(venda()?.total) }}</strong></div>
       </div>
 
       <div class="payment-entry">
-        <input type="number" min="0" placeholder="Valor" disabled />
+        <input placeholder="Valor" [value]="formatarMoeda(venda()?.pendente)" disabled />
         <button type="button" (click)="abrirAtalho($event, 'pagamentos')">Adicionar pagamento</button>
       </div>
 
       <div class="payment-list">
-        <small>Nenhum pagamento adicionado.</small>
+        @if (venda()?.pagamentos?.length) {
+          @for (pagamento of venda()?.pagamentos || []; track pagamento.uuid) {
+            <div class="payment-line">
+              <strong>{{ pagamento.codigo }} · {{ pagamento.descricao }}</strong>
+              <span>{{ pagamento.tipo }} · {{ formatarMoeda(pagamento.valor) }}</span>
+              <button type="button" (click)="removerPagamento(pagamento.uuid)">×</button>
+            </div>
+          }
+        } @else {
+          <small>Nenhum pagamento adicionado.</small>
+        }
       </div>
 
       <div class="payments">
-        <button class="cash" type="button" (click)="abrirAtalho($event, 'pagamentos')"><span>▣</span>DINHEIRO</button>
-        <button class="card" type="button" (click)="abrirAtalho($event, 'pagamentos')"><span>▭</span>CARTÃO</button>
-        <button class="pix" type="button" (click)="abrirAtalho($event, 'pagamentos')"><span>▦</span>PIX</button>
-        <button class="exchange" type="button" (click)="abrirAtalho($event, 'pagamentos')"><span>↻</span>TROCA</button>
-        <button class="finish" type="button" (click)="tentarAdicionarProduto(produtoSelecionado)" [disabled]="!produtoSelecionado">
+        <button class="cash" type="button" (click)="abrirPagamentos('DINHEIRO', $event)"><span>▣</span>DINHEIRO</button>
+        <button class="card" type="button" (click)="abrirPagamentos('CARTAO', $event)"><span>▭</span>CARTÃO</button>
+        <button class="pix" type="button" (click)="abrirPagamentos('PIX', $event)"><span>▦</span>PIX</button>
+        <button class="exchange" type="button" (click)="abrirPagamentos('OUTRAS', $event)"><span>↻</span>OUTRAS</button>
+        <button class="finish" type="button" (click)="abrirConfirmacaoFinalizacao()" [disabled]="!venda() || !venda()?.itens?.length || !venda()?.pagamentos?.length || venda()?.pendente !== '0.00'">
           <span>✓</span>FINALIZAR
         </button>
       </div>
@@ -327,6 +339,8 @@
               <strong>Consulta de Preço</strong>
             } @else if (modalAtalho === 'cancelar-venda') {
               <strong>Cancelar Venda</strong>
+            } @else if (modalAtalho === 'pagamentos') {
+              <strong>Pagamentos</strong>
             } @else {
               <strong>Recurso ainda não integrado ao Hub</strong>
             }
@@ -371,6 +385,48 @@
               <button type="button" (click)="fecharAtalho()">Voltar</button>
             </div>
           </div>
+        } @else if (modalAtalho === 'pagamentos') {
+          <div class="payment-modal">
+            <section class="payment-summary">
+              <article><span>Total</span><strong>{{ formatarMoeda(venda()?.total) }}</strong></article>
+              <article><span>Pago</span><strong>{{ formatarMoeda(venda()?.totalPago) }}</strong></article>
+              <article><span>Pendente</span><strong>{{ formatarMoeda(venda()?.pendente) }}</strong></article>
+              <article><span>Troco</span><strong>{{ formatarMoeda(venda()?.troco) }}</strong></article>
+            </section>
+
+            <div class="payment-modal-grid">
+              <div class="payment-forms">
+                @if (carregandoFormasPagamento) {
+                  <p>Carregando formas...</p>
+                }
+                @for (forma of formasPagamentoFiltradas(); track forma.id) {
+                  <button type="button" [class.selected]="formaPagamentoSelecionada?.id === forma.id" (click)="selecionarFormaPagamento(forma)">
+                    <strong>{{ forma.codigo }} · {{ forma.descricao }}</strong>
+                    <span>{{ forma.tipo }} · {{ forma.numParcelas }}x</span>
+                    @if (forma.tefHabilitado) {
+                      <b>TEF</b>
+                    }
+                    @if (forma.parcelas.length) {
+                      <small>
+                        @for (parcela of forma.parcelas; track parcela.ordem) {
+                          {{ parcela.ordem }}: {{ parcela.dias }}d
+                        }
+                      </small>
+                    }
+                  </button>
+                }
+              </div>
+
+              <form class="payment-form" (submit)="$event.preventDefault(); adicionarPagamento()">
+                <label>Valor<input name="valorPagamento" [(ngModel)]="valorPagamento" inputmode="decimal" autocomplete="off" /></label>
+                <label>Autorização<input name="autorizacaoPagamento" [(ngModel)]="autorizacaoPagamento" maxlength="120" autocomplete="off" /></label>
+                @if (formaPagamentoSelecionada?.tefHabilitado) {
+                  <p>Esta forma exige integração TEF.</p>
+                }
+                <button type="submit" [disabled]="!formaPagamentoSelecionada || formaPagamentoSelecionada.tefHabilitado || vendaLoading()">Adicionar</button>
+              </form>
+            </div>
+          </div>
         } @else {
           <div class="modal-confirm">
             <strong>Recurso ainda não integrado ao Hub</strong>
@@ -380,6 +436,27 @@
             </div>
           </div>
         }
+      </section>
+    </div>
+  }
+
+  @if (confirmandoFinalizacao && venda()) {
+    <div class="pdv-modal-backdrop">
+      <section class="pdv-modal">
+        <header>
+          <div>
+            <strong>Finalizar Venda</strong>
+            <span>Venda {{ venda()?.uuid?.slice(0, 8) }}</span>
+          </div>
+        </header>
+        <div class="modal-confirm">
+          <strong>Total {{ formatarMoeda(venda()?.total) }}</strong>
+          <span>Pago {{ formatarMoeda(venda()?.totalPago) }} · Troco {{ formatarMoeda(venda()?.troco) }}</span>
+          <div>
+            <button type="button" (click)="confirmandoFinalizacao = false">Voltar</button>
+            <button type="button" class="danger" (click)="finalizarVendaConfirmada()">Finalizar Venda</button>
+          </div>
+        </div>
       </section>
     </div>
   }

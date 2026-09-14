@@ -118,7 +118,7 @@ describe('PdvPageComponent', () => {
     vendaSignal = signal(vendaAbertaStub.venda);
     vendaStatusSignal = signal<'inicializando' | 'sem-venda' | 'aberta' | 'erro'>('aberta');
     vendaLoadingSignal = signal(false);
-    vendaSession = jasmine.createSpyObj<VendaSessionService>('VendaSessionService', ['bootstrap', 'adicionarItem', 'alterarQuantidade', 'removerItem', 'cancelarVenda', 'limparEstado'], {
+    vendaSession = jasmine.createSpyObj<VendaSessionService>('VendaSessionService', ['bootstrap', 'adicionarItem', 'alterarQuantidade', 'removerItem', 'cancelarVenda', 'limparEstado', 'listarFormasPagamento', 'adicionarPagamento', 'removerPagamento', 'finalizarVenda'], {
       venda: vendaSignal.asReadonly(),
       status: vendaStatusSignal.asReadonly(),
       loadingOperacao: vendaLoadingSignal.asReadonly(),
@@ -128,6 +128,10 @@ describe('PdvPageComponent', () => {
     vendaSession.alterarQuantidade.and.returnValue(of({ ok: true }));
     vendaSession.removerItem.and.returnValue(of({ ok: true }));
     vendaSession.cancelarVenda.and.returnValue(of({ ok: true }));
+    vendaSession.listarFormasPagamento.and.returnValue(of({ versao: 1, sincronizadoEm: null, formas: [] }));
+    vendaSession.adicionarPagamento.and.returnValue(of({ ok: true }));
+    vendaSession.removerPagamento.and.returnValue(of({ ok: true }));
+    vendaSession.finalizarVenda.and.returnValue(of({ ok: true }));
 
     await TestBed.configureTestingModule({
       imports: [PdvPageComponent, RouterTestingModule.withRoutes([{ path: 'operador', component: EmptyRouteComponent }])],
@@ -318,7 +322,7 @@ describe('PdvPageComponent', () => {
     expect(fixture.nativeElement.textContent).not.toContain('399,90');
   });
 
-  it('mantem F2-F10 visuais e recurso pendente nao chama API inexistente', () => {
+  it('mantem F2-F10 visuais e F9 abre pagamentos locais', () => {
     const component = fixture.componentInstance;
     const text = fixture.nativeElement.textContent;
 
@@ -328,7 +332,8 @@ describe('PdvPageComponent', () => {
 
     component.abrirAtalho(new Event('click'), 'pagamentos');
 
-    expect(component.mensagem).toBe('Pagamento será habilitado na próxima etapa.');
+    expect(component.modalAtalho).toBe('pagamentos');
+    expect(vendaSession.listarFormasPagamento).toHaveBeenCalled();
     expect(facade.buscarCatalogo).not.toHaveBeenCalled();
   });
 });

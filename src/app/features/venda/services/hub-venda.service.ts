@@ -4,6 +4,12 @@ import { map, Observable } from 'rxjs';
 
 import { HUB_TERMINAL_API_PATH } from '../../../core/api/api.config';
 import {
+  AdicionarPagamentoRequest,
+  FormasPagamentoApiResponse,
+  FormasPagamentoResponse,
+  mapFormasPagamento,
+} from '../../../core/models/pagamento.models';
+import {
   mapVendaAtual,
   VendaAtualResponse,
   VendaApiResponse,
@@ -15,6 +21,7 @@ import {
 export class HubVendaService {
   private readonly http = inject(HttpClient);
   private readonly baseUrl = `${HUB_TERMINAL_API_PATH}/venda`;
+  private readonly terminalUrl = HUB_TERMINAL_API_PATH;
 
   atual(): Observable<VendaAtualResponse> {
     return this.http.get<VendaApiResponse>(`${this.baseUrl}/atual/`).pipe(map(mapVendaAtual));
@@ -36,5 +43,27 @@ export class HubVendaService {
 
   cancelar(): Observable<VendaAtualResponse> {
     return this.http.post<VendaApiResponse>(`${this.baseUrl}/cancelar/`, {}).pipe(map(mapVendaAtual));
+  }
+
+  listarFormasPagamento(): Observable<FormasPagamentoResponse> {
+    return this.http.get<FormasPagamentoApiResponse>(`${this.terminalUrl}/formas-pagamento/`).pipe(map(mapFormasPagamento));
+  }
+
+  adicionarPagamento(request: AdicionarPagamentoRequest): Observable<VendaAtualResponse> {
+    return this.http.post<VendaApiResponse>(`${this.baseUrl}/pagamento/`, {
+      venda_uuid: request.vendaUuid,
+      operacao_uuid: request.operacaoUuid,
+      forma_pagamento_id: request.formaPagamentoId,
+      valor: request.valor,
+      autorizacao: request.autorizacao,
+    }).pipe(map(mapVendaAtual));
+  }
+
+  removerPagamento(pagamentoUuid: string): Observable<VendaAtualResponse> {
+    return this.http.delete<VendaApiResponse>(`${this.baseUrl}/pagamento/${pagamentoUuid}/`).pipe(map(mapVendaAtual));
+  }
+
+  finalizarVenda(vendaUuid: string): Observable<VendaAtualResponse> {
+    return this.http.post<VendaApiResponse>(`${this.baseUrl}/finalizar/`, { venda_uuid: vendaUuid }).pipe(map(mapVendaAtual));
   }
 }

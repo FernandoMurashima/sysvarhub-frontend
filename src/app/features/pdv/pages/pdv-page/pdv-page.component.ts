@@ -3,11 +3,13 @@ import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { Subscription } from 'rxjs';
 
+import { FormaPagamento } from '../../../../core/models/pagamento.models';
 import { VendaItemHubResumo } from '../../../../core/models/venda.models';
 import { CaixaSessionService } from '../../../caixa/services/caixa-session.service';
 import { normalizarValorAbertura } from '../../../caixa/services/caixa-valor.parser';
 import { OperatorSessionService } from '../../../operador/services/operator-session.service';
 import { VendaSessionService } from '../../../venda/services/venda-session.service';
+import { formatarMoedaString, normalizarValorPagamento, somarMoedasString } from '../../../venda/services/pagamento-valor.parser';
 import { PdvProdutoConsulta } from '../../models/pdv-produto-consulta.model';
 import { PdvHubFacade } from '../../services/pdv-hub.facade';
 
@@ -47,6 +49,13 @@ export class PdvPageComponent implements OnInit, OnDestroy {
   mensagem = '';
   mensagemAlerta = '';
   modalAtalho: PdvAtalho | '' = '';
+  formasPagamento: FormaPagamento[] = [];
+  formaPagamentoSelecionada: FormaPagamento | null = null;
+  filtroPagamento: 'TODAS' | 'DINHEIRO' | 'CARTAO' | 'PIX' | 'OUTRAS' = 'TODAS';
+  valorPagamento = '';
+  autorizacaoPagamento = '';
+  carregandoFormasPagamento = false;
+  confirmandoFinalizacao = false;
   carregandoBusca = false;
   tabelaPreco = '-';
   catalogoVersao: number | null = null;
@@ -165,7 +174,7 @@ export class PdvPageComponent implements OnInit, OnDestroy {
   }
 
   tentarAdicionarProduto(produto: PdvProdutoConsulta | null): void {
-    if (!produto) return;
+    if (!produto || this.temPagamentoAtivo()) return;
     this.adicionarProduto(produto);
   }
 
@@ -188,6 +197,10 @@ export class PdvPageComponent implements OnInit, OnDestroy {
     }
 
     if (atalho === 'cancelar-item') {
+      if (this.temPagamentoAtivo()) {
+        this.mensagem = 'Remova os pagamentos antes de alterar a venda.';
+        return;
+      }
       const item = this.venda()?.itens.find((linha) => linha.uuid === this.itemSelecionadoUuid);
       if (!item) {
         this.mensagem = 'Selecione um item para cancelar.';
@@ -202,12 +215,16 @@ export class PdvPageComponent implements OnInit, OnDestroy {
         this.mensagem = 'Nenhuma venda em andamento.';
         return;
       }
+      if (this.temPagamentoAtivo()) {
+        this.mensagem = 'Remova os pagamentos antes de cancelar a venda.';
+        return;
+      }
       this.modalAtalho = 'cancelar-venda';
       return;
     }
 
     if (atalho === 'pagamentos') {
-      this.mensagem = 'Pagamento será habilitado na próxima etapa.';
+      this.abrirPagamentos('TODAS');
       return;
     }
 
@@ -300,18 +317,13 @@ export class PdvPageComponent implements OnInit, OnDestroy {
   }
 
   formatarMoeda(valor: string | null | undefined): string {
-    if (!valor) return 'R$ 0,00';
-    const normalizado = valor.replace(',', '.');
-    const [inteiro, decimal = '00'] = normalizado.split('.');
-    return `R$ ${Number(inteiro).toLocaleString('pt-BR')},${decimal.padEnd(2, '0').slice(0, 2)}`;
+    return formatarMoedaString(valor);
   }
 
   totalDescontos(): string {
     const venda = this.venda();
     if (!venda) return '0.00';
-    const descontoItens = Number(venda.descontoItens || '0');
-    const descontoGeral = Number(venda.descontoGeral || '0');
-    return (descontoItens + descontoGeral).toFixed(2);
+    return somarMoedasString(venda.descontoItens, venda.descontoGeral);
   }
 
   motivos(produto: PdvProdutoConsulta): string {
@@ -327,10 +339,18 @@ export class PdvPageComponent implements OnInit, OnDestroy {
   }
 
   aumentarItem(item: VendaItemHubResumo): void {
+    if (this.temPagamentoAtivo()) {
+      this.mensagem = 'Remova os pagamentos antes de alterar a venda.';
+      return;
+    }
     this.alterarQuantidadeItem(item, item.quantidade + 1);
   }
 
   diminuirItem(item: VendaItemHubResumo): void {
+    if (this.temPagamentoAtivo()) {
+      this.mensagem = 'Remova os pagamentos antes de alterar a venda.';
+      return;
+    }
     if (item.quantidade <= 1) {
       this.mensagem = 'Use remover para excluir item com quantidade 1.';
       return;
@@ -347,6 +367,10 @@ export class PdvPageComponent implements OnInit, OnDestroy {
   }
 
   removerItem(item: VendaItemHubResumo): void {
+    if (this.temPagamentoAtivo()) {
+      this.mensagem = 'Remova os pagamentos antes de alterar a venda.';
+      return;
+    }
     this.itemOperandoUuid = item.uuid;
     this.vendaSession.removerItem(item.uuid).subscribe((resultado) => {
       this.itemOperandoUuid = null;
@@ -356,6 +380,11 @@ export class PdvPageComponent implements OnInit, OnDestroy {
   }
 
   cancelarVendaConfirmada(): void {
+    if (this.temPagamentoAtivo()) {
+      this.fecharAtalho();
+      this.mensagem = 'Remova os pagamentos antes de cancelar a venda.';
+      return;
+    }
     this.vendaSession.cancelarVenda().subscribe((resultado) => {
       this.fecharAtalho();
       if (resultado.ok) {
@@ -366,6 +395,99 @@ export class PdvPageComponent implements OnInit, OnDestroy {
       }
       this.tratarResultadoOperacao(resultado, 'Venda cancelada.');
     });
+  }
+
+  abrirPagamentos(filtro: 'TODAS' | 'DINHEIRO' | 'CARTAO' | 'PIX' | 'OUTRAS', event?: Event): void {
+    event?.preventDefault();
+    const venda = this.venda();
+    if (!venda || !venda.itens.length) {
+      this.mensagem = 'Inclua itens na venda antes de adicionar pagamento.';
+      return;
+    }
+    this.modalAtalho = 'pagamentos';
+    this.filtroPagamento = filtro;
+    this.carregarFormasPagamento(filtro);
+  }
+
+  formasPagamentoFiltradas(): FormaPagamento[] {
+    if (this.filtroPagamento === 'TODAS') return this.formasPagamento;
+    if (this.filtroPagamento === 'DINHEIRO') return this.formasPagamento.filter((forma) => forma.tipo === 'DINHEIRO');
+    if (this.filtroPagamento === 'PIX') return this.formasPagamento.filter((forma) => forma.tipo === 'PIX');
+    if (this.filtroPagamento === 'CARTAO') {
+      return this.formasPagamento.filter((forma) => ['DEBITO', 'CREDITO_ROTATIVO', 'CREDITO_PARCELADO'].includes(forma.tipo));
+    }
+    return this.formasPagamento.filter((forma) => !['DINHEIRO', 'PIX', 'DEBITO', 'CREDITO_ROTATIVO', 'CREDITO_PARCELADO'].includes(forma.tipo));
+  }
+
+  selecionarFormaPagamento(forma: FormaPagamento): void {
+    this.formaPagamentoSelecionada = forma;
+    this.valorPagamento = this.venda()?.pendente || '';
+  }
+
+  adicionarPagamento(): void {
+    const venda = this.venda();
+    const forma = this.formaPagamentoSelecionada;
+    if (!venda || !forma) return;
+    if (forma.tefHabilitado) {
+      this.mensagem = 'Esta forma exige integração TEF.';
+      return;
+    }
+    const valor = normalizarValorPagamento(this.valorPagamento);
+    if (!valor) {
+      this.mensagem = 'Valor de pagamento inválido.';
+      return;
+    }
+    this.vendaSession.adicionarPagamento(venda.uuid, forma.id, valor, this.autorizacaoPagamento.trim()).subscribe((resultado) => {
+      if (resultado.ok) {
+        this.valorPagamento = this.venda()?.pendente || '';
+        this.autorizacaoPagamento = '';
+        this.mensagem = 'Pagamento adicionado.';
+        return;
+      }
+      this.mensagem = resultado.detail || 'Falha ao adicionar pagamento.';
+    });
+  }
+
+  removerPagamento(pagamentoUuid: string): void {
+    this.vendaSession.removerPagamento(pagamentoUuid).subscribe((resultado) => {
+      this.mensagem = resultado.ok ? 'Pagamento removido.' : resultado.detail || 'Falha ao remover pagamento.';
+    });
+  }
+
+  abrirConfirmacaoFinalizacao(): void {
+    const venda = this.venda();
+    if (!venda || !venda.itens.length || !venda.pagamentos.length || venda.pendente !== '0.00') {
+      this.mensagem = 'Finalize somente após itens e pagamento completo.';
+      return;
+    }
+    this.confirmandoFinalizacao = true;
+  }
+
+  finalizarVendaConfirmada(): void {
+    const venda = this.venda();
+    if (!venda) return;
+    this.vendaSession.finalizarVenda(venda.uuid).subscribe((resultado) => {
+      this.confirmandoFinalizacao = false;
+      if (!resultado.ok) {
+        this.mensagem = resultado.detail || 'Falha ao finalizar venda.';
+        return;
+      }
+      const troco = venda.troco !== '0.00' ? ` Troco: ${this.formatarMoeda(venda.troco)}.` : '';
+      this.fecharAtalho();
+      this.itemSelecionadoUuid = null;
+      this.busca = '';
+      this.produtos = [];
+      this.produtoSelecionado = null;
+      this.mensagem = `Venda finalizada com sucesso.${troco}`;
+    });
+  }
+
+  temPagamentoAtivo(): boolean {
+    return Boolean(this.venda()?.pagamentos.length);
+  }
+
+  categoriaDisponivel(categoria: 'DINHEIRO' | 'CARTAO' | 'PIX' | 'OUTRAS'): boolean {
+    return this.formasPorCategoria(categoria).length > 0;
   }
 
   private consultarProdutos(termo: string, selecionarExato = false): void {
@@ -428,6 +550,10 @@ export class PdvPageComponent implements OnInit, OnDestroy {
       this.mensagem = `Produto bloqueado: ${this.motivos(produto)}`;
       return;
     }
+    if (this.temPagamentoAtivo()) {
+      this.mensagem = 'Remova os pagamentos antes de alterar a venda.';
+      return;
+    }
 
     this.vendaSession.adicionarItem(produto.skuId, 1).subscribe((resultado) => {
       this.tratarResultadoOperacao(resultado, 'Item adicionado.');
@@ -436,6 +562,31 @@ export class PdvPageComponent implements OnInit, OnDestroy {
         this.busca = '';
       }
     });
+  }
+
+  private carregarFormasPagamento(filtro: 'TODAS' | 'DINHEIRO' | 'CARTAO' | 'PIX' | 'OUTRAS'): void {
+    this.carregandoFormasPagamento = true;
+    this.vendaSession.listarFormasPagamento().subscribe({
+      next: (response) => {
+        this.formasPagamento = response.formas;
+        this.carregandoFormasPagamento = false;
+        const formas = filtro === 'TODAS' ? response.formas : this.formasPorCategoria(filtro);
+        this.formaPagamentoSelecionada = formas[0] || response.formas[0] || null;
+        this.valorPagamento = this.venda()?.pendente || '';
+      },
+      error: () => {
+        this.carregandoFormasPagamento = false;
+        this.mensagem = 'Falha ao carregar formas de pagamento.';
+      },
+    });
+  }
+
+  private formasPorCategoria(categoria: 'DINHEIRO' | 'CARTAO' | 'PIX' | 'OUTRAS'): FormaPagamento[] {
+    const anteriores = this.filtroPagamento;
+    this.filtroPagamento = categoria;
+    const formas = this.formasPagamentoFiltradas();
+    this.filtroPagamento = anteriores;
+    return formas;
   }
 
   private tratarResultadoOperacao(resultado: { ok: boolean; detail?: string; estoqueDisponivel?: string }, sucesso: string): void {

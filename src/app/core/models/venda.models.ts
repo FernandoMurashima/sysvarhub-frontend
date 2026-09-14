@@ -28,8 +28,26 @@ export interface VendaHubResumo {
   descontoItens: string;
   descontoGeral: string;
   total: string;
+  totalPago: string;
+  pendente: string;
+  troco: string;
   operadorCriacao: OperadorHubPublico;
   itens: VendaItemHubResumo[];
+  pagamentos: VendaPagamentoHubResumo[];
+}
+
+export interface VendaPagamentoHubResumo {
+  uuid: string;
+  formaPagamentoId: number;
+  formaRetaguardaId: number;
+  codigo: string;
+  descricao: string;
+  tipo: string;
+  numParcelas: number;
+  valor: string;
+  autorizacao: string;
+  origemCaptura: string;
+  criadoEm: string;
 }
 
 export interface VendaAtualResponse {
@@ -71,8 +89,26 @@ export interface VendaHubResumoApi {
   desconto_itens: string;
   desconto_geral: string;
   total: string;
+  total_pago?: string;
+  pendente?: string;
+  troco?: string;
   operador_criacao: OperadorHubPublicoApi;
   itens: VendaItemHubResumoApi[];
+  pagamentos?: VendaPagamentoHubResumoApi[];
+}
+
+export interface VendaPagamentoHubResumoApi {
+  uuid: string;
+  forma_pagamento_id: number;
+  forma_retaguarda_id: number;
+  codigo: string;
+  descricao: string;
+  tipo: string;
+  num_parcelas: number;
+  valor: string;
+  autorizacao: string;
+  origem_captura: string;
+  criado_em: string;
 }
 
 export interface VendaApiResponse {
@@ -94,8 +130,12 @@ export function mapVenda(venda: VendaHubResumoApi): VendaHubResumo {
     descontoItens: venda.desconto_itens,
     descontoGeral: venda.desconto_geral,
     total: venda.total,
+    totalPago: venda.total_pago ?? '0.00',
+    pendente: venda.pendente ?? venda.total,
+    troco: venda.troco ?? '0.00',
     operadorCriacao: mapOperador(venda.operador_criacao),
     itens: venda.itens.map(mapVendaItem),
+    pagamentos: (venda.pagamentos ?? []).map(mapVendaPagamento),
   };
 }
 
@@ -116,5 +156,21 @@ export function mapVendaItem(item: VendaItemHubResumoApi): VendaItemHubResumo {
     precoUnitario: item.preco_unitario,
     desconto: item.desconto,
     totalItem: item.total_item,
+  };
+}
+
+export function mapVendaPagamento(pagamento: VendaPagamentoHubResumoApi): VendaPagamentoHubResumo {
+  return {
+    uuid: pagamento.uuid,
+    formaPagamentoId: pagamento.forma_pagamento_id,
+    formaRetaguardaId: pagamento.forma_retaguarda_id,
+    codigo: pagamento.codigo,
+    descricao: pagamento.descricao,
+    tipo: pagamento.tipo,
+    numParcelas: pagamento.num_parcelas,
+    valor: pagamento.valor,
+    autorizacao: pagamento.autorizacao,
+    origemCaptura: pagamento.origem_captura,
+    criadoEm: pagamento.criado_em,
   };
 }

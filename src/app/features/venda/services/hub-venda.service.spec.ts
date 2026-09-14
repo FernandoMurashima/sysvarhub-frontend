@@ -52,4 +52,55 @@ describe('HubVendaService', () => {
     expect(cancelar.request.method).toBe('POST');
     cancelar.flush({ venda: null });
   });
+
+  it('lista formas e opera pagamentos/finalizacao', () => {
+    service.listarFormasPagamento().subscribe((response) => expect(response.formas[0].codigo).toBe('DIN'));
+    const formas = httpMock.expectOne('/api/terminal/formas-pagamento/');
+    expect(formas.request.method).toBe('GET');
+    formas.flush({
+      versao: 1,
+      sincronizado_em: null,
+      formas: [{
+        id: 1,
+        retaguarda_id: 10,
+        codigo: 'DIN',
+        descricao: 'Dinheiro',
+        tipo: 'DINHEIRO',
+        num_parcelas: 1,
+        tef_habilitado: false,
+        parcelas: [],
+      }],
+    });
+
+    service.adicionarPagamento({
+      vendaUuid: 'venda',
+      operacaoUuid: 'op',
+      formaPagamentoId: 1,
+      valor: '199.90',
+      autorizacao: '',
+    }).subscribe();
+    const pagamento = httpMock.expectOne('/api/terminal/venda/pagamento/');
+    expect(pagamento.request.method).toBe('POST');
+    expect(pagamento.request.body).toEqual({
+      venda_uuid: 'venda',
+      operacao_uuid: 'op',
+      forma_pagamento_id: 1,
+      valor: '199.90',
+      autorizacao: '',
+    });
+    pagamento.flush({ venda: null });
+
+    service.removerPagamento('pag').subscribe();
+    const removerPagamento = httpMock.expectOne('/api/terminal/venda/pagamento/pag/');
+    expect(removerPagamento.request.method).toBe('DELETE');
+    removerPagamento.flush({ venda: null });
+  });
+
+  it('finaliza venda por uuid', () => {
+    service.finalizarVenda('venda').subscribe();
+    const request = httpMock.expectOne('/api/terminal/venda/finalizar/');
+    expect(request.request.method).toBe('POST');
+    expect(request.request.body).toEqual({ venda_uuid: 'venda' });
+    request.flush({ venda: null });
+  });
 });

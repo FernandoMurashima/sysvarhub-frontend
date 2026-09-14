@@ -157,6 +157,18 @@ describe('terminalAuthInterceptor', () => {
     expect(router.navigateByUrl).not.toHaveBeenCalled();
   });
 
+  it('401 em formas de pagamento nao limpa Terminal nem navega pareamento', () => {
+    credentialStore.getToken.and.returnValue('token-ficticio');
+
+    http.get('/api/terminal/formas-pagamento/').subscribe({ error: () => undefined });
+    const request = httpMock.expectOne('/api/terminal/formas-pagamento/');
+    request.flush({}, { status: 401, statusText: 'Unauthorized' });
+
+    expect(request.request.headers.get('Authorization')).toBe('Terminal token-ficticio');
+    expect(credentialStore.clearToken).not.toHaveBeenCalled();
+    expect(router.navigateByUrl).not.toHaveBeenCalled();
+  });
+
   it('401 no login do operador pode limpar Terminal', () => {
     credentialStore.getToken.and.returnValue('token-ficticio');
 

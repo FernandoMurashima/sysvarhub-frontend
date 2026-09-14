@@ -11,6 +11,9 @@ describe('venda models', () => {
         desconto_itens: '0.00',
         desconto_geral: '0.00',
         total: '199.90',
+        total_pago: '100.00',
+        pendente: '99.90',
+        troco: '0.00',
         operador_criacao: { usuario_id: 99, codigo: 'caixa.barra', nome: 'Juliana', tipo: 'Caixa', perfil: null },
         itens: [{
           uuid: 'item',
@@ -29,6 +32,19 @@ describe('venda models', () => {
           desconto: '0.00',
           total_item: '399.80',
         }],
+        pagamentos: [{
+          uuid: 'pag',
+          forma_pagamento_id: 1,
+          forma_retaguarda_id: 10,
+          codigo: 'DIN',
+          descricao: 'Dinheiro',
+          tipo: 'DINHEIRO',
+          num_parcelas: 1,
+          valor: '100.00',
+          autorizacao: '',
+          origem_captura: 'MANUAL',
+          criado_em: '2026-09-13T12:01:00',
+        }],
       },
     };
 
@@ -40,5 +56,9 @@ describe('venda models', () => {
     expect(venda?.itens[0].skuId).toBe(10825);
     expect(venda?.itens[0].quantidade).toBe(2);
     expect(venda?.itens[0].precoUnitario).toBe('199.9000');
+    expect(venda?.totalPago).toBe('100.00');
+    expect(venda?.pendente).toBe('99.90');
+    expect(venda?.troco).toBe('0.00');
+    expect(venda?.pagamentos[0].formaPagamentoId).toBe(1);
   });
 });

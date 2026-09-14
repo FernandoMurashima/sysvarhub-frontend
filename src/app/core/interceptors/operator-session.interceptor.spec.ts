@@ -87,6 +87,16 @@ describe('operatorSessionInterceptor', () => {
     item.flush({});
   });
 
+  it('envia header em formas de pagamento', () => {
+    sessionStore.getToken.and.returnValue('sessao-operador-ficticia');
+
+    http.get('/api/terminal/formas-pagamento/').subscribe();
+    const request = httpMock.expectOne('/api/terminal/formas-pagamento/');
+
+    expect(request.request.headers.get('X-Sysvar-Operador-Session')).toBe('sessao-operador-ficticia');
+    request.flush({});
+  });
+
   it('nao envia header em pareamento nem URL externa', () => {
     sessionStore.getToken.and.returnValue('sessao-operador-ficticia');
 
