@@ -5,7 +5,9 @@ import { RouterTestingModule } from '@angular/router/testing';
 import { of } from 'rxjs';
 
 import { SessaoCaixaHubResumo } from '../../../../core/models/caixa.models';
+import { ClienteHubResumo } from '../../../../core/models/cliente.models';
 import { CaixaSessionService } from '../../../caixa/services/caixa-session.service';
+import { HubClienteService } from '../../../cliente/services/hub-cliente.service';
 import { OperatorSessionService } from '../../../operador/services/operator-session.service';
 import { VendaSessionService } from '../../../venda/services/venda-session.service';
 import { sessaoCaixaAbertaStub, vendaAbertaStub } from '../../../../testing/terminal-test-data';
@@ -57,6 +59,25 @@ const produtoSemPreco: PdvProdutoConsulta = {
   motivosBloqueio: ['SEM_PRECO'],
 };
 
+const clienteAtivo: ClienteHubResumo = {
+  clienteUuid: 'cliente-uuid',
+  retaguardaId: 123,
+  origem: 'RETAGUARDA',
+  tipoPessoa: 'PF',
+  documento: '12345678901',
+  clientePadrao: false,
+  nomeCliente: 'Maria Silva',
+  apelido: '',
+  telefone1: '21999990000',
+  email: 'maria@example.com',
+  cidade: 'Rio de Janeiro',
+  estado: 'RJ',
+  bloqueio: false,
+  motivoBloqueio: null,
+  ativo: true,
+  presenteRetaguarda: true,
+};
+
 @Component({
   standalone: true,
   template: '',
@@ -67,6 +88,7 @@ describe('PdvPageComponent', () => {
   let fixture: ComponentFixture<PdvPageComponent>;
   let facade: jasmine.SpyObj<PdvHubFacade>;
   let operatorSession: jasmine.SpyObj<OperatorSessionService>;
+  let hubClienteService: jasmine.SpyObj<HubClienteService>;
   let caixaSession: jasmine.SpyObj<CaixaSessionService>;
   let vendaSession: jasmine.SpyObj<VendaSessionService>;
   let caixaStatusSignal = signal<'inicializando' | 'fechado' | 'aberto' | 'erro'>('aberto');
@@ -107,6 +129,15 @@ describe('PdvPageComponent', () => {
       }).asReadonly(),
     });
     operatorSession.logout.and.returnValue(of(true));
+    hubClienteService = jasmine.createSpyObj<HubClienteService>('HubClienteService', ['listar']);
+    hubClienteService.listar.and.returnValue(of({
+      clientesVersao: 1,
+      clientesSincronizadoEm: '2026-09-14T10:00:00',
+      q: '',
+      total: 1,
+      limit: 50,
+      clientes: [clienteAtivo],
+    }));
     caixaStatusSignal = signal<'inicializando' | 'fechado' | 'aberto' | 'erro'>('aberto');
     sessaoCaixaSignal = signal(sessaoCaixaAbertaStub);
     caixaSession = jasmine.createSpyObj<CaixaSessionService>('CaixaSessionService', ['bootstrap', 'abrir'], {
@@ -118,7 +149,7 @@ describe('PdvPageComponent', () => {
     vendaSignal = signal(vendaAbertaStub.venda);
     vendaStatusSignal = signal<'inicializando' | 'sem-venda' | 'aberta' | 'erro'>('aberta');
     vendaLoadingSignal = signal(false);
-    vendaSession = jasmine.createSpyObj<VendaSessionService>('VendaSessionService', ['bootstrap', 'adicionarItem', 'alterarQuantidade', 'removerItem', 'cancelarVenda', 'limparEstado', 'listarFormasPagamento', 'adicionarPagamento', 'removerPagamento', 'finalizarVenda'], {
+    vendaSession = jasmine.createSpyObj<VendaSessionService>('VendaSessionService', ['bootstrap', 'adicionarItem', 'alterarQuantidade', 'removerItem', 'cancelarVenda', 'limparEstado', 'listarFormasPagamento', 'adicionarPagamento', 'removerPagamento', 'finalizarVenda', 'selecionarCliente', 'removerCliente'], {
       venda: vendaSignal.asReadonly(),
       status: vendaStatusSignal.asReadonly(),
       loadingOperacao: vendaLoadingSignal.asReadonly(),
@@ -132,12 +163,15 @@ describe('PdvPageComponent', () => {
     vendaSession.adicionarPagamento.and.returnValue(of({ ok: true }));
     vendaSession.removerPagamento.and.returnValue(of({ ok: true }));
     vendaSession.finalizarVenda.and.returnValue(of({ ok: true }));
+    vendaSession.selecionarCliente.and.returnValue(of({ ok: true }));
+    vendaSession.removerCliente.and.returnValue(of({ ok: true }));
 
     await TestBed.configureTestingModule({
       imports: [PdvPageComponent, RouterTestingModule.withRoutes([{ path: 'operador', component: EmptyRouteComponent }])],
       providers: [
         { provide: PdvHubFacade, useValue: facade },
         { provide: OperatorSessionService, useValue: operatorSession },
+        { provide: HubClienteService, useValue: hubClienteService },
         { provide: CaixaSessionService, useValue: caixaSession },
         { provide: VendaSessionService, useValue: vendaSession },
       ],
@@ -335,6 +369,149 @@ describe('PdvPageComponent', () => {
     expect(component.modalAtalho).toBe('pagamentos');
     expect(vendaSession.listarFormasPagamento).toHaveBeenCalled();
     expect(facade.buscarCatalogo).not.toHaveBeenCalled();
+  });
+
+  it('F2 e botao Cliente abrem modal e carregam clientes locais', () => {
+    const component = fixture.componentInstance;
+
+    component.atalhoF2(new KeyboardEvent('keydown', { key: 'F2' }));
+    fixture.detectChanges();
+
+    expect(component.modalAtalho).toBe('cliente');
+    expect(hubClienteService.listar).toHaveBeenCalledWith('');
+    expect(fixture.nativeElement.textContent).toContain('CLIENTE · F2');
+    expect(fixture.nativeElement.textContent).toContain('Maria Silva');
+    expect(fixture.nativeElement.textContent).not.toContain('Recurso ainda não integrado ao Hub');
+  });
+
+  it('busca cliente com debounce', fakeAsync(() => {
+    const component = fixture.componentInstance;
+    component.abrirCliente();
+    hubClienteService.listar.calls.reset();
+
+    component.buscaCliente = 'maria';
+    component.aoDigitarBuscaCliente();
+    tick(249);
+    expect(hubClienteService.listar).not.toHaveBeenCalled();
+    tick(1);
+
+    expect(hubClienteService.listar).toHaveBeenCalledWith('maria');
+  }));
+
+  it('inativo e bloqueado aparecem mas nao podem confirmar', () => {
+    const component = fixture.componentInstance;
+    const inativo = { ...clienteAtivo, clienteUuid: 'inativo', ativo: false };
+    const bloqueado = { ...clienteAtivo, clienteUuid: 'bloqueado', bloqueio: true };
+
+    component.abrirCliente();
+    component.clientesEncontrados = [inativo, bloqueado];
+    component.selecionarClienteLista(inativo);
+    component.confirmarClienteSelecionado();
+    fixture.detectChanges();
+
+    expect(vendaSession.selecionarCliente).not.toHaveBeenCalled();
+    expect(fixture.nativeElement.textContent).toContain('INATIVO');
+    expect(fixture.nativeElement.textContent).toContain('BLOQUEADO');
+  });
+
+  it('cliente padrao e LOCAL podem ser selecionados', () => {
+    const component = fixture.componentInstance;
+    const local = { ...clienteAtivo, clienteUuid: 'local', retaguardaId: null, origem: 'LOCAL' as const };
+    const padrao = { ...clienteAtivo, clienteUuid: 'padrao', clientePadrao: true };
+
+    component.abrirCliente();
+    component.selecionarClienteLista(local);
+    component.confirmarClienteSelecionado();
+    component.abrirCliente();
+    component.selecionarClienteLista(padrao);
+    component.confirmarClienteSelecionado();
+
+    expect(vendaSession.selecionarCliente).toHaveBeenCalledWith('local');
+    expect(vendaSession.selecionarCliente).toHaveBeenCalledWith('padrao');
+  });
+
+  it('selecao fecha modal e atualiza informacoes da venda', () => {
+    const component = fixture.componentInstance;
+    vendaSignal.set({
+      ...vendaAbertaStub.venda!,
+      cliente: {
+        clienteUuid: 'cliente-uuid',
+        retaguardaId: 123,
+        tipoPessoa: 'PF',
+        documento: '12345678901',
+        clientePadrao: false,
+        nomeCliente: 'Maria Silva',
+      },
+    });
+
+    component.abrirCliente();
+    component.selecionarClienteLista(clienteAtivo);
+    component.confirmarClienteSelecionado();
+    fixture.detectChanges();
+
+    expect(component.modalAtalho).toBe('');
+    expect(component.mensagem).toBe('Cliente selecionado.');
+    expect(fixture.nativeElement.textContent).toContain('Maria Silva');
+    expect(fixture.nativeElement.textContent).toContain('Código 123');
+  });
+
+  it('F2 pode iniciar venda sem item e troca mantem venda', () => {
+    const component = fixture.componentInstance;
+    vendaSignal.set(null);
+    vendaSession.selecionarCliente.and.callFake(() => {
+      vendaSignal.set({ ...vendaAbertaStub.venda!, itens: [], cliente: { clienteUuid: 'cliente-uuid', retaguardaId: 123, tipoPessoa: 'PF', documento: null, clientePadrao: false, nomeCliente: 'Maria Silva' } });
+      return of({ ok: true });
+    });
+
+    component.abrirCliente();
+    component.selecionarClienteLista(clienteAtivo);
+    component.confirmarClienteSelecionado();
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.textContent).toContain('Venda em andamento · venda-hu');
+    expect(component.venda()?.itens.length).toBe(0);
+  });
+
+  it('remocao limpa cliente sem cancelar venda', () => {
+    const component = fixture.componentInstance;
+    vendaSignal.set({ ...vendaAbertaStub.venda!, cliente: { clienteUuid: 'cliente-uuid', retaguardaId: 123, tipoPessoa: 'PF', documento: null, clientePadrao: false, nomeCliente: 'Maria Silva' } });
+    vendaSession.removerCliente.and.callFake(() => {
+      vendaSignal.set({ ...vendaAbertaStub.venda!, cliente: null });
+      return of({ ok: true });
+    });
+
+    component.abrirCliente();
+    component.removerClienteVenda();
+    fixture.detectChanges();
+
+    expect(vendaSession.removerCliente).toHaveBeenCalled();
+    expect(component.mensagem).toBe('Cliente removido da venda.');
+    expect(fixture.nativeElement.textContent).toContain('Consumidor não identificado');
+  });
+
+  it('pagamento ativo bloqueia alterar cliente no modal', () => {
+    const component = fixture.componentInstance;
+    vendaSignal.set({ ...vendaAbertaStub.venda!, pagamentos: [{ uuid: 'pag', formaPagamentoId: 1, formaRetaguardaId: 10, codigo: 'DIN', descricao: 'Dinheiro', tipo: 'DINHEIRO', numParcelas: 1, valor: '199.90', autorizacao: '', origemCaptura: 'MANUAL', criadoEm: '2026-09-14' }] });
+
+    component.abrirCliente();
+    component.selecionarClienteLista(clienteAtivo);
+    component.confirmarClienteSelecionado();
+    fixture.detectChanges();
+
+    expect(vendaSession.selecionarCliente).not.toHaveBeenCalled();
+    expect(fixture.nativeElement.textContent).toContain('Remova os pagamentos antes de alterar o cliente.');
+  });
+
+  it('ESC fecha modal de cliente e bootstrap restaura cliente da venda', () => {
+    const component = fixture.componentInstance;
+    vendaSignal.set({ ...vendaAbertaStub.venda!, cliente: { clienteUuid: 'cliente-uuid', retaguardaId: 123, tipoPessoa: 'PF', documento: '12345678901', clientePadrao: false, nomeCliente: 'Maria Silva' } });
+
+    component.abrirCliente();
+    component.atalhoEscape(new KeyboardEvent('keydown', { key: 'Escape' }));
+    fixture.detectChanges();
+
+    expect(component.modalAtalho).toBe('');
+    expect(fixture.nativeElement.textContent).toContain('Maria Silva');
   });
 
   it('remove entrada redundante lateral de adicionar pagamento e preserva atalhos de pagamento', () => {

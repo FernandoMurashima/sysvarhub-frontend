@@ -10,6 +10,7 @@ const OPERATOR_SESSION_PATHS = [
   '/api/terminal/caixa/',
   '/api/terminal/venda/',
   '/api/terminal/formas-pagamento/',
+  '/api/terminal/clientes/',
 ];
 
 export const operatorSessionInterceptor: HttpInterceptorFn = (req, next) => {

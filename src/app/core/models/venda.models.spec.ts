@@ -14,6 +14,14 @@ describe('venda models', () => {
         total_pago: '100.00',
         pendente: '99.90',
         troco: '0.00',
+        cliente: {
+          cliente_uuid: 'cliente-uuid',
+          retaguarda_id: 123,
+          tipo_pessoa: 'PF',
+          documento: '12345678901',
+          cliente_padrao: false,
+          nome_cliente: 'Cliente Teste',
+        },
         operador_criacao: { usuario_id: 99, codigo: 'caixa.barra', nome: 'Juliana', tipo: 'Caixa', perfil: null },
         itens: [{
           uuid: 'item',
@@ -59,6 +67,28 @@ describe('venda models', () => {
     expect(venda?.totalPago).toBe('100.00');
     expect(venda?.pendente).toBe('99.90');
     expect(venda?.troco).toBe('0.00');
+    expect(venda?.cliente?.clienteUuid).toBe('cliente-uuid');
+    expect(venda?.cliente?.retaguardaId).toBe(123);
+    expect(venda?.cliente?.nomeCliente).toBe('Cliente Teste');
     expect(venda?.pagamentos[0].formaPagamentoId).toBe(1);
+  });
+
+  it('mapeia venda com cliente null', () => {
+    const venda = mapVendaAtual({
+      venda: {
+        uuid: 'venda',
+        status: 'ABERTA',
+        criada_em: '2026-09-13T12:00:00',
+        subtotal: '0.00',
+        desconto_itens: '0.00',
+        desconto_geral: '0.00',
+        total: '0.00',
+        cliente: null,
+        operador_criacao: { usuario_id: 99, codigo: 'caixa.barra', nome: 'Juliana', tipo: 'Caixa', perfil: null },
+        itens: [],
+      },
+    }).venda;
+
+    expect(venda?.cliente).toBeNull();
   });
 });

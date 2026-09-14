@@ -61,6 +61,14 @@ export class VendaSessionService {
     return this.executarOperacao(this.hubVendaService.removerItem(itemUuid));
   }
 
+  selecionarCliente(clienteUuid: string): Observable<VendaOperacaoResultado> {
+    return this.executarOperacaoCliente(this.hubVendaService.selecionarCliente(clienteUuid));
+  }
+
+  removerCliente(): Observable<VendaOperacaoResultado> {
+    return this.executarOperacaoCliente(this.hubVendaService.removerCliente());
+  }
+
   cancelarVenda(): Observable<VendaOperacaoResultado> {
     this.loadingOperacaoSignal.set(true);
     return this.hubVendaService.cancelar().pipe(
@@ -182,6 +190,28 @@ export class VendaSessionService {
 
     this.carregarAtual().subscribe();
     return of({ ok: false, detail: 'Falha de comunicação com o Hub local. Atualizando estado da venda.' });
+  }
+
+  private executarOperacaoCliente(request$: Observable<{ venda: VendaHubResumo | null }>): Observable<VendaOperacaoResultado> {
+    this.loadingOperacaoSignal.set(true);
+    return request$.pipe(
+      tap((response) => this.definirVenda(response.venda)),
+      map(() => ({ ok: true })),
+      catchError((error: unknown) => this.tratarErroCliente(error)),
+      tap(() => this.loadingOperacaoSignal.set(false)),
+    );
+  }
+
+  private tratarErroCliente(error: unknown): Observable<VendaOperacaoResultado> {
+    if (this.isAuthenticationError(error)) {
+      this.tratarSessaoOperadorExpirada();
+      return of({ ok: false, detail: 'Sessão de operador expirada.' });
+    }
+    if (error instanceof HttpErrorResponse && (error.status === 400 || error.status === 409)) {
+      return of({ ok: false, detail: error.error?.detail || 'Cliente inválido para a venda.' });
+    }
+    this.carregarAtual().subscribe();
+    return of({ ok: false, detail: 'Não foi possível confirmar a alteração do cliente. O estado da venda foi atualizado.' });
   }
 
   private tratarErroPagamento(error: unknown): Observable<VendaOperacaoResultado> {

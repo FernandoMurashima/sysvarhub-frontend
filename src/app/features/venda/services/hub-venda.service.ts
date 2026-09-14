@@ -41,6 +41,14 @@ export class HubVendaService {
     return this.http.delete<VendaApiResponse>(`${this.baseUrl}/item/${itemUuid}/`).pipe(map(mapVendaAtual));
   }
 
+  selecionarCliente(clienteUuid: string): Observable<VendaAtualResponse> {
+    return this.http.put<VendaApiResponse>(`${this.baseUrl}/cliente/`, { cliente_uuid: clienteUuid }).pipe(map(mapVendaAtual));
+  }
+
+  removerCliente(): Observable<VendaAtualResponse> {
+    return this.http.delete<VendaApiResponse>(`${this.baseUrl}/cliente/`).pipe(map(mapVendaAtual));
+  }
+
   cancelar(): Observable<VendaAtualResponse> {
     return this.http.post<VendaApiResponse>(`${this.baseUrl}/cancelar/`, {}).pipe(map(mapVendaAtual));
   }

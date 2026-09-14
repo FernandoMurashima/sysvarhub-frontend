@@ -31,9 +31,19 @@ export interface VendaHubResumo {
   totalPago: string;
   pendente: string;
   troco: string;
+  cliente: VendaClienteResumo | null;
   operadorCriacao: OperadorHubPublico;
   itens: VendaItemHubResumo[];
   pagamentos: VendaPagamentoHubResumo[];
+}
+
+export interface VendaClienteResumo {
+  clienteUuid: string;
+  retaguardaId: number | null;
+  tipoPessoa: 'PF' | 'PJ' | '';
+  documento: string | null;
+  clientePadrao: boolean;
+  nomeCliente: string;
 }
 
 export interface VendaPagamentoHubResumo {
@@ -92,9 +102,19 @@ export interface VendaHubResumoApi {
   total_pago?: string;
   pendente?: string;
   troco?: string;
+  cliente?: VendaClienteResumoApi | null;
   operador_criacao: OperadorHubPublicoApi;
   itens: VendaItemHubResumoApi[];
   pagamentos?: VendaPagamentoHubResumoApi[];
+}
+
+export interface VendaClienteResumoApi {
+  cliente_uuid: string;
+  retaguarda_id: number | null;
+  tipo_pessoa: 'PF' | 'PJ' | '';
+  documento: string | null;
+  cliente_padrao: boolean;
+  nome_cliente: string;
 }
 
 export interface VendaPagamentoHubResumoApi {
@@ -133,9 +153,21 @@ export function mapVenda(venda: VendaHubResumoApi): VendaHubResumo {
     totalPago: venda.total_pago ?? '0.00',
     pendente: venda.pendente ?? venda.total,
     troco: venda.troco ?? '0.00',
+    cliente: venda.cliente ? mapVendaCliente(venda.cliente) : null,
     operadorCriacao: mapOperador(venda.operador_criacao),
     itens: venda.itens.map(mapVendaItem),
     pagamentos: (venda.pagamentos ?? []).map(mapVendaPagamento),
+  };
+}
+
+export function mapVendaCliente(cliente: VendaClienteResumoApi): VendaClienteResumo {
+  return {
+    clienteUuid: cliente.cliente_uuid,
+    retaguardaId: cliente.retaguarda_id,
+    tipoPessoa: cliente.tipo_pessoa,
+    documento: cliente.documento,
+    clientePadrao: cliente.cliente_padrao,
+    nomeCliente: cliente.nome_cliente,
   };
 }
 

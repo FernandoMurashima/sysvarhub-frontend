@@ -23,6 +23,8 @@ describe('VendaSessionService', () => {
       'removerItem',
       'cancelar',
       'listarFormasPagamento',
+      'selecionarCliente',
+      'removerCliente',
     ]);
     operatorSession = jasmine.createSpyObj<OperatorSessionService>('OperatorSessionService', ['invalidarSessao']);
     router = jasmine.createSpyObj<Router>('Router', ['navigateByUrl']);
@@ -67,6 +69,100 @@ describe('VendaSessionService', () => {
       expect(resultado.ok).toBeTrue();
       expect(service.status()).toBe('sem-venda');
       expect(service.venda()).toBeNull();
+      done();
+    });
+  });
+
+  it('selecionar, trocar e remover cliente atualizam venda pela resposta do backend', (done) => {
+    const vendaComCliente = {
+      venda: {
+        ...vendaAbertaStub.venda!,
+        cliente: {
+          clienteUuid: 'cliente-uuid',
+          retaguardaId: 123,
+          tipoPessoa: 'PF' as const,
+          documento: '12345678901',
+          clientePadrao: false,
+          nomeCliente: 'Cliente Teste',
+        },
+      },
+    };
+    const vendaComOutroCliente = {
+      venda: {
+        ...vendaAbertaStub.venda!,
+        cliente: {
+          clienteUuid: 'outro-cliente',
+          retaguardaId: null,
+          tipoPessoa: 'PF' as const,
+          documento: null,
+          clientePadrao: false,
+          nomeCliente: 'Cliente Local',
+        },
+      },
+    };
+    hubVendaService.selecionarCliente.and.returnValues(of(vendaComCliente), of(vendaComOutroCliente));
+    hubVendaService.removerCliente.and.returnValue(of({ venda: { ...vendaAbertaStub.venda!, cliente: null } }));
+
+    service.selecionarCliente('cliente-uuid').subscribe((primeiro) => {
+      expect(primeiro.ok).toBeTrue();
+      expect(service.venda()?.cliente?.clienteUuid).toBe('cliente-uuid');
+      service.selecionarCliente('outro-cliente').subscribe((segundo) => {
+        expect(segundo.ok).toBeTrue();
+        expect(service.venda()?.cliente?.clienteUuid).toBe('outro-cliente');
+        service.removerCliente().subscribe((terceiro) => {
+          expect(terceiro.ok).toBeTrue();
+          expect(service.venda()?.cliente).toBeNull();
+          done();
+        });
+      });
+    });
+  });
+
+  it('cliente pode criar venda vazia e deixa sessao ativa', (done) => {
+    hubVendaService.selecionarCliente.and.returnValue(of({ venda: { ...vendaAbertaStub.venda!, itens: [] } }));
+
+    service.selecionarCliente('cliente-uuid').subscribe((resultado) => {
+      expect(resultado.ok).toBeTrue();
+      expect(service.status()).toBe('aberta');
+      expect(service.venda()?.itens).toEqual([]);
+      done();
+    });
+  });
+
+  it('400 e 409 de cliente usam detail do backend', (done) => {
+    hubVendaService.selecionarCliente.and.returnValues(
+      throwError(() => new HttpErrorResponse({ status: 400, error: { detail: 'Cliente inválido.' } })),
+      throwError(() => new HttpErrorResponse({ status: 409, error: { detail: 'Cliente bloqueado.' } })),
+    );
+
+    service.selecionarCliente('cliente').subscribe((primeiro) => {
+      expect(primeiro.detail).toBe('Cliente inválido.');
+      service.selecionarCliente('cliente').subscribe((segundo) => {
+        expect(segundo.detail).toBe('Cliente bloqueado.');
+        done();
+      });
+    });
+  });
+
+  it('401 de cliente invalida operador e navega operador', (done) => {
+    hubVendaService.selecionarCliente.and.returnValue(throwError(() => new HttpErrorResponse({ status: 401 })));
+
+    service.selecionarCliente('cliente').subscribe((resultado) => {
+      expect(resultado.ok).toBeFalse();
+      expect(operatorSession.invalidarSessao).toHaveBeenCalled();
+      expect(router.navigateByUrl).toHaveBeenCalledWith('/operador');
+      done();
+    });
+  });
+
+  it('falha de rede em cliente reconcilia com GET uma vez sem repetir escrita', (done) => {
+    hubVendaService.selecionarCliente.and.returnValue(throwError(() => new HttpErrorResponse({ status: 0 })));
+    hubVendaService.atual.and.returnValue(of(vendaAbertaStub));
+
+    service.selecionarCliente('cliente').subscribe((resultado) => {
+      expect(resultado.detail).toBe('Não foi possível confirmar a alteração do cliente. O estado da venda foi atualizado.');
+      expect(hubVendaService.selecionarCliente).toHaveBeenCalledTimes(1);
+      expect(hubVendaService.atual).toHaveBeenCalledTimes(1);
       done();
     });
   });

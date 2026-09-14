@@ -97,8 +97,17 @@
           </label>
         }
         <label>
-          Código do Cliente
-          <div class="select-like readonly-like">Consumidor final pendente</div>
+          Cliente
+          <div class="select-like readonly-like client-summary">
+            @if (venda()?.cliente) {
+              <span>
+                <strong>{{ venda()?.cliente?.nomeCliente }}</strong>
+                <small>{{ clienteCodigoResumo(venda()?.cliente) }} · {{ formatarDocumentoCliente(venda()?.cliente) }}</small>
+              </span>
+            } @else {
+              Consumidor não identificado
+            }
+          </div>
         </label>
         <label>
           Vendedor
@@ -339,6 +348,8 @@
           <div>
             @if (modalAtalho === 'preco') {
               <strong>Consulta de Preço</strong>
+            } @else if (modalAtalho === 'cliente') {
+              <strong>CLIENTE · F2</strong>
             } @else if (modalAtalho === 'cancelar-venda') {
               <strong>Cancelar Venda</strong>
             } @else if (modalAtalho === 'pagamentos') {
@@ -351,7 +362,92 @@
           <button type="button" (click)="fecharAtalho()">Fechar</button>
         </header>
 
-        @if (modalAtalho === 'preco') {
+        @if (modalAtalho === 'cliente') {
+          <div class="client-modal">
+            <section class="current-client">
+              <span>Cliente da venda</span>
+              @if (venda()?.cliente) {
+                <strong>{{ venda()?.cliente?.nomeCliente }}</strong>
+                <small>{{ clienteCodigoResumo(venda()?.cliente) }} · {{ formatarDocumentoCliente(venda()?.cliente) }}</small>
+              } @else {
+                <strong>Consumidor não identificado</strong>
+                <small>Venda sem cliente selecionado</small>
+              }
+            </section>
+
+            @if (temPagamentoAtivo()) {
+              <p class="client-warning">Remova os pagamentos antes de alterar o cliente.</p>
+            }
+
+            <div class="modal-search">
+              <input
+                name="buscaCliente"
+                [(ngModel)]="buscaCliente"
+                (ngModelChange)="aoDigitarBuscaCliente()"
+                placeholder="Nome, CPF/CNPJ, telefone ou e-mail"
+                autocomplete="off"
+              />
+            </div>
+
+            <div class="client-results">
+              @if (carregandoClientes) {
+                <p>Consultando clientes...</p>
+              } @else if (erroClientes) {
+                <p>{{ erroClientes }}</p>
+              } @else {
+                @for (cliente of clientesEncontrados; track cliente.clienteUuid) {
+                  <button
+                    type="button"
+                    [class.selected]="clienteListaSelecionado?.clienteUuid === cliente.clienteUuid"
+                    [class.blocked]="clienteSelecaoBloqueada(cliente)"
+                    (click)="selecionarClienteLista(cliente)"
+                    (dblclick)="confirmarClienteSelecionado()"
+                  >
+                    <span>
+                      <strong>{{ cliente.nomeCliente }}</strong>
+                      <small>{{ formatarDocumentoCliente(cliente) }} · {{ clienteCidadeUf(cliente) }}</small>
+                      @if (cliente.telefone1) {
+                        <small>{{ cliente.telefone1 }}</small>
+                      }
+                    </span>
+                    <span class="client-badges">
+                      @if (cliente.clientePadrao) {
+                        <b>PADRÃO</b>
+                      }
+                      @if (!cliente.ativo) {
+                        <b>INATIVO</b>
+                      }
+                      @if (cliente.bloqueio) {
+                        <b>BLOQUEADO</b>
+                      }
+                      @if (cliente.origem === 'LOCAL') {
+                        <b>LOCAL</b>
+                      }
+                    </span>
+                  </button>
+                }
+                @if (!clientesEncontrados.length) {
+                  <p>Nenhum cliente encontrado.</p>
+                }
+              }
+            </div>
+
+            <footer class="client-actions">
+              @if (venda()?.cliente) {
+                <button type="button" class="danger" [disabled]="temPagamentoAtivo() || vendaLoading()" (click)="removerClienteVenda()">Remover cliente</button>
+              }
+              <button type="button" (click)="fecharAtalho()">Fechar</button>
+              <button
+                type="button"
+                class="primary"
+                [disabled]="!clienteListaSelecionado || clienteSelecaoBloqueada(clienteListaSelecionado) || temPagamentoAtivo() || vendaLoading()"
+                (click)="confirmarClienteSelecionado()"
+              >
+                Selecionar
+              </button>
+            </footer>
+          </div>
+        } @else if (modalAtalho === 'preco') {
           <div class="modal-search">
             <input [(ngModel)]="buscaModal" (keydown.enter)="buscarPrecoAtalho()" placeholder="Digite código, referência, descrição ou EAN" />
             <button type="button" (click)="buscarPrecoAtalho()">Buscar</button>

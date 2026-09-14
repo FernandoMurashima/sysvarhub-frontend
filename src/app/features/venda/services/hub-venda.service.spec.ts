@@ -53,6 +53,41 @@ describe('HubVendaService', () => {
     cancelar.flush({ venda: null });
   });
 
+  it('seleciona e remove cliente da venda', () => {
+    service.selecionarCliente('cliente-uuid').subscribe((response) => expect(response.venda?.cliente?.clienteUuid).toBe('cliente-uuid'));
+    const selecionar = httpMock.expectOne('/api/terminal/venda/cliente/');
+    expect(selecionar.request.method).toBe('PUT');
+    expect(selecionar.request.body).toEqual({ cliente_uuid: 'cliente-uuid' });
+    selecionar.flush({
+      venda: {
+        uuid: 'venda',
+        status: 'ABERTA',
+        criada_em: '2026-09-14T10:00:00',
+        subtotal: '0.00',
+        desconto_itens: '0.00',
+        desconto_geral: '0.00',
+        total: '0.00',
+        cliente: {
+          cliente_uuid: 'cliente-uuid',
+          retaguarda_id: null,
+          tipo_pessoa: 'PF',
+          documento: null,
+          cliente_padrao: false,
+          nome_cliente: 'Cliente Local',
+        },
+        operador_criacao: { usuario_id: 1, codigo: '001', nome: 'Operador', tipo: 'Caixa', perfil: null },
+        itens: [],
+        pagamentos: [],
+      },
+    });
+
+    service.removerCliente().subscribe((response) => expect(response.venda).toBeNull());
+    const remover = httpMock.expectOne('/api/terminal/venda/cliente/');
+    expect(remover.request.method).toBe('DELETE');
+    expect(remover.request.body).toBeNull();
+    remover.flush({ venda: null });
+  });
+
   it('lista formas e opera pagamentos/finalizacao', () => {
     service.listarFormasPagamento().subscribe((response) => expect(response.formas[0].codigo).toBe('DIN'));
     const formas = httpMock.expectOne('/api/terminal/formas-pagamento/');

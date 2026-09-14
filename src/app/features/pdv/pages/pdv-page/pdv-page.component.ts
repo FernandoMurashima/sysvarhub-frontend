@@ -3,9 +3,11 @@ import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { Subscription } from 'rxjs';
 
+import { ClienteHubResumo, formatarDocumentoCliente } from '../../../../core/models/cliente.models';
 import { FormaPagamento } from '../../../../core/models/pagamento.models';
-import { VendaItemHubResumo } from '../../../../core/models/venda.models';
+import { VendaClienteResumo, VendaItemHubResumo } from '../../../../core/models/venda.models';
 import { CaixaSessionService } from '../../../caixa/services/caixa-session.service';
+import { HubClienteService } from '../../../cliente/services/hub-cliente.service';
 import { normalizarValorAbertura } from '../../../caixa/services/caixa-valor.parser';
 import { OperatorSessionService } from '../../../operador/services/operator-session.service';
 import { VendaSessionService } from '../../../venda/services/venda-session.service';
@@ -36,6 +38,7 @@ export class PdvPageComponent implements OnInit, OnDestroy {
   private readonly operatorSession = inject(OperatorSessionService);
   private readonly caixaSession = inject(CaixaSessionService);
   private readonly vendaSession = inject(VendaSessionService);
+  private readonly hubClienteService = inject(HubClienteService);
   private readonly router = inject(Router);
 
   busca = '';
@@ -57,6 +60,11 @@ export class PdvPageComponent implements OnInit, OnDestroy {
   carregandoFormasPagamento = false;
   confirmandoFinalizacao = false;
   carregandoBusca = false;
+  buscaCliente = '';
+  clientesEncontrados: ClienteHubResumo[] = [];
+  clienteListaSelecionado: ClienteHubResumo | null = null;
+  carregandoClientes = false;
+  erroClientes = '';
   tabelaPreco = '-';
   catalogoVersao: number | null = null;
   catalogoSincronizadoEm: string | null = null;
@@ -65,7 +73,9 @@ export class PdvPageComponent implements OnInit, OnDestroy {
   abrindoCaixa = false;
   readonly vendedor = '-';
   private buscaTimer: ReturnType<typeof setTimeout> | null = null;
+  private buscaClienteTimer: ReturnType<typeof setTimeout> | null = null;
   private buscaSubscription: Subscription | null = null;
+  private clientesSubscription: Subscription | null = null;
 
   readonly loja = this.facade.loja;
   readonly caixa = this.facade.caixa;
@@ -98,7 +108,9 @@ export class PdvPageComponent implements OnInit, OnDestroy {
 
   ngOnDestroy(): void {
     if (this.buscaTimer) clearTimeout(this.buscaTimer);
+    if (this.buscaClienteTimer) clearTimeout(this.buscaClienteTimer);
     this.buscaSubscription?.unsubscribe();
+    this.clientesSubscription?.unsubscribe();
   }
 
   @HostListener('document:keydown.f2', ['$event'])
@@ -144,6 +156,22 @@ export class PdvPageComponent implements OnInit, OnDestroy {
   @HostListener('document:keydown.f10', ['$event'])
   atalhoF10(event: KeyboardEvent): void {
     this.abrirAtalho(event, 'fechamento');
+  }
+
+  @HostListener('document:keydown.escape', ['$event'])
+  atalhoEscape(event: KeyboardEvent): void {
+    if (!this.modalAtalho) return;
+    event.preventDefault();
+    this.fecharAtalho();
+  }
+
+  @HostListener('document:keydown.enter', ['$event'])
+  atalhoEnter(event: KeyboardEvent): void {
+    if (this.modalAtalho !== 'cliente') return;
+    const target = event.target as HTMLElement | null;
+    if (target?.tagName.toLowerCase() === 'input') return;
+    event.preventDefault();
+    this.confirmarClienteSelecionado();
   }
 
   aoDigitarBusca(): void {
@@ -228,6 +256,11 @@ export class PdvPageComponent implements OnInit, OnDestroy {
       return;
     }
 
+    if (atalho === 'cliente') {
+      this.abrirCliente();
+      return;
+    }
+
     if (atalho === 'fechamento') {
       this.mensagem = 'Fechamento de caixa será integrado em etapa posterior.';
       return;
@@ -241,6 +274,72 @@ export class PdvPageComponent implements OnInit, OnDestroy {
     this.modalAtalho = '';
     this.buscaModal = '';
     this.produtosPreco = [];
+    this.limparEstadoClienteModal();
+  }
+
+  abrirCliente(): void {
+    this.modalAtalho = 'cliente';
+    this.mensagem = '';
+    this.buscaCliente = '';
+    this.clienteListaSelecionado = null;
+    this.consultarClientes('');
+  }
+
+  aoDigitarBuscaCliente(): void {
+    if (this.buscaClienteTimer) clearTimeout(this.buscaClienteTimer);
+    this.buscaClienteTimer = setTimeout(() => this.consultarClientes(this.buscaCliente), 250);
+  }
+
+  selecionarClienteLista(cliente: ClienteHubResumo): void {
+    this.clienteListaSelecionado = cliente;
+  }
+
+  confirmarClienteSelecionado(): void {
+    const cliente = this.clienteListaSelecionado;
+    if (!cliente || this.clienteSelecaoBloqueada(cliente) || this.temPagamentoAtivo()) return;
+
+    const clienteAnterior = this.venda()?.cliente?.clienteUuid || null;
+    this.vendaSession.selecionarCliente(cliente.clienteUuid).subscribe((resultado) => {
+      if (!resultado.ok) {
+        this.mensagem = resultado.detail || 'Falha ao selecionar cliente.';
+        return;
+      }
+      this.fecharAtalho();
+      this.mensagem = clienteAnterior && clienteAnterior !== cliente.clienteUuid ? 'Cliente alterado.' : 'Cliente selecionado.';
+    });
+  }
+
+  removerClienteVenda(): void {
+    if (this.temPagamentoAtivo()) return;
+    this.vendaSession.removerCliente().subscribe((resultado) => {
+      if (!resultado.ok) {
+        this.mensagem = resultado.detail || 'Falha ao remover cliente.';
+        return;
+      }
+      this.fecharAtalho();
+      this.mensagem = 'Cliente removido da venda.';
+    });
+  }
+
+  clienteSelecaoBloqueada(cliente: ClienteHubResumo): boolean {
+    return !cliente.ativo || cliente.bloqueio;
+  }
+
+  formatarDocumentoCliente(cliente: ClienteHubResumo | VendaClienteResumo | null | undefined): string {
+    if (!cliente) return 'Sem documento';
+    return formatarDocumentoCliente(cliente.tipoPessoa || 'PF', cliente.documento);
+  }
+
+  clienteCodigoResumo(cliente: VendaClienteResumo | null | undefined): string {
+    if (!cliente) return 'Consumidor não identificado';
+    return cliente.retaguardaId === null ? 'LOCAL' : `Código ${cliente.retaguardaId}`;
+  }
+
+  clienteCidadeUf(cliente: ClienteHubResumo): string {
+    const cidade = cliente.cidade.trim();
+    const estado = cliente.estado.trim();
+    if (cidade && estado) return `${cidade} / ${estado}`;
+    return cidade || estado || '-';
   }
 
   selecionarValorAbertura(event: Event): void {
@@ -587,6 +686,35 @@ export class PdvPageComponent implements OnInit, OnDestroy {
     const formas = this.formasPagamentoFiltradas();
     this.filtroPagamento = anteriores;
     return formas;
+  }
+
+  private consultarClientes(termo: string): void {
+    this.clientesSubscription?.unsubscribe();
+    this.carregandoClientes = true;
+    this.erroClientes = '';
+    this.clientesSubscription = this.hubClienteService.listar(termo).subscribe({
+      next: (resultado) => {
+        this.clientesEncontrados = resultado.clientes;
+        this.clienteListaSelecionado = resultado.clientes[0] || null;
+        this.carregandoClientes = false;
+      },
+      error: () => {
+        this.clientesEncontrados = [];
+        this.clienteListaSelecionado = null;
+        this.carregandoClientes = false;
+        this.erroClientes = 'Falha de comunicação com o Hub local.';
+      },
+    });
+  }
+
+  private limparEstadoClienteModal(): void {
+    if (this.buscaClienteTimer) clearTimeout(this.buscaClienteTimer);
+    this.clientesSubscription?.unsubscribe();
+    this.buscaCliente = '';
+    this.clientesEncontrados = [];
+    this.clienteListaSelecionado = null;
+    this.carregandoClientes = false;
+    this.erroClientes = '';
   }
 
   private tratarResultadoOperacao(resultado: { ok: boolean; detail?: string; estoqueDisponivel?: string }, sucesso: string): void {

@@ -114,6 +114,7 @@ export const vendaAbertaStub: VendaAtualResponse = {
     totalPago: '0.00',
     pendente: '199.90',
     troco: '0.00',
+    cliente: null,
     operadorCriacao: operadorLoginResponseStub.operador,
     itens: [
       {

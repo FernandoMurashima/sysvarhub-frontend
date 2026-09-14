@@ -97,6 +97,16 @@ describe('operatorSessionInterceptor', () => {
     request.flush({});
   });
 
+  it('envia header em consulta de clientes', () => {
+    sessionStore.getToken.and.returnValue('sessao-operador-ficticia');
+
+    http.get('/api/terminal/clientes/').subscribe();
+    const request = httpMock.expectOne('/api/terminal/clientes/');
+
+    expect(request.request.headers.get('X-Sysvar-Operador-Session')).toBe('sessao-operador-ficticia');
+    request.flush({});
+  });
+
   it('nao envia header em pareamento nem URL externa', () => {
     sessionStore.getToken.and.returnValue('sessao-operador-ficticia');
 
