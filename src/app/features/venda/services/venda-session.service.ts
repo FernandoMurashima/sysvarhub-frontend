@@ -222,7 +222,13 @@ export class VendaSessionService {
       map((response) => response.venda
         ? { ok: true }
         : { ok: false, detail: 'Não foi possível confirmar o início da venda. Tente novamente.' }),
-      catchError(() => of({ ok: false, detail: 'Falha de comunicação com o Hub local.' })),
+      catchError((erroReconciliacao: unknown) => {
+        if (this.isAuthenticationError(erroReconciliacao)) {
+          this.tratarSessaoOperadorExpirada();
+          return of({ ok: false, detail: 'Sessão de operador expirada.' });
+        }
+        return of({ ok: false, detail: 'Falha de comunicação com o Hub local.' });
+      }),
     );
   }
 

@@ -328,6 +328,24 @@ describe('VendaSessionService', () => {
     });
   });
 
+  [401, 403].forEach((status) => {
+    it(`erro de rede ao iniciar com GET ${status} invalida operador sem desparear terminal`, (done) => {
+      hubVendaService.iniciarVenda.and.returnValue(throwError(() => new HttpErrorResponse({ status: 0 })));
+      hubVendaService.atual.and.returnValue(throwError(() => new HttpErrorResponse({ status })));
+
+      service.iniciarVenda().subscribe((resultado) => {
+        expect(resultado.ok).toBeFalse();
+        expect(resultado.detail).toBe('Sessão de operador expirada.');
+        expect(operatorSession.invalidarSessao).toHaveBeenCalled();
+        expect(router.navigateByUrl).toHaveBeenCalledOnceWith('/operador');
+        expect(router.navigateByUrl).not.toHaveBeenCalledWith('/pareamento');
+        expect(hubVendaService.iniciarVenda).toHaveBeenCalledTimes(1);
+        expect(hubVendaService.atual).toHaveBeenCalledTimes(1);
+        done();
+      });
+    });
+  });
+
   it('401 ao iniciar invalida somente operador e navega operador', (done) => {
     hubVendaService.iniciarVenda.and.returnValue(throwError(() => new HttpErrorResponse({ status: 401 })));
 
