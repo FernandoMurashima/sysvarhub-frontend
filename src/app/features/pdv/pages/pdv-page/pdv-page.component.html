@@ -365,13 +365,13 @@
         @if (modalAtalho === 'cliente') {
           <div class="client-modal">
             <section class="current-client">
-              <span>Cliente da venda</span>
+              <span>{{ venda() ? 'Cliente da venda' : 'Cliente pré-selecionado' }}</span>
               @if (clienteOperacional()) {
                 <strong>{{ clienteOperacional()?.nomeCliente }}</strong>
                 <small>{{ clienteCodigoResumo(clienteOperacional()) }} · {{ formatarDocumentoCliente(clienteOperacional()) }}</small>
               } @else {
-                <strong>Consumidor não identificado</strong>
-                <small>Venda sem cliente selecionado</small>
+                <strong>{{ venda() ? 'Consumidor não identificado' : 'Nenhum cliente pré-selecionado' }}</strong>
+                <small>{{ venda() ? 'Venda sem cliente selecionado' : 'Venda ainda não iniciada' }}</small>
               }
             </section>
 

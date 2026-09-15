@@ -112,6 +112,10 @@ describe('PdvPageComponent', () => {
     };
   }
 
+  function textoClienteAtual(): string {
+    return fixture.nativeElement.querySelector('.current-client')?.textContent || '';
+  }
+
   beforeEach(async () => {
     facade = jasmine.createSpyObj<PdvHubFacade>('PdvHubFacade', ['buscarCatalogo'], {
       loja: signal('Filial 1').asReadonly(),
@@ -485,21 +489,33 @@ describe('PdvPageComponent', () => {
     const component = fixture.componentInstance;
     vendaSignal.set(null);
     vendaStatusSignal.set('sem-venda');
-    vendaSession.selecionarCliente.and.callFake(() => {
-      clientePreselecionadoSignal.set(clientePreselecionadoStub);
-      return of({ ok: true });
-    });
+    clientePreselecionadoSignal.set(clientePreselecionadoStub);
 
     component.abrirCliente();
-    component.selecionarClienteLista(clienteAtivo);
-    component.confirmarClienteSelecionado();
     fixture.detectChanges();
 
+    expect(textoClienteAtual()).toContain('Cliente pré-selecionado');
+    expect(textoClienteAtual()).not.toContain('Cliente da venda');
+    expect(textoClienteAtual()).toContain('Maria Silva');
+    expect(fixture.nativeElement.textContent).toContain('Cliente pré-selecionado');
+    expect(fixture.nativeElement.textContent).not.toContain('Cliente da venda');
     expect(fixture.nativeElement.textContent).toContain('Venda ainda não iniciada');
     expect(fixture.nativeElement.textContent).not.toContain('Venda em andamento · venda-hu');
-    expect(fixture.nativeElement.textContent).toContain('Maria Silva');
     expect(component.venda()).toBeNull();
-    expect(component.mensagem).toBe('Cliente selecionado.');
+  });
+
+  it('F2 sem venda e sem cliente mostra nenhum cliente preselecionado', () => {
+    const component = fixture.componentInstance;
+    vendaSignal.set(null);
+    vendaStatusSignal.set('sem-venda');
+    clientePreselecionadoSignal.set(null);
+
+    component.abrirCliente();
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.textContent).toContain('Cliente pré-selecionado');
+    expect(fixture.nativeElement.textContent).toContain('Nenhum cliente pré-selecionado');
+    expect(fixture.nativeElement.textContent).not.toContain('Cliente da venda');
   });
 
   it('troca cliente preselecionado usa mensagem Cliente alterado', () => {
@@ -517,6 +533,7 @@ describe('PdvPageComponent', () => {
   });
 
   it('cliente da VendaHub prevalece visualmente sobre pre-selecao', () => {
+    const component = fixture.componentInstance;
     vendaSignal.set({
       ...vendaAbertaStub.venda!,
       cliente: {
@@ -529,10 +546,26 @@ describe('PdvPageComponent', () => {
       },
     });
     clientePreselecionadoSignal.set(clientePreselecionadoStub);
+    component.abrirCliente();
     fixture.detectChanges();
 
-    expect(fixture.nativeElement.textContent).toContain('Cliente da Venda');
-    expect(fixture.nativeElement.textContent).not.toContain('Maria Silva');
+    expect(textoClienteAtual()).toContain('Cliente da venda');
+    expect(textoClienteAtual()).toContain('Cliente da Venda');
+    expect(textoClienteAtual()).not.toContain('Maria Silva');
+  });
+
+  it('venda existente sem cliente nao faz fallback para pre-selecao', () => {
+    const component = fixture.componentInstance;
+    vendaSignal.set({ ...vendaAbertaStub.venda!, cliente: null });
+    clientePreselecionadoSignal.set(clientePreselecionadoStub);
+
+    component.abrirCliente();
+    fixture.detectChanges();
+
+    expect(component.clienteOperacional()).toBeNull();
+    expect(textoClienteAtual()).toContain('Cliente da venda');
+    expect(textoClienteAtual()).toContain('Venda sem cliente selecionado');
+    expect(textoClienteAtual()).not.toContain('Maria Silva');
   });
 
   it('remocao limpa cliente sem cancelar venda', () => {
@@ -567,6 +600,7 @@ describe('PdvPageComponent', () => {
     fixture.detectChanges();
 
     expect(vendaSession.removerCliente).toHaveBeenCalled();
+    expect(component.mensagem).toBe('Cliente pré-selecionado removido.');
     expect(fixture.nativeElement.textContent).toContain('Venda ainda não iniciada');
     expect(fixture.nativeElement.textContent).toContain('Consumidor não identificado');
   });

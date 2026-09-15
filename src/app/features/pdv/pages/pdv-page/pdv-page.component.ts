@@ -312,13 +312,14 @@ export class PdvPageComponent implements OnInit, OnDestroy {
 
   removerClienteVenda(): void {
     if (this.temPagamentoAtivo()) return;
+    const removendoClienteVenda = Boolean(this.venda());
     this.vendaSession.removerCliente().subscribe((resultado) => {
       if (!resultado.ok) {
         this.mensagem = resultado.detail || 'Falha ao remover cliente.';
         return;
       }
       this.fecharAtalho();
-      this.mensagem = 'Cliente removido da venda.';
+      this.mensagem = removendoClienteVenda ? 'Cliente removido da venda.' : 'Cliente pré-selecionado removido.';
     });
   }
 
@@ -337,7 +338,8 @@ export class PdvPageComponent implements OnInit, OnDestroy {
   }
 
   clienteOperacional(): VendaClienteResumo | null {
-    return this.venda()?.cliente ?? this.clientePreselecionado();
+    const venda = this.venda();
+    return venda ? venda.cliente : this.clientePreselecionado();
   }
 
   clienteCidadeUf(cliente: ClienteHubResumo): string {
