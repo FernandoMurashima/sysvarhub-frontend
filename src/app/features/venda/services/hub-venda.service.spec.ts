@@ -36,6 +36,15 @@ describe('HubVendaService', () => {
     request.flush({ venda: null });
   });
 
+  it('inicia venda com POST e body vazio', () => {
+    service.iniciarVenda().subscribe();
+    const request = httpMock.expectOne('/api/terminal/venda/iniciar/');
+
+    expect(request.request.method).toBe('POST');
+    expect(request.request.body).toEqual({});
+    request.flush({ venda: null });
+  });
+
   it('altera, remove e cancela venda', () => {
     service.alterarQuantidade('item', 2).subscribe();
     const patch = httpMock.expectOne('/api/terminal/venda/item/item/');

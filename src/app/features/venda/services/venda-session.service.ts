@@ -55,6 +55,16 @@ export class VendaSessionService {
     return this.executarOperacao(this.hubVendaService.adicionarItem(skuId, quantidade));
   }
 
+  iniciarVenda(): Observable<VendaOperacaoResultado> {
+    this.loadingOperacaoSignal.set(true);
+    return this.hubVendaService.iniciarVenda().pipe(
+      tap((response) => this.definirEstado(response)),
+      map(() => ({ ok: true })),
+      catchError((error: unknown) => this.tratarErroInicioVenda(error)),
+      tap(() => this.loadingOperacaoSignal.set(false)),
+    );
+  }
+
   alterarQuantidade(itemUuid: string, quantidade: number): Observable<VendaOperacaoResultado> {
     return this.executarOperacao(this.hubVendaService.alterarQuantidade(itemUuid, quantidade));
   }
@@ -195,6 +205,25 @@ export class VendaSessionService {
 
     this.carregarAtual().subscribe();
     return of({ ok: false, detail: 'Falha de comunicação com o Hub local. Atualizando estado da venda.' });
+  }
+
+  private tratarErroInicioVenda(error: unknown): Observable<VendaOperacaoResultado> {
+    if (this.isAuthenticationError(error)) {
+      this.tratarSessaoOperadorExpirada();
+      return of({ ok: false, detail: 'Sessão de operador expirada.' });
+    }
+
+    if (error instanceof HttpErrorResponse && (error.status === 400 || error.status === 409)) {
+      return of({ ok: false, detail: error.error?.detail || 'Não foi possível iniciar a venda.' });
+    }
+
+    return this.hubVendaService.atual().pipe(
+      tap((response) => this.definirEstado(response)),
+      map((response) => response.venda
+        ? { ok: true }
+        : { ok: false, detail: 'Não foi possível confirmar o início da venda. Tente novamente.' }),
+      catchError(() => of({ ok: false, detail: 'Falha de comunicação com o Hub local.' })),
+    );
   }
 
   private executarOperacaoCliente(request$: Observable<VendaAtualResponse>): Observable<VendaOperacaoResultado> {

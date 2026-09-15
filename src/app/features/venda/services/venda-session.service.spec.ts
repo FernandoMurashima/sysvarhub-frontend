@@ -19,6 +19,7 @@ describe('VendaSessionService', () => {
   beforeEach(() => {
     hubVendaService = jasmine.createSpyObj<HubVendaService>('HubVendaService', [
       'atual',
+      'iniciarVenda',
       'adicionarItem',
       'alterarQuantidade',
       'removerItem',
@@ -71,6 +72,36 @@ describe('VendaSessionService', () => {
       expect(resultado.ok).toBeTrue();
       expect(service.status()).toBe('aberta');
       expect(service.venda()?.itens[0].descricao).toBe('Calça Jeans Reta Aurora');
+      expect(service.clientePreselecionado()).toBeNull();
+      done();
+    });
+  });
+
+  it('iniciar venda com 201 define venda aberta e limpa pre-selecao', (done) => {
+    hubVendaService.atual.and.returnValue(of(vendaAtualComClientePreselecionadoStub));
+    hubVendaService.iniciarVenda.and.returnValue(of({
+      venda: { ...vendaAbertaStub.venda!, cliente: vendaAtualComClientePreselecionadoStub.clientePreselecionado },
+      clientePreselecionado: null,
+    }));
+
+    service.bootstrap().subscribe(() => {
+      service.iniciarVenda().subscribe((resultado) => {
+        expect(resultado.ok).toBeTrue();
+        expect(service.status()).toBe('aberta');
+        expect(service.venda()?.cliente?.clienteUuid).toBe('cliente-uuid');
+        expect(service.clientePreselecionado()).toBeNull();
+        done();
+      });
+    });
+  });
+
+  it('iniciar venda com 200 tem mesmo comportamento de sucesso', (done) => {
+    hubVendaService.iniciarVenda.and.returnValue(of(vendaAbertaStub));
+
+    service.iniciarVenda().subscribe((resultado) => {
+      expect(resultado.ok).toBeTrue();
+      expect(service.status()).toBe('aberta');
+      expect(service.venda()).toEqual(vendaAbertaStub.venda);
       expect(service.clientePreselecionado()).toBeNull();
       done();
     });
@@ -188,15 +219,15 @@ describe('VendaSessionService', () => {
     });
   });
 
-  it('primeiro item transforma estado para venda aberta e limpa pre-selecao', (done) => {
+  it('iniciar venda transforma estado para venda aberta e limpa pre-selecao', (done) => {
     hubVendaService.atual.and.returnValue(of(vendaAtualComClientePreselecionadoStub));
-    hubVendaService.adicionarItem.and.returnValue(of({
+    hubVendaService.iniciarVenda.and.returnValue(of({
       venda: { ...vendaAbertaStub.venda!, cliente: vendaAtualComClientePreselecionadoStub.clientePreselecionado },
       clientePreselecionado: null,
     }));
 
     service.bootstrap().subscribe(() => {
-      service.adicionarItem(10825).subscribe((resultado) => {
+      service.iniciarVenda().subscribe((resultado) => {
         expect(resultado.ok).toBeTrue();
         expect(service.status()).toBe('aberta');
         expect(service.venda()?.cliente?.clienteUuid).toBe('cliente-uuid');
@@ -254,6 +285,57 @@ describe('VendaSessionService', () => {
       expect(resultado.detail).toBe('Não foi possível confirmar a alteração do cliente. O estado da venda foi atualizado.');
       expect(hubVendaService.selecionarCliente).toHaveBeenCalledTimes(1);
       expect(hubVendaService.atual).toHaveBeenCalledTimes(1);
+      done();
+    });
+  });
+
+  it('erro de rede ao iniciar nao repete POST e reconcilia com GET', (done) => {
+    hubVendaService.iniciarVenda.and.returnValue(throwError(() => new HttpErrorResponse({ status: 0 })));
+    hubVendaService.atual.and.returnValue(of(vendaAbertaStub));
+
+    service.iniciarVenda().subscribe((resultado) => {
+      expect(resultado.ok).toBeTrue();
+      expect(hubVendaService.iniciarVenda).toHaveBeenCalledTimes(1);
+      expect(hubVendaService.atual).toHaveBeenCalledTimes(1);
+      expect(service.status()).toBe('aberta');
+      expect(service.venda()).toEqual(vendaAbertaStub.venda);
+      done();
+    });
+  });
+
+  it('erro de rede ao iniciar com GET sem venda mantem sem-venda', (done) => {
+    hubVendaService.iniciarVenda.and.returnValue(throwError(() => new HttpErrorResponse({ status: 0 })));
+    hubVendaService.atual.and.returnValue(of(vendaAtualSemVendaStub));
+
+    service.iniciarVenda().subscribe((resultado) => {
+      expect(resultado.ok).toBeFalse();
+      expect(resultado.detail).toBe('Não foi possível confirmar o início da venda. Tente novamente.');
+      expect(service.status()).toBe('sem-venda');
+      expect(service.venda()).toBeNull();
+      done();
+    });
+  });
+
+  it('erro de rede ao iniciar com GET falhando informa comunicacao sem inventar venda', (done) => {
+    hubVendaService.iniciarVenda.and.returnValue(throwError(() => new HttpErrorResponse({ status: 0 })));
+    hubVendaService.atual.and.returnValue(throwError(() => new HttpErrorResponse({ status: 0 })));
+
+    service.iniciarVenda().subscribe((resultado) => {
+      expect(resultado.ok).toBeFalse();
+      expect(resultado.detail).toBe('Falha de comunicação com o Hub local.');
+      expect(service.venda()).toBeNull();
+      done();
+    });
+  });
+
+  it('401 ao iniciar invalida somente operador e navega operador', (done) => {
+    hubVendaService.iniciarVenda.and.returnValue(throwError(() => new HttpErrorResponse({ status: 401 })));
+
+    service.iniciarVenda().subscribe((resultado) => {
+      expect(resultado.ok).toBeFalse();
+      expect(operatorSession.invalidarSessao).toHaveBeenCalled();
+      expect(router.navigateByUrl).toHaveBeenCalledOnceWith('/operador');
+      expect(router.navigateByUrl).not.toHaveBeenCalledWith('/pareamento');
       done();
     });
   });

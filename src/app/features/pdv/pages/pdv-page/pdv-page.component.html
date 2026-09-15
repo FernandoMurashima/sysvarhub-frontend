@@ -185,9 +185,14 @@
             </div>
           }
           @if (!venda()) {
-            <div class="empty">Bipe ou digite um produto para iniciar a venda.</div>
+            <div class="empty start-sale-state">
+              <span>Selecione um cliente, se necessário, e inicie a venda.</span>
+              @if (caixaStatus() === 'aberto') {
+                <button type="button" [disabled]="vendaLoading()" (click)="iniciarVenda()">INICIAR VENDA</button>
+              }
+            </div>
           } @else if (!venda()?.itens?.length) {
-            <div class="empty">Venda em andamento sem itens.</div>
+            <div class="empty">Venda em andamento sem itens. Aguardando bipagem.</div>
           }
         </div>
       </section>

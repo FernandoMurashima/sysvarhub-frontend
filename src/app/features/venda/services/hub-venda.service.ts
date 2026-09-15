@@ -27,6 +27,10 @@ export class HubVendaService {
     return this.http.get<VendaApiResponse>(`${this.baseUrl}/atual/`).pipe(map(mapVendaAtual));
   }
 
+  iniciarVenda(): Observable<VendaAtualResponse> {
+    return this.http.post<VendaApiResponse>(`${this.baseUrl}/iniciar/`, {}).pipe(map(mapVendaAtual));
+  }
+
   adicionarItem(skuId: number, quantidade = 1): Observable<VendaAtualResponse> {
     const body: VendaItemAdicionarRequest = { sku_id: skuId, quantidade };
     return this.http.post<VendaApiResponse>(`${this.baseUrl}/item/`, body).pipe(map(mapVendaAtual));

@@ -155,13 +155,14 @@ describe('PdvPageComponent', () => {
     clientePreselecionadoSignal = signal(null as typeof clientePreselecionadoStub | null);
     vendaStatusSignal = signal<'inicializando' | 'sem-venda' | 'aberta' | 'erro'>('aberta');
     vendaLoadingSignal = signal(false);
-    vendaSession = jasmine.createSpyObj<VendaSessionService>('VendaSessionService', ['bootstrap', 'adicionarItem', 'alterarQuantidade', 'removerItem', 'cancelarVenda', 'limparEstado', 'listarFormasPagamento', 'adicionarPagamento', 'removerPagamento', 'finalizarVenda', 'selecionarCliente', 'removerCliente'], {
+    vendaSession = jasmine.createSpyObj<VendaSessionService>('VendaSessionService', ['bootstrap', 'iniciarVenda', 'adicionarItem', 'alterarQuantidade', 'removerItem', 'cancelarVenda', 'limparEstado', 'listarFormasPagamento', 'adicionarPagamento', 'removerPagamento', 'finalizarVenda', 'selecionarCliente', 'removerCliente'], {
       venda: vendaSignal.asReadonly(),
       clientePreselecionado: clientePreselecionadoSignal.asReadonly(),
       status: vendaStatusSignal.asReadonly(),
       loadingOperacao: vendaLoadingSignal.asReadonly(),
     });
     vendaSession.bootstrap.and.returnValue(of(true));
+    vendaSession.iniciarVenda.and.returnValue(of({ ok: true }));
     vendaSession.adicionarItem.and.returnValue(of({ ok: true }));
     vendaSession.alterarQuantidade.and.returnValue(of({ ok: true }));
     vendaSession.removerItem.and.returnValue(of({ ok: true }));
@@ -350,6 +351,80 @@ describe('PdvPageComponent', () => {
 
     expect(component.produtoSelecionado?.skuId).toBe(10825);
     expect(vendaSession.adicionarItem).toHaveBeenCalledWith(10825, 1);
+  });
+
+  it('botao INICIAR VENDA aparece com caixa aberto e sem venda', () => {
+    vendaSignal.set(null);
+    vendaStatusSignal.set('sem-venda');
+    fixture.detectChanges();
+
+    const text = fixture.nativeElement.textContent;
+    expect(text).toContain('Selecione um cliente, se necessário, e inicie a venda.');
+    expect(text).toContain('INICIAR VENDA');
+    expect(text).not.toContain(['Bipe ou digite um produto', 'para iniciar a venda'].join(' '));
+  });
+
+  it('botao INICIAR VENDA nao aparece como ativo quando venda existe', () => {
+    vendaSignal.set(vendaAbertaStub.venda);
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.textContent).toContain('Venda em andamento · venda-hu');
+    expect(fixture.nativeElement.textContent).not.toContain('INICIAR VENDA');
+  });
+
+  it('clicar INICIAR VENDA chama sessao e mostra sucesso', () => {
+    const component = fixture.componentInstance;
+    vendaSignal.set(null);
+    vendaStatusSignal.set('sem-venda');
+    vendaSession.iniciarVenda.and.callFake(() => {
+      vendaSignal.set({ ...vendaAbertaStub.venda!, cliente: clientePreselecionadoStub });
+      clientePreselecionadoSignal.set(null);
+      vendaStatusSignal.set('aberta');
+      return of({ ok: true });
+    });
+
+    component.iniciarVenda();
+    fixture.detectChanges();
+
+    expect(vendaSession.iniciarVenda).toHaveBeenCalled();
+    expect(component.mensagem).toBe('Venda iniciada.');
+    expect(fixture.nativeElement.textContent).toContain('Venda em andamento · venda-hu');
+    expect(component.clienteOperacional()?.clienteUuid).toBe('cliente-uuid');
+  });
+
+  it('clicar INICIAR VENDA com caixa fechado nao chama API', () => {
+    const component = fixture.componentInstance;
+    caixaStatusSignal.set('fechado');
+    vendaSignal.set(null);
+
+    component.iniciarVenda();
+
+    expect(vendaSession.iniciarVenda).not.toHaveBeenCalled();
+    expect(component.mensagem).toBe('Abra o caixa antes de iniciar uma venda.');
+  });
+
+  it('sem venda inclusao de produto nao chama adicionarItem', () => {
+    const component = fixture.componentInstance;
+    vendaSignal.set(null);
+    vendaStatusSignal.set('sem-venda');
+
+    component.tentarAdicionarProduto(produtoVendavel);
+
+    expect(vendaSession.adicionarItem).not.toHaveBeenCalled();
+    expect(component.mensagem).toBe('Inicie a venda antes de incluir produtos.');
+  });
+
+  it('sem venda ENTER com produto exato consulta mas nao inclui item', () => {
+    const component = fixture.componentInstance;
+    vendaSignal.set(null);
+    vendaStatusSignal.set('sem-venda');
+
+    component.busca = '7892701000013';
+    component.aoEnterBusca(new KeyboardEvent('keydown', { key: 'Enter' }));
+
+    expect(component.produtoSelecionado?.skuId).toBe(10825);
+    expect(vendaSession.adicionarItem).not.toHaveBeenCalled();
+    expect(component.mensagem).toBe('Inicie a venda antes de incluir produtos.');
   });
 
   it('preco null nao ganha fallback', () => {

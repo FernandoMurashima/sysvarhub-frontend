@@ -373,8 +373,20 @@ export class PdvPageComponent implements OnInit, OnDestroy {
         return;
       }
       this.valorAbertura = '0,00';
-      this.mensagem = 'Caixa aberto. Venda local pronta para bipagem.';
+      this.mensagem = 'Caixa aberto. Inicie a venda para incluir produtos.';
       this.vendaSession.bootstrap().subscribe();
+    });
+  }
+
+  iniciarVenda(): void {
+    if (this.caixaStatus() !== 'aberto') {
+      this.mensagem = 'Abra o caixa antes de iniciar uma venda.';
+      return;
+    }
+    if (this.venda()) return;
+
+    this.vendaSession.iniciarVenda().subscribe((resultado) => {
+      this.tratarResultadoOperacao(resultado, 'Venda iniciada.');
     });
   }
 
@@ -654,6 +666,10 @@ export class PdvPageComponent implements OnInit, OnDestroy {
     }
     if (!produto.vendavel) {
       this.mensagem = `Produto bloqueado: ${this.motivos(produto)}`;
+      return;
+    }
+    if (!this.venda()) {
+      this.mensagem = 'Inicie a venda antes de incluir produtos.';
       return;
     }
     if (this.temPagamentoAtivo()) {
