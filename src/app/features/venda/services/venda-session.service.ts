@@ -1,9 +1,9 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { inject, Injectable, signal } from '@angular/core';
 import { Router } from '@angular/router';
-import { catchError, map, Observable, of, tap, throwError } from 'rxjs';
+import { catchError, map, Observable, of, switchMap, tap, throwError } from 'rxjs';
 
-import { VendaHubResumo, VendaSessionStatus } from '../../../core/models/venda.models';
+import { VendaAtualResponse, VendaClienteResumo, VendaHubResumo, VendaSessionStatus } from '../../../core/models/venda.models';
 import { AdicionarPagamentoRequest, FormasPagamentoResponse } from '../../../core/models/pagamento.models';
 import { OperatorSessionService } from '../../operador/services/operator-session.service';
 import { HubVendaService } from './hub-venda.service';
@@ -29,11 +29,13 @@ export class VendaSessionService {
 
   private readonly statusSignal = signal<VendaSessionStatus>('inicializando');
   private readonly vendaSignal = signal<VendaHubResumo | null>(null);
+  private readonly clientePreselecionadoSignal = signal<VendaClienteResumo | null>(null);
   private readonly loadingOperacaoSignal = signal(false);
   private intencaoPagamentoPendente: PagamentoIntencao | null = null;
 
   readonly status = this.statusSignal.asReadonly();
   readonly venda = this.vendaSignal.asReadonly();
+  readonly clientePreselecionado = this.clientePreselecionadoSignal.asReadonly();
   readonly loadingOperacao = this.loadingOperacaoSignal.asReadonly();
 
   bootstrap(): Observable<boolean> {
@@ -43,7 +45,7 @@ export class VendaSessionService {
   carregarAtual(): Observable<boolean> {
     this.statusSignal.set('inicializando');
     return this.hubVendaService.atual().pipe(
-      tap((response) => this.definirVenda(response.venda)),
+      tap((response) => this.definirEstado(response)),
       map((response) => response.venda !== null),
       catchError((error: unknown) => this.tratarErroCarregamento(error)),
     );
@@ -103,7 +105,7 @@ export class VendaSessionService {
     return this.hubVendaService.adicionarPagamento(request).pipe(
       tap((response) => {
         this.intencaoPagamentoPendente = null;
-        this.definirVenda(response.venda);
+        this.definirEstado(response);
       }),
       map(() => ({ ok: true })),
       catchError((error: unknown) => this.tratarErroPagamento(error)),
@@ -121,10 +123,11 @@ export class VendaSessionService {
       tap((response) => {
         if (response.venda?.status === 'FINALIZADA') {
           this.vendaSignal.set(null);
+          this.clientePreselecionadoSignal.set(null);
           this.statusSignal.set('sem-venda');
           return;
         }
-        this.definirVenda(response.venda);
+        this.definirEstado(response);
       }),
       map(() => ({ ok: true })),
       catchError((error: unknown) => this.tratarErroFinalizacao(error)),
@@ -134,6 +137,7 @@ export class VendaSessionService {
 
   limparEstado(): void {
     this.vendaSignal.set(null);
+    this.clientePreselecionadoSignal.set(null);
     this.statusSignal.set('sem-venda');
     this.loadingOperacaoSignal.set(false);
     this.intencaoPagamentoPendente = null;
@@ -149,19 +153,20 @@ export class VendaSessionService {
     return nova;
   }
 
-  private executarOperacao(request$: Observable<{ venda: VendaHubResumo | null }>): Observable<VendaOperacaoResultado> {
+  private executarOperacao(request$: Observable<VendaAtualResponse>): Observable<VendaOperacaoResultado> {
     this.loadingOperacaoSignal.set(true);
     return request$.pipe(
-      tap((response) => this.definirVenda(response.venda)),
+      tap((response) => this.definirEstado(response)),
       map(() => ({ ok: true })),
       catchError((error: unknown) => this.tratarErroOperacao(error)),
       tap(() => this.loadingOperacaoSignal.set(false)),
     );
   }
 
-  private definirVenda(venda: VendaHubResumo | null): void {
-    this.vendaSignal.set(venda);
-    this.statusSignal.set(venda ? 'aberta' : 'sem-venda');
+  private definirEstado(response: VendaAtualResponse): void {
+    this.vendaSignal.set(response.venda);
+    this.clientePreselecionadoSignal.set(response.venda ? null : response.clientePreselecionado);
+    this.statusSignal.set(response.venda ? 'aberta' : 'sem-venda');
   }
 
   private tratarErroCarregamento(error: unknown): Observable<boolean> {
@@ -192,10 +197,11 @@ export class VendaSessionService {
     return of({ ok: false, detail: 'Falha de comunicação com o Hub local. Atualizando estado da venda.' });
   }
 
-  private executarOperacaoCliente(request$: Observable<{ venda: VendaHubResumo | null }>): Observable<VendaOperacaoResultado> {
+  private executarOperacaoCliente(request$: Observable<VendaAtualResponse>): Observable<VendaOperacaoResultado> {
     this.loadingOperacaoSignal.set(true);
     return request$.pipe(
-      tap((response) => this.definirVenda(response.venda)),
+      switchMap((response) => (response.venda ? of(response) : this.hubVendaService.atual())),
+      tap((response) => this.definirEstado(response)),
       map(() => ({ ok: true })),
       catchError((error: unknown) => this.tratarErroCliente(error)),
       tap(() => this.loadingOperacaoSignal.set(false)),

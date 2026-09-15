@@ -91,4 +91,43 @@ describe('venda models', () => {
 
     expect(venda?.cliente).toBeNull();
   });
+
+  it('mapeia venda null com cliente_preselecionado', () => {
+    const response = mapVendaAtual({
+      venda: null,
+      cliente_preselecionado: {
+        cliente_uuid: 'cliente-uuid',
+        retaguarda_id: 123,
+        tipo_pessoa: 'PF',
+        documento: '12345678901',
+        cliente_padrao: false,
+        nome_cliente: 'Cliente Teste',
+      },
+    });
+
+    expect(response.venda).toBeNull();
+    expect(response.clientePreselecionado?.clienteUuid).toBe('cliente-uuid');
+    expect(response.clientePreselecionado?.nomeCliente).toBe('Cliente Teste');
+  });
+
+  it('mapeia venda existente com cliente_preselecionado null', () => {
+    const response = mapVendaAtual({
+      venda: {
+        uuid: 'venda',
+        status: 'ABERTA',
+        criada_em: '2026-09-13T12:00:00',
+        subtotal: '0.00',
+        desconto_itens: '0.00',
+        desconto_geral: '0.00',
+        total: '0.00',
+        cliente: null,
+        operador_criacao: { usuario_id: 99, codigo: 'caixa.barra', nome: 'Juliana', tipo: 'Caixa', perfil: null },
+        itens: [],
+      },
+      cliente_preselecionado: null,
+    });
+
+    expect(response.venda?.uuid).toBe('venda');
+    expect(response.clientePreselecionado).toBeNull();
+  });
 });

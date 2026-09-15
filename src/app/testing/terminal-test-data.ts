@@ -137,8 +137,24 @@ export const vendaAbertaStub: VendaAtualResponse = {
     ],
     pagamentos: [],
   },
+  clientePreselecionado: null,
 };
 
 export const vendaAtualSemVendaStub: VendaAtualResponse = {
   venda: null,
+  clientePreselecionado: null,
+};
+
+export const clientePreselecionadoStub = {
+  clienteUuid: 'cliente-uuid',
+  retaguardaId: 123,
+  tipoPessoa: 'PF' as const,
+  documento: '12345678901',
+  clientePadrao: false,
+  nomeCliente: 'Maria Silva',
+};
+
+export const vendaAtualComClientePreselecionadoStub: VendaAtualResponse = {
+  venda: null,
+  clientePreselecionado: clientePreselecionadoStub,
 };

@@ -10,7 +10,7 @@ import { CaixaSessionService } from '../../../caixa/services/caixa-session.servi
 import { ClienteSessionExpiredError, ClienteSessionService } from '../../../cliente/services/cliente-session.service';
 import { OperatorSessionService } from '../../../operador/services/operator-session.service';
 import { VendaSessionService } from '../../../venda/services/venda-session.service';
-import { sessaoCaixaAbertaStub, vendaAbertaStub } from '../../../../testing/terminal-test-data';
+import { clientePreselecionadoStub, sessaoCaixaAbertaStub, vendaAbertaStub } from '../../../../testing/terminal-test-data';
 import { PdvCatalogoConsulta, PdvProdutoConsulta } from '../../models/pdv-produto-consulta.model';
 import { PdvHubFacade } from '../../services/pdv-hub.facade';
 import { PdvPageComponent } from './pdv-page.component';
@@ -94,6 +94,7 @@ describe('PdvPageComponent', () => {
   let caixaStatusSignal = signal<'inicializando' | 'fechado' | 'aberto' | 'erro'>('aberto');
   let sessaoCaixaSignal = signal<SessaoCaixaHubResumo | null>(sessaoCaixaAbertaStub);
   let vendaSignal = signal(vendaAbertaStub.venda);
+  let clientePreselecionadoSignal = signal(null as typeof clientePreselecionadoStub | null);
   let vendaStatusSignal = signal<'inicializando' | 'sem-venda' | 'aberta' | 'erro'>('aberta');
   let vendaLoadingSignal = signal(false);
   let router: Router;
@@ -147,10 +148,12 @@ describe('PdvPageComponent', () => {
     caixaSession.bootstrap.and.returnValue(of(true));
     caixaSession.abrir.and.returnValue(of({ ok: true }));
     vendaSignal = signal(vendaAbertaStub.venda);
+    clientePreselecionadoSignal = signal(null as typeof clientePreselecionadoStub | null);
     vendaStatusSignal = signal<'inicializando' | 'sem-venda' | 'aberta' | 'erro'>('aberta');
     vendaLoadingSignal = signal(false);
     vendaSession = jasmine.createSpyObj<VendaSessionService>('VendaSessionService', ['bootstrap', 'adicionarItem', 'alterarQuantidade', 'removerItem', 'cancelarVenda', 'limparEstado', 'listarFormasPagamento', 'adicionarPagamento', 'removerPagamento', 'finalizarVenda', 'selecionarCliente', 'removerCliente'], {
       venda: vendaSignal.asReadonly(),
+      clientePreselecionado: clientePreselecionadoSignal.asReadonly(),
       status: vendaStatusSignal.asReadonly(),
       loadingOperacao: vendaLoadingSignal.asReadonly(),
     });
@@ -478,11 +481,12 @@ describe('PdvPageComponent', () => {
     expect(fixture.nativeElement.textContent).toContain('Código 123');
   });
 
-  it('F2 pode iniciar venda sem item e troca mantem venda', () => {
+  it('F2 sem item mostra cliente preselecionado sem venda iniciada', () => {
     const component = fixture.componentInstance;
     vendaSignal.set(null);
+    vendaStatusSignal.set('sem-venda');
     vendaSession.selecionarCliente.and.callFake(() => {
-      vendaSignal.set({ ...vendaAbertaStub.venda!, itens: [], cliente: { clienteUuid: 'cliente-uuid', retaguardaId: 123, tipoPessoa: 'PF', documento: null, clientePadrao: false, nomeCliente: 'Maria Silva' } });
+      clientePreselecionadoSignal.set(clientePreselecionadoStub);
       return of({ ok: true });
     });
 
@@ -491,8 +495,44 @@ describe('PdvPageComponent', () => {
     component.confirmarClienteSelecionado();
     fixture.detectChanges();
 
-    expect(fixture.nativeElement.textContent).toContain('Venda em andamento · venda-hu');
-    expect(component.venda()?.itens.length).toBe(0);
+    expect(fixture.nativeElement.textContent).toContain('Venda ainda não iniciada');
+    expect(fixture.nativeElement.textContent).not.toContain('Venda em andamento · venda-hu');
+    expect(fixture.nativeElement.textContent).toContain('Maria Silva');
+    expect(component.venda()).toBeNull();
+    expect(component.mensagem).toBe('Cliente selecionado.');
+  });
+
+  it('troca cliente preselecionado usa mensagem Cliente alterado', () => {
+    const component = fixture.componentInstance;
+    vendaSignal.set(null);
+    vendaStatusSignal.set('sem-venda');
+    clientePreselecionadoSignal.set({ ...clientePreselecionadoStub, clienteUuid: 'cliente-anterior' });
+    vendaSession.selecionarCliente.and.returnValue(of({ ok: true }));
+
+    component.abrirCliente();
+    component.selecionarClienteLista(clienteAtivo);
+    component.confirmarClienteSelecionado();
+
+    expect(component.mensagem).toBe('Cliente alterado.');
+  });
+
+  it('cliente da VendaHub prevalece visualmente sobre pre-selecao', () => {
+    vendaSignal.set({
+      ...vendaAbertaStub.venda!,
+      cliente: {
+        clienteUuid: 'cliente-venda',
+        retaguardaId: 456,
+        tipoPessoa: 'PF',
+        documento: null,
+        clientePadrao: false,
+        nomeCliente: 'Cliente da Venda',
+      },
+    });
+    clientePreselecionadoSignal.set(clientePreselecionadoStub);
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.textContent).toContain('Cliente da Venda');
+    expect(fixture.nativeElement.textContent).not.toContain('Maria Silva');
   });
 
   it('remocao limpa cliente sem cancelar venda', () => {
@@ -509,6 +549,25 @@ describe('PdvPageComponent', () => {
 
     expect(vendaSession.removerCliente).toHaveBeenCalled();
     expect(component.mensagem).toBe('Cliente removido da venda.');
+    expect(fixture.nativeElement.textContent).toContain('Consumidor não identificado');
+  });
+
+  it('remocao de cliente preselecionado mantem venda nao iniciada', () => {
+    const component = fixture.componentInstance;
+    vendaSignal.set(null);
+    vendaStatusSignal.set('sem-venda');
+    clientePreselecionadoSignal.set(clientePreselecionadoStub);
+    vendaSession.removerCliente.and.callFake(() => {
+      clientePreselecionadoSignal.set(null);
+      return of({ ok: true });
+    });
+
+    component.abrirCliente();
+    component.removerClienteVenda();
+    fixture.detectChanges();
+
+    expect(vendaSession.removerCliente).toHaveBeenCalled();
+    expect(fixture.nativeElement.textContent).toContain('Venda ainda não iniciada');
     expect(fixture.nativeElement.textContent).toContain('Consumidor não identificado');
   });
 

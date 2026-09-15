@@ -86,6 +86,7 @@ export class PdvPageComponent implements OnInit, OnDestroy {
   readonly sessaoCaixa = this.caixaSession.sessao;
   readonly vendaStatus = this.vendaSession.status;
   readonly venda = this.vendaSession.venda;
+  readonly clientePreselecionado = this.vendaSession.clientePreselecionado;
   readonly vendaLoading = this.vendaSession.loadingOperacao;
 
   ngOnInit(): void {
@@ -298,7 +299,7 @@ export class PdvPageComponent implements OnInit, OnDestroy {
     const cliente = this.clienteListaSelecionado;
     if (!cliente || this.clienteSelecaoBloqueada(cliente) || this.temPagamentoAtivo()) return;
 
-    const clienteAnterior = this.venda()?.cliente?.clienteUuid || null;
+    const clienteAnterior = this.clienteOperacional()?.clienteUuid || null;
     this.vendaSession.selecionarCliente(cliente.clienteUuid).subscribe((resultado) => {
       if (!resultado.ok) {
         this.mensagem = resultado.detail || 'Falha ao selecionar cliente.';
@@ -333,6 +334,10 @@ export class PdvPageComponent implements OnInit, OnDestroy {
   clienteCodigoResumo(cliente: VendaClienteResumo | null | undefined): string {
     if (!cliente) return 'Consumidor não identificado';
     return cliente.retaguardaId === null ? 'LOCAL' : `Código ${cliente.retaguardaId}`;
+  }
+
+  clienteOperacional(): VendaClienteResumo | null {
+    return this.venda()?.cliente ?? this.clientePreselecionado();
   }
 
   clienteCidadeUf(cliente: ClienteHubResumo): string {

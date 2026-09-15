@@ -62,6 +62,7 @@ export interface VendaPagamentoHubResumo {
 
 export interface VendaAtualResponse {
   venda: VendaHubResumo | null;
+  clientePreselecionado: VendaClienteResumo | null;
 }
 
 export interface VendaItemAdicionarRequest {
@@ -133,11 +134,14 @@ export interface VendaPagamentoHubResumoApi {
 
 export interface VendaApiResponse {
   venda: VendaHubResumoApi | null;
+  cliente_preselecionado?: VendaClienteResumoApi | null;
 }
 
 export function mapVendaAtual(response: VendaApiResponse): VendaAtualResponse {
+  const venda = response.venda ? mapVenda(response.venda) : null;
   return {
-    venda: response.venda ? mapVenda(response.venda) : null,
+    venda,
+    clientePreselecionado: venda ? null : response.cliente_preselecionado ? mapVendaCliente(response.cliente_preselecionado) : null,
   };
 }
 

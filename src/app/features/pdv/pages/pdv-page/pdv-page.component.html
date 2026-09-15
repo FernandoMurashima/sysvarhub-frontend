@@ -99,10 +99,10 @@
         <label>
           Cliente
           <div class="select-like readonly-like client-summary">
-            @if (venda()?.cliente) {
+            @if (clienteOperacional()) {
               <span>
-                <strong>{{ venda()?.cliente?.nomeCliente }}</strong>
-                <small>{{ clienteCodigoResumo(venda()?.cliente) }} · {{ formatarDocumentoCliente(venda()?.cliente) }}</small>
+                <strong>{{ clienteOperacional()?.nomeCliente }}</strong>
+                <small>{{ clienteCodigoResumo(clienteOperacional()) }} · {{ formatarDocumentoCliente(clienteOperacional()) }}</small>
               </span>
             } @else {
               Consumidor não identificado
@@ -366,9 +366,9 @@
           <div class="client-modal">
             <section class="current-client">
               <span>Cliente da venda</span>
-              @if (venda()?.cliente) {
-                <strong>{{ venda()?.cliente?.nomeCliente }}</strong>
-                <small>{{ clienteCodigoResumo(venda()?.cliente) }} · {{ formatarDocumentoCliente(venda()?.cliente) }}</small>
+              @if (clienteOperacional()) {
+                <strong>{{ clienteOperacional()?.nomeCliente }}</strong>
+                <small>{{ clienteCodigoResumo(clienteOperacional()) }} · {{ formatarDocumentoCliente(clienteOperacional()) }}</small>
               } @else {
                 <strong>Consumidor não identificado</strong>
                 <small>Venda sem cliente selecionado</small>
@@ -433,7 +433,7 @@
             </div>
 
             <footer class="client-actions">
-              @if (venda()?.cliente) {
+              @if (clienteOperacional()) {
                 <button type="button" class="danger" [disabled]="temPagamentoAtivo() || vendaLoading()" (click)="removerClienteVenda()">Remover cliente</button>
               }
               <button type="button" (click)="fecharAtalho()">Fechar</button>

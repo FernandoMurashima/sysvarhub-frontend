@@ -4,7 +4,8 @@ import { Router } from '@angular/router';
 import { of, throwError } from 'rxjs';
 
 import { FormasPagamentoResponse } from '../../../core/models/pagamento.models';
-import { vendaAbertaStub, vendaAtualSemVendaStub } from '../../../testing/terminal-test-data';
+import { VendaAtualResponse } from '../../../core/models/venda.models';
+import { vendaAbertaStub, vendaAtualComClientePreselecionadoStub, vendaAtualSemVendaStub } from '../../../testing/terminal-test-data';
 import { OperatorSessionService } from '../../operador/services/operator-session.service';
 import { HubVendaService } from './hub-venda.service';
 import { VendaSessionService } from './venda-session.service';
@@ -47,6 +48,18 @@ describe('VendaSessionService', () => {
     service.carregarAtual().subscribe(() => {
       expect(service.status()).toBe('sem-venda');
       expect(service.venda()).toBeNull();
+      expect(service.clientePreselecionado()).toBeNull();
+      done();
+    });
+  });
+
+  it('bootstrap sem venda com cliente preselecionado mantem status sem-venda', (done) => {
+    hubVendaService.atual.and.returnValue(of(vendaAtualComClientePreselecionadoStub));
+
+    service.bootstrap().subscribe(() => {
+      expect(service.status()).toBe('sem-venda');
+      expect(service.venda()).toBeNull();
+      expect(service.clientePreselecionado()?.clienteUuid).toBe('cliente-uuid');
       done();
     });
   });
@@ -58,6 +71,7 @@ describe('VendaSessionService', () => {
       expect(resultado.ok).toBeTrue();
       expect(service.status()).toBe('aberta');
       expect(service.venda()?.itens[0].descricao).toBe('Calça Jeans Reta Aurora');
+      expect(service.clientePreselecionado()).toBeNull();
       done();
     });
   });
@@ -74,7 +88,7 @@ describe('VendaSessionService', () => {
   });
 
   it('selecionar, trocar e remover cliente atualizam venda pela resposta do backend', (done) => {
-    const vendaComCliente = {
+    const vendaComCliente: VendaAtualResponse = {
       venda: {
         ...vendaAbertaStub.venda!,
         cliente: {
@@ -86,8 +100,9 @@ describe('VendaSessionService', () => {
           nomeCliente: 'Cliente Teste',
         },
       },
+      clientePreselecionado: null,
     };
-    const vendaComOutroCliente = {
+    const vendaComOutroCliente: VendaAtualResponse = {
       venda: {
         ...vendaAbertaStub.venda!,
         cliente: {
@@ -99,9 +114,10 @@ describe('VendaSessionService', () => {
           nomeCliente: 'Cliente Local',
         },
       },
+      clientePreselecionado: null,
     };
     hubVendaService.selecionarCliente.and.returnValues(of(vendaComCliente), of(vendaComOutroCliente));
-    hubVendaService.removerCliente.and.returnValue(of({ venda: { ...vendaAbertaStub.venda!, cliente: null } }));
+    hubVendaService.removerCliente.and.returnValue(of({ venda: { ...vendaAbertaStub.venda!, cliente: null }, clientePreselecionado: null }));
 
     service.selecionarCliente('cliente-uuid').subscribe((primeiro) => {
       expect(primeiro.ok).toBeTrue();
@@ -118,13 +134,88 @@ describe('VendaSessionService', () => {
     });
   });
 
-  it('cliente pode criar venda vazia e deixa sessao ativa', (done) => {
-    hubVendaService.selecionarCliente.and.returnValue(of({ venda: { ...vendaAbertaStub.venda!, itens: [] } }));
+  it('selecionar cliente pre-venda faz refresh canonico sem abrir venda', (done) => {
+    hubVendaService.selecionarCliente.and.returnValue(of(vendaAtualSemVendaStub));
+    hubVendaService.atual.and.returnValue(of(vendaAtualComClientePreselecionadoStub));
 
     service.selecionarCliente('cliente-uuid').subscribe((resultado) => {
       expect(resultado.ok).toBeTrue();
-      expect(service.status()).toBe('aberta');
-      expect(service.venda()?.itens).toEqual([]);
+      expect(hubVendaService.atual).toHaveBeenCalledTimes(1);
+      expect(service.status()).toBe('sem-venda');
+      expect(service.venda()).toBeNull();
+      expect(service.clientePreselecionado()?.clienteUuid).toBe('cliente-uuid');
+      done();
+    });
+  });
+
+  it('trocar cliente pre-venda substitui pre-selecao pelo estado canonico', (done) => {
+    const outroCliente = {
+      venda: null,
+      clientePreselecionado: {
+        clienteUuid: 'outro-cliente',
+        retaguardaId: null,
+        tipoPessoa: 'PF' as const,
+        documento: null,
+        clientePadrao: false,
+        nomeCliente: 'Cliente Local',
+      },
+    };
+    hubVendaService.selecionarCliente.and.returnValues(of(vendaAtualSemVendaStub), of(vendaAtualSemVendaStub));
+    hubVendaService.atual.and.returnValues(of(vendaAtualComClientePreselecionadoStub), of(outroCliente));
+
+    service.selecionarCliente('cliente-uuid').subscribe(() => {
+      service.selecionarCliente('outro-cliente').subscribe(() => {
+        expect(service.status()).toBe('sem-venda');
+        expect(service.venda()).toBeNull();
+        expect(service.clientePreselecionado()?.clienteUuid).toBe('outro-cliente');
+        done();
+      });
+    });
+  });
+
+  it('remover cliente pre-venda limpa pre-selecao pelo GET canonico', (done) => {
+    hubVendaService.atual.and.returnValues(of(vendaAtualComClientePreselecionadoStub), of(vendaAtualSemVendaStub));
+    hubVendaService.removerCliente.and.returnValue(of(vendaAtualSemVendaStub));
+
+    service.bootstrap().subscribe(() => {
+      service.removerCliente().subscribe((resultado) => {
+        expect(resultado.ok).toBeTrue();
+        expect(service.status()).toBe('sem-venda');
+        expect(service.venda()).toBeNull();
+        expect(service.clientePreselecionado()).toBeNull();
+        done();
+      });
+    });
+  });
+
+  it('primeiro item transforma estado para venda aberta e limpa pre-selecao', (done) => {
+    hubVendaService.atual.and.returnValue(of(vendaAtualComClientePreselecionadoStub));
+    hubVendaService.adicionarItem.and.returnValue(of({
+      venda: { ...vendaAbertaStub.venda!, cliente: vendaAtualComClientePreselecionadoStub.clientePreselecionado },
+      clientePreselecionado: null,
+    }));
+
+    service.bootstrap().subscribe(() => {
+      service.adicionarItem(10825).subscribe((resultado) => {
+        expect(resultado.ok).toBeTrue();
+        expect(service.status()).toBe('aberta');
+        expect(service.venda()?.cliente?.clienteUuid).toBe('cliente-uuid');
+        expect(service.clientePreselecionado()).toBeNull();
+        done();
+      });
+    });
+  });
+
+  it('Ctrl+F5 bootstrap restaura pre-selecao do Hub sem storage', (done) => {
+    localStorage.clear();
+    sessionStorage.clear();
+    hubVendaService.atual.and.returnValue(of(vendaAtualComClientePreselecionadoStub));
+
+    service.bootstrap().subscribe(() => {
+      expect(service.venda()).toBeNull();
+      expect(service.clientePreselecionado()?.nomeCliente).toBe('Maria Silva');
+      expect(localStorage.length).toBe(0);
+      expect(sessionStorage.length).toBe(0);
       done();
     });
   });
