@@ -118,6 +118,21 @@ describe('operatorSessionInterceptor', () => {
     request.flush({});
   });
 
+  it('envia header nos endpoints de tipos de despesa e movimentacoes de caixa', () => {
+    sessionStore.getToken.and.returnValue('sessao-operador-atual');
+
+    http.get('/api/terminal/tipos-despesa-pdv/').subscribe();
+    http.post('/api/terminal/caixa/movimentacoes/', { tipo: 'SANGRIA', valor: '10.00' }).subscribe();
+
+    const tipos = httpMock.expectOne('/api/terminal/tipos-despesa-pdv/');
+    const movimentacoes = httpMock.expectOne('/api/terminal/caixa/movimentacoes/');
+
+    expect(tipos.request.headers.get('X-Sysvar-Operador-Session')).toBe('sessao-operador-atual');
+    expect(movimentacoes.request.headers.get('X-Sysvar-Operador-Session')).toBe('sessao-operador-atual');
+    tipos.flush({});
+    movimentacoes.flush({});
+  });
+
   it('nao envia header em pareamento nem URL externa', () => {
     sessionStore.getToken.and.returnValue('sessao-operador-ficticia');
 

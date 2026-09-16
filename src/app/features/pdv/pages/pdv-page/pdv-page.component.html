@@ -370,6 +370,8 @@
               <strong>Cancelar Venda</strong>
             } @else if (modalAtalho === 'pagamentos') {
               <strong>Pagamentos</strong>
+            } @else if (modalAtalho === 'despesa') {
+              <strong>Movimentação de Caixa · F8</strong>
             } @else {
               <strong>Recurso ainda não integrado ao Hub</strong>
             }
@@ -378,7 +380,61 @@
           <button type="button" (click)="fecharAtalho()">Fechar</button>
         </header>
 
-        @if (modalAtalho === 'cliente') {
+        @if (modalAtalho === 'despesa') {
+          <form class="modal-expense cash-movement-form" (submit)="registrarMovimentacaoCaixa($event)">
+            <label class="wide">
+              Operação
+              <div class="movement-tabs">
+                <button type="button" [class.active]="movimentacaoCaixaForm.tipo === 'DESPESA'" (click)="aoTrocarTipoMovimentacao('DESPESA')">Despesa</button>
+                <button type="button" [class.active]="movimentacaoCaixaForm.tipo === 'SANGRIA'" (click)="aoTrocarTipoMovimentacao('SANGRIA')">Sangria</button>
+                <button type="button" [class.active]="movimentacaoCaixaForm.tipo === 'SUPRIMENTO'" (click)="aoTrocarTipoMovimentacao('SUPRIMENTO')">Suprimento</button>
+              </div>
+            </label>
+
+            @if (movimentacaoCaixaForm.tipo === 'DESPESA') {
+              <label class="wide">
+                Tipo de despesa
+                <select name="tipoDespesaId" [(ngModel)]="movimentacaoCaixaForm.tipoDespesaId" [disabled]="carregandoTiposDespesa || !tiposDespesaPdv.length">
+                  @for (tipo of tiposDespesaPdv; track tipo.id) {
+                    <option [ngValue]="tipo.id">{{ tipo.codigo }} · {{ tipo.descricao }}</option>
+                  }
+                </select>
+              </label>
+            }
+
+            <label>
+              Valor
+              <input name="valorMovimentacao" [(ngModel)]="movimentacaoCaixaForm.valor" inputmode="decimal" autocomplete="off" placeholder="0,00" />
+            </label>
+
+            <label>
+              Documento @if (documentoDespesaObrigatorio()) { <strong class="required-marker">obrigatório</strong> }
+              <input name="documentoMovimentacao" [(ngModel)]="movimentacaoCaixaForm.documento" autocomplete="off" />
+            </label>
+
+            <label class="wide">
+              Histórico
+              <input name="historicoMovimentacao" [(ngModel)]="movimentacaoCaixaForm.historico" autocomplete="off" />
+            </label>
+
+            @if (carregandoTiposDespesa) {
+              <p class="client-warning wide">Carregando tipos de despesa do Hub...</p>
+            } @else if (movimentacaoCaixaForm.tipo === 'DESPESA' && !tiposDespesaPdv.length) {
+              <p class="client-warning wide">Nenhum tipo de despesa disponível no Hub.</p>
+            }
+
+            @if (erroMovimentacaoCaixa) {
+              <p class="client-form-error wide">{{ erroMovimentacaoCaixa }}</p>
+            }
+
+            <div class="modal-actions">
+              <button type="button" (click)="fecharAtalho()">VOLTAR</button>
+              <button type="submit" [disabled]="registrandoMovimentacaoCaixa || (movimentacaoCaixaForm.tipo === 'DESPESA' && !tiposDespesaPdv.length)">
+                {{ registrandoMovimentacaoCaixa ? 'Registrando...' : 'REGISTRAR' }}
+              </button>
+            </div>
+          </form>
+        } @else if (modalAtalho === 'cliente') {
           <div class="client-modal">
             <section class="current-client">
               <span>{{ venda() ? 'Cliente da venda' : 'Cliente pré-selecionado' }}</span>

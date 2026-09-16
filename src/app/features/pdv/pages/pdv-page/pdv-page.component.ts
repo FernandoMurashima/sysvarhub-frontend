@@ -5,10 +5,14 @@ import { Router, RouterLink } from '@angular/router';
 import { Subscription } from 'rxjs';
 
 import { ClienteCadastroRequest, ClienteHubResumo, ClienteTipoPessoa, formatarDocumentoCliente } from '../../../../core/models/cliente.models';
+import { TipoMovimentacaoCaixa } from '../../../../core/models/movimentacao-caixa.models';
 import { FormaPagamento } from '../../../../core/models/pagamento.models';
+import { TipoDespesaPdv } from '../../../../core/models/tipo-despesa-pdv.models';
 import { VendaClienteResumo, VendaItemHubResumo } from '../../../../core/models/venda.models';
 import { VendedorHubResumo } from '../../../../core/models/vendedor.models';
 import { CaixaSessionService } from '../../../caixa/services/caixa-session.service';
+import { HubMovimentacoesCaixaService } from '../../../caixa/services/hub-movimentacoes-caixa.service';
+import { HubTiposDespesaPdvService } from '../../../caixa/services/hub-tipos-despesa-pdv.service';
 import { ClienteCadastroComunicacaoIncertError, ClienteSessionExpiredError, ClienteSessionService } from '../../../cliente/services/cliente-session.service';
 import { normalizarValorAbertura } from '../../../caixa/services/caixa-valor.parser';
 import { OperatorSessionService } from '../../../operador/services/operator-session.service';
@@ -49,6 +53,14 @@ interface ClienteCadastroForm {
   estado: string;
 }
 
+interface MovimentacaoCaixaForm {
+  tipo: TipoMovimentacaoCaixa;
+  tipoDespesaId: number | null;
+  valor: string;
+  documento: string;
+  historico: string;
+}
+
 @Component({
   selector: 'app-pdv-page',
   standalone: true,
@@ -60,6 +72,8 @@ export class PdvPageComponent implements OnInit, OnDestroy {
   readonly facade = inject(PdvHubFacade);
   private readonly operatorSession = inject(OperatorSessionService);
   private readonly caixaSession = inject(CaixaSessionService);
+  private readonly tiposDespesaService = inject(HubTiposDespesaPdvService);
+  private readonly movimentacoesCaixaService = inject(HubMovimentacoesCaixaService);
   private readonly vendaSession = inject(VendaSessionService);
   private readonly clienteSession = inject(ClienteSessionService);
   private readonly vendedorSession = inject(VendedorSessionService);
@@ -104,6 +118,11 @@ export class PdvPageComponent implements OnInit, OnDestroy {
   valorAbertura = '0,00';
   erroAbertura = '';
   abrindoCaixa = false;
+  tiposDespesaPdv: TipoDespesaPdv[] = [];
+  carregandoTiposDespesa = false;
+  erroMovimentacaoCaixa = '';
+  registrandoMovimentacaoCaixa = false;
+  movimentacaoCaixaForm: MovimentacaoCaixaForm = this.criarMovimentacaoCaixaForm();
   private buscaTimer: ReturnType<typeof setTimeout> | null = null;
   private buscaClienteTimer: ReturnType<typeof setTimeout> | null = null;
   private buscaVendedorTimer: ReturnType<typeof setTimeout> | null = null;
@@ -111,6 +130,8 @@ export class PdvPageComponent implements OnInit, OnDestroy {
   private clientesSubscription: Subscription | null = null;
   private vendedoresSubscription: Subscription | null = null;
   private cadastroClienteSubscription: Subscription | null = null;
+  private tiposDespesaSubscription: Subscription | null = null;
+  private movimentacaoCaixaSubscription: Subscription | null = null;
 
   readonly loja = this.facade.loja;
   readonly caixa = this.facade.caixa;
@@ -151,6 +172,8 @@ export class PdvPageComponent implements OnInit, OnDestroy {
     this.clientesSubscription?.unsubscribe();
     this.vendedoresSubscription?.unsubscribe();
     this.cadastroClienteSubscription?.unsubscribe();
+    this.tiposDespesaSubscription?.unsubscribe();
+    this.movimentacaoCaixaSubscription?.unsubscribe();
   }
 
   @HostListener('document:keydown.f2', ['$event'])
@@ -316,6 +339,11 @@ export class PdvPageComponent implements OnInit, OnDestroy {
       return;
     }
 
+    if (atalho === 'despesa') {
+      this.abrirMovimentacaoCaixa();
+      return;
+    }
+
     this.modalAtalho = atalho;
     this.mensagem = 'Recurso ainda não integrado ao Hub.';
   }
@@ -326,6 +354,82 @@ export class PdvPageComponent implements OnInit, OnDestroy {
     this.produtosPreco = [];
     this.limparEstadoClienteModal();
     this.limparEstadoVendedorModal();
+    this.limparEstadoMovimentacaoCaixa();
+  }
+
+  abrirMovimentacaoCaixa(): void {
+    this.modalAtalho = 'despesa';
+    this.mensagem = '';
+    this.erroMovimentacaoCaixa = '';
+    this.movimentacaoCaixaForm = this.criarMovimentacaoCaixaForm();
+    this.carregarTiposDespesaPdv();
+  }
+
+  aoTrocarTipoMovimentacao(tipo: TipoMovimentacaoCaixa): void {
+    this.movimentacaoCaixaForm.tipo = tipo;
+    this.erroMovimentacaoCaixa = '';
+    if (tipo !== 'DESPESA') {
+      this.movimentacaoCaixaForm.tipoDespesaId = null;
+    }
+  }
+
+  tipoDespesaSelecionado(): TipoDespesaPdv | null {
+    const id = this.movimentacaoCaixaForm.tipoDespesaId;
+    return this.tiposDespesaPdv.find((tipo) => tipo.id === Number(id)) || null;
+  }
+
+  documentoDespesaObrigatorio(): boolean {
+    return this.movimentacaoCaixaForm.tipo === 'DESPESA' && Boolean(this.tipoDespesaSelecionado()?.exigeDocumento);
+  }
+
+  registrarMovimentacaoCaixa(event?: Event): void {
+    event?.preventDefault();
+    if (this.registrandoMovimentacaoCaixa) return;
+
+    const form = this.movimentacaoCaixaForm;
+    const valor = normalizarValorPagamento(form.valor);
+    if (!valor) {
+      this.erroMovimentacaoCaixa = 'Valor inválido.';
+      return;
+    }
+    if (form.tipo === 'DESPESA' && !form.tipoDespesaId) {
+      this.erroMovimentacaoCaixa = 'Selecione o tipo de despesa.';
+      return;
+    }
+    if (this.documentoDespesaObrigatorio() && !form.documento.trim()) {
+      this.erroMovimentacaoCaixa = 'Documento obrigatório para este tipo de despesa.';
+      return;
+    }
+
+    const payload = {
+      tipo: form.tipo,
+      valor,
+      documento: form.documento.trim(),
+      historico: form.historico.trim(),
+      ...(form.tipo === 'DESPESA' ? { tipo_despesa_id: Number(form.tipoDespesaId) } : {}),
+    };
+    this.registrandoMovimentacaoCaixa = true;
+    this.erroMovimentacaoCaixa = '';
+    this.movimentacaoCaixaSubscription?.unsubscribe();
+    this.movimentacaoCaixaSubscription = this.movimentacoesCaixaService.registrar(payload).subscribe({
+      next: () => {
+        const tipo = form.tipo;
+        this.registrandoMovimentacaoCaixa = false;
+        this.movimentacaoCaixaForm = this.criarMovimentacaoCaixaForm();
+        this.fecharAtalho();
+        this.mensagem = tipo === 'DESPESA' ? 'Despesa registrada.' : tipo === 'SANGRIA' ? 'Sangria registrada.' : 'Suprimento registrado.';
+      },
+      error: (error: unknown) => {
+        this.registrandoMovimentacaoCaixa = false;
+        if (this.isAuthenticationError(error)) {
+          this.operatorSession.invalidarSessao();
+          this.fecharAtalho();
+          void this.router.navigateByUrl('/operador');
+          return;
+        }
+        this.erroMovimentacaoCaixa = this.detailErroHttp(error) || 'Falha de comunicação com o Hub local.';
+      },
+    });
   }
 
   abrirCliente(): void {
@@ -974,6 +1078,48 @@ export class PdvPageComponent implements OnInit, OnDestroy {
     this.erroVendedores = '';
   }
 
+  private limparEstadoMovimentacaoCaixa(): void {
+    this.tiposDespesaSubscription?.unsubscribe();
+    this.movimentacaoCaixaSubscription?.unsubscribe();
+    this.movimentacaoCaixaForm = this.criarMovimentacaoCaixaForm();
+    this.erroMovimentacaoCaixa = '';
+    this.carregandoTiposDespesa = false;
+    this.registrandoMovimentacaoCaixa = false;
+  }
+
+  private carregarTiposDespesaPdv(): void {
+    this.tiposDespesaSubscription?.unsubscribe();
+    this.carregandoTiposDespesa = true;
+    this.tiposDespesaSubscription = this.tiposDespesaService.listar().subscribe({
+      next: (response) => {
+        this.tiposDespesaPdv = response.tipos;
+        this.carregandoTiposDespesa = false;
+        this.movimentacaoCaixaForm.tipoDespesaId = response.tipos[0]?.id || null;
+      },
+      error: (error: unknown) => {
+        this.tiposDespesaPdv = [];
+        this.carregandoTiposDespesa = false;
+        if (this.isAuthenticationError(error)) {
+          this.operatorSession.invalidarSessao();
+          this.fecharAtalho();
+          void this.router.navigateByUrl('/operador');
+          return;
+        }
+        this.erroMovimentacaoCaixa = this.detailErroHttp(error) || 'Falha de comunicação com o Hub local.';
+      },
+    });
+  }
+
+  private criarMovimentacaoCaixaForm(): MovimentacaoCaixaForm {
+    return {
+      tipo: 'DESPESA',
+      tipoDespesaId: null,
+      valor: '',
+      documento: '',
+      historico: '',
+    };
+  }
+
   private selecionarClienteAposCadastro(cliente: ClienteHubResumo): void {
     this.vendaSession.selecionarCliente(cliente.clienteUuid).subscribe((resultado) => {
       this.salvandoCliente = false;
@@ -1054,6 +1200,10 @@ export class PdvPageComponent implements OnInit, OnDestroy {
       return body?.detail || error.message;
     }
     return '';
+  }
+
+  private isAuthenticationError(error: unknown): boolean {
+    return error instanceof HttpErrorResponse && (error.status === 401 || error.status === 403);
   }
 
   private tratarResultadoOperacao(resultado: { ok: boolean; detail?: string; estoqueDisponivel?: string }, sucesso: string): void {

@@ -9,6 +9,8 @@ import { SessaoCaixaHubResumo } from '../../../../core/models/caixa.models';
 import { ClienteHubResumo } from '../../../../core/models/cliente.models';
 import { VendedorHubResumo } from '../../../../core/models/vendedor.models';
 import { CaixaSessionService } from '../../../caixa/services/caixa-session.service';
+import { HubMovimentacoesCaixaService } from '../../../caixa/services/hub-movimentacoes-caixa.service';
+import { HubTiposDespesaPdvService } from '../../../caixa/services/hub-tipos-despesa-pdv.service';
 import { ClienteSessionExpiredError, ClienteSessionService } from '../../../cliente/services/cliente-session.service';
 import { OperatorSessionService } from '../../../operador/services/operator-session.service';
 import { VendaSessionService } from '../../../venda/services/venda-session.service';
@@ -102,6 +104,8 @@ describe('PdvPageComponent', () => {
   let clienteSession: jasmine.SpyObj<ClienteSessionService>;
   let vendedorSession: jasmine.SpyObj<VendedorSessionService>;
   let caixaSession: jasmine.SpyObj<CaixaSessionService>;
+  let tiposDespesaService: jasmine.SpyObj<HubTiposDespesaPdvService>;
+  let movimentacoesCaixaService: jasmine.SpyObj<HubMovimentacoesCaixaService>;
   let vendaSession: jasmine.SpyObj<VendaSessionService>;
   let caixaStatusSignal = signal<'inicializando' | 'fechado' | 'aberto' | 'erro'>('aberto');
   let sessaoCaixaSignal = signal<SessaoCaixaHubResumo | null>(sessaoCaixaAbertaStub);
@@ -137,7 +141,7 @@ describe('PdvPageComponent', () => {
       empresa: signal('Empresa Teste Ltda').asReadonly(),
     });
     facade.buscarCatalogo.and.returnValue(of(catalogo([produtoVendavel])));
-    operatorSession = jasmine.createSpyObj<OperatorSessionService>('OperatorSessionService', ['logout'], {
+    operatorSession = jasmine.createSpyObj<OperatorSessionService>('OperatorSessionService', ['logout', 'invalidarSessao'], {
       operador: signal({
         usuarioId: 99,
         codigo: 'caixa.barra',
@@ -174,6 +178,47 @@ describe('PdvPageComponent', () => {
     });
     caixaSession.bootstrap.and.returnValue(of(true));
     caixaSession.abrir.and.returnValue(of({ ok: true }));
+    tiposDespesaService = jasmine.createSpyObj<HubTiposDespesaPdvService>('HubTiposDespesaPdvService', ['listar']);
+    tiposDespesaService.listar.and.returnValue(of({
+      tiposDespesaPdvVersao: 1,
+      tiposDespesaPdvSincronizadoEm: '2026-09-16T10:00:00',
+      total: 1,
+      tipos: [{
+        id: 123,
+        codigo: 'LAN',
+        descricao: 'Lanche',
+        exigeDocumento: false,
+        natureza: {
+          id: 456,
+          codigo: '3301',
+          descricao: 'Lanche',
+          categoriaPrincipal: 'Loja',
+          subcategoria: 'Equipe',
+          tipo: 'DESPESA',
+          status: 'ATIVO',
+          tipoNatureza: 'DEBITO',
+          naturezaOperacao: 'DESPESA',
+          categoriaGerencial: 'Operacional',
+          movimentaFinanceiro: true,
+          entraDre: true,
+        },
+      }],
+    }));
+    movimentacoesCaixaService = jasmine.createSpyObj<HubMovimentacoesCaixaService>('HubMovimentacoesCaixaService', ['registrar']);
+    movimentacoesCaixaService.registrar.and.returnValue(of({
+      uuid: 'mov-uuid',
+      tipo: 'SANGRIA',
+      status: 'EFETIVA',
+      valor: '10.00',
+      documento: 'SANG-1',
+      historico: 'Sangria PDV',
+      ocorridoEm: '2026-09-16T10:00:00',
+      caixa: { id: 29, codigo: 'CX', descricao: 'Caixa', ativo: true },
+      sessaoCaixaUuid: 'sessao-caixa',
+      terminal: { uuid: 'terminal-uuid', codigo: 'PDV-01', nome: 'PDV 01' },
+      operador: { usuarioId: 99, codigo: 'caixa.barra', nome: 'Juliana Rocha', tipo: 'Caixa', perfil: null },
+      tipoDespesa: null,
+    }));
     vendaSignal = signal(vendaAbertaStub.venda);
     clientePreselecionadoSignal = signal(null as typeof clientePreselecionadoStub | null);
     vendedorPreselecionadoSignal = signal(null as VendedorHubResumo | null);
@@ -209,6 +254,8 @@ describe('PdvPageComponent', () => {
         { provide: ClienteSessionService, useValue: clienteSession },
         { provide: VendedorSessionService, useValue: vendedorSession },
         { provide: CaixaSessionService, useValue: caixaSession },
+        { provide: HubTiposDespesaPdvService, useValue: tiposDespesaService },
+        { provide: HubMovimentacoesCaixaService, useValue: movimentacoesCaixaService },
         { provide: VendaSessionService, useValue: vendaSession },
       ],
     }).compileComponents();
@@ -480,6 +527,96 @@ describe('PdvPageComponent', () => {
     expect(component.modalAtalho).toBe('pagamentos');
     expect(vendaSession.listarFormasPagamento).toHaveBeenCalled();
     expect(facade.buscarCatalogo).not.toHaveBeenCalled();
+  });
+
+  it('F8 abre modal de movimentacao iniciando em DESPESA e carrega tipos locais', () => {
+    const component = fixture.componentInstance;
+
+    component.abrirAtalho(new Event('click'), 'despesa');
+    fixture.detectChanges();
+
+    expect(component.modalAtalho).toBe('despesa');
+    expect(component.movimentacaoCaixaForm.tipo).toBe('DESPESA');
+    expect(tiposDespesaService.listar).toHaveBeenCalled();
+    expect(fixture.nativeElement.textContent).toContain('Movimentação de Caixa');
+    expect(fixture.nativeElement.textContent).toContain('Tipo de despesa');
+  });
+
+  it('DESPESA valida tipo documento obrigatorio e envia tipo_despesa_id com valor decimal', () => {
+    const component = fixture.componentInstance;
+    tiposDespesaService.listar.and.returnValue(of({
+      tiposDespesaPdvVersao: 1,
+      tiposDespesaPdvSincronizadoEm: null,
+      total: 1,
+      tipos: [{
+        id: 777,
+        codigo: 'DOC',
+        descricao: 'Despesa com doc',
+        exigeDocumento: true,
+        natureza: {
+          id: 1,
+          codigo: '3301',
+          descricao: 'Natureza',
+          categoriaPrincipal: '',
+          subcategoria: '',
+          tipo: 'DESPESA',
+          status: 'ATIVO',
+          tipoNatureza: 'DEBITO',
+          naturezaOperacao: 'DESPESA',
+          categoriaGerencial: '',
+          movimentaFinanceiro: true,
+          entraDre: true,
+        },
+      }],
+    }));
+
+    component.abrirAtalho(new Event('click'), 'despesa');
+    component.movimentacaoCaixaForm.valor = '25,9';
+    component.registrarMovimentacaoCaixa();
+    expect(component.erroMovimentacaoCaixa).toBe('Documento obrigatório para este tipo de despesa.');
+
+    component.movimentacaoCaixaForm.documento = 'NF-123';
+    component.registrarMovimentacaoCaixa();
+
+    expect(movimentacoesCaixaService.registrar).toHaveBeenCalledWith({
+      tipo: 'DESPESA',
+      valor: '25.90',
+      documento: 'NF-123',
+      historico: '',
+      tipo_despesa_id: 777,
+    });
+  });
+
+  it('SANGRIA e SUPRIMENTO nao enviam tipo_despesa_id e sucesso fecha modal com mensagem', () => {
+    const component = fixture.componentInstance;
+
+    component.abrirAtalho(new Event('click'), 'despesa');
+    component.aoTrocarTipoMovimentacao('SANGRIA');
+    component.movimentacaoCaixaForm.tipoDespesaId = 123;
+    component.movimentacaoCaixaForm.valor = '100';
+    component.registrarMovimentacaoCaixa();
+
+    expect(movimentacoesCaixaService.registrar).toHaveBeenCalledWith({
+      tipo: 'SANGRIA',
+      valor: '100.00',
+      documento: '',
+      historico: '',
+    });
+    expect(component.modalAtalho).toBe('');
+    expect(component.mensagem).toBe('Sangria registrada.');
+
+    component.abrirAtalho(new Event('click'), 'despesa');
+    component.aoTrocarTipoMovimentacao('SUPRIMENTO');
+    component.movimentacaoCaixaForm.valor = '50';
+    component.registrarMovimentacaoCaixa();
+
+    expect(movimentacoesCaixaService.registrar).toHaveBeenCalledWith({
+      tipo: 'SUPRIMENTO',
+      valor: '50.00',
+      documento: '',
+      historico: '',
+    });
+    expect(component.mensagem).toBe('Suprimento registrado.');
   });
 
   it('F2 e botao Cliente abrem modal e carregam clientes locais', () => {

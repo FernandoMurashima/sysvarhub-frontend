@@ -16,6 +16,8 @@ const OPERATOR_SCOPED_PATHS = [
   '/api/terminal/venda/',
   '/api/terminal/formas-pagamento/',
   '/api/terminal/clientes/',
+  '/api/terminal/vendedores/',
+  '/api/terminal/tipos-despesa-pdv/',
 ];
 
 export const terminalAuthInterceptor: HttpInterceptorFn = (req, next) => {
