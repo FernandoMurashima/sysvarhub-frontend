@@ -384,73 +384,109 @@
               <p class="client-warning">Remova os pagamentos antes de alterar o cliente.</p>
             }
 
-            <div class="modal-search">
-              <input
-                name="buscaCliente"
-                [(ngModel)]="buscaCliente"
-                (ngModelChange)="aoDigitarBuscaCliente()"
-                placeholder="Nome, CPF/CNPJ, telefone ou e-mail"
-                autocomplete="off"
-              />
-            </div>
+            @if (clienteModalModo === 'busca') {
+              <div class="modal-search">
+                <input
+                  name="buscaCliente"
+                  [(ngModel)]="buscaCliente"
+                  (ngModelChange)="aoDigitarBuscaCliente()"
+                  placeholder="Nome, CPF/CNPJ, telefone ou e-mail"
+                  autocomplete="off"
+                />
+                <button type="button" [disabled]="temPagamentoAtivo()" (click)="abrirCadastroCliente()">NOVO CLIENTE</button>
+              </div>
 
-            <div class="client-results">
-              @if (carregandoClientes) {
-                <p>Consultando clientes...</p>
-              } @else if (erroClientes) {
-                <p>{{ erroClientes }}</p>
-              } @else {
-                @for (cliente of clientesEncontrados; track cliente.clienteUuid) {
-                  <button
-                    type="button"
-                    [class.selected]="clienteListaSelecionado?.clienteUuid === cliente.clienteUuid"
-                    [class.blocked]="clienteSelecaoBloqueada(cliente)"
-                    (click)="selecionarClienteLista(cliente)"
-                    (dblclick)="confirmarClienteSelecionado()"
-                  >
-                    <span>
-                      <strong>{{ cliente.nomeCliente }}</strong>
-                      <small>{{ formatarDocumentoCliente(cliente) }} · {{ clienteCidadeUf(cliente) }}</small>
-                      @if (cliente.telefone1) {
-                        <small>{{ cliente.telefone1 }}</small>
-                      }
-                    </span>
-                    <span class="client-badges">
-                      @if (cliente.clientePadrao) {
-                        <b>PADRÃO</b>
-                      }
-                      @if (!cliente.ativo) {
-                        <b>INATIVO</b>
-                      }
-                      @if (cliente.bloqueio) {
-                        <b>BLOQUEADO</b>
-                      }
-                      @if (cliente.origem === 'LOCAL') {
-                        <b>LOCAL</b>
-                      }
-                    </span>
+              <div class="client-results">
+                @if (carregandoClientes) {
+                  <p>Consultando clientes...</p>
+                } @else if (erroClientes) {
+                  <p>{{ erroClientes }}</p>
+                } @else {
+                  @for (cliente of clientesEncontrados; track cliente.clienteUuid) {
+                    <button
+                      type="button"
+                      [class.selected]="clienteListaSelecionado?.clienteUuid === cliente.clienteUuid"
+                      [class.blocked]="clienteSelecaoBloqueada(cliente)"
+                      (click)="selecionarClienteLista(cliente)"
+                      (dblclick)="confirmarClienteSelecionado()"
+                    >
+                      <span>
+                        <strong>{{ cliente.nomeCliente }}</strong>
+                        <small>{{ formatarDocumentoCliente(cliente) }} · {{ clienteCidadeUf(cliente) }}</small>
+                        @if (cliente.telefone1) {
+                          <small>{{ cliente.telefone1 }}</small>
+                        }
+                      </span>
+                      <span class="client-badges">
+                        @if (cliente.clientePadrao) {
+                          <b>PADRÃO</b>
+                        }
+                        @if (!cliente.ativo) {
+                          <b>INATIVO</b>
+                        }
+                        @if (cliente.bloqueio) {
+                          <b>BLOQUEADO</b>
+                        }
+                        @if (cliente.origem === 'LOCAL') {
+                          <b>LOCAL</b>
+                        }
+                      </span>
+                    </button>
+                  }
+                  @if (!clientesEncontrados.length) {
+                    <p>Nenhum cliente encontrado.</p>
+                  }
+                }
+              </div>
+
+              <footer class="client-actions">
+                @if (clienteOperacional()) {
+                  <button type="button" class="danger" [disabled]="temPagamentoAtivo() || vendaLoading()" (click)="removerClienteVenda()">Remover cliente</button>
+                }
+                <button type="button" (click)="fecharAtalho()">Fechar</button>
+                <button
+                  type="button"
+                  class="primary"
+                  [disabled]="!clienteListaSelecionado || clienteSelecaoBloqueada(clienteListaSelecionado) || temPagamentoAtivo() || vendaLoading()"
+                  (click)="confirmarClienteSelecionado()"
+                >
+                  Selecionar
+                </button>
+              </footer>
+            } @else {
+              <form class="client-create-form" (submit)="salvarClienteCadastro($event)">
+                <div class="person-type">
+                  <button type="button" [class.active]="clienteCadastro.tipoPessoa === 'PF'" [disabled]="salvandoCliente" (click)="aoTrocarTipoPessoaCliente('PF')">Pessoa Física</button>
+                  <button type="button" [class.active]="clienteCadastro.tipoPessoa === 'PJ'" [disabled]="salvandoCliente" (click)="aoTrocarTipoPessoaCliente('PJ')">Pessoa Jurídica</button>
+                </div>
+
+                <label>{{ labelDocumentoCadastro() }} *<input name="documentoCadastro" [(ngModel)]="clienteCadastro.documento" [disabled]="salvandoCliente" autocomplete="off" inputmode="numeric" /></label>
+                <label>{{ labelNomeCadastro() }} *<input name="nomeCadastro" [(ngModel)]="clienteCadastro.nomeCliente" [disabled]="salvandoCliente" autocomplete="off" /></label>
+                <label>Apelido<input name="apelidoCadastro" [(ngModel)]="clienteCadastro.apelido" [disabled]="salvandoCliente" autocomplete="off" /></label>
+                <label>Telefone<input name="telefoneCadastro" [(ngModel)]="clienteCadastro.telefone1" [disabled]="salvandoCliente" autocomplete="off" inputmode="tel" /></label>
+                <label>Telefone 2<input name="telefone2Cadastro" [(ngModel)]="clienteCadastro.telefone2" [disabled]="salvandoCliente" autocomplete="off" inputmode="tel" /></label>
+                <label>E-mail<input name="emailCadastro" [(ngModel)]="clienteCadastro.email" [disabled]="salvandoCliente" autocomplete="off" inputmode="email" /></label>
+                <label>Aniversário<input name="aniversarioCadastro" [(ngModel)]="clienteCadastro.aniversario" [disabled]="salvandoCliente" type="date" /></label>
+                <label>CEP<input name="cepCadastro" [(ngModel)]="clienteCadastro.cep" [disabled]="salvandoCliente" autocomplete="off" inputmode="numeric" /></label>
+                <label>Endereço<input name="enderecoCadastro" [(ngModel)]="clienteCadastro.endereco" [disabled]="salvandoCliente" autocomplete="off" /></label>
+                <label>Número<input name="numeroCadastro" [(ngModel)]="clienteCadastro.numero" [disabled]="salvandoCliente" autocomplete="off" /></label>
+                <label>Complemento<input name="complementoCadastro" [(ngModel)]="clienteCadastro.complemento" [disabled]="salvandoCliente" autocomplete="off" /></label>
+                <label>Bairro<input name="bairroCadastro" [(ngModel)]="clienteCadastro.bairro" [disabled]="salvandoCliente" autocomplete="off" /></label>
+                <label>Cidade<input name="cidadeCadastro" [(ngModel)]="clienteCadastro.cidade" [disabled]="salvandoCliente" autocomplete="off" /></label>
+                <label>UF<input name="estadoCadastro" [(ngModel)]="clienteCadastro.estado" [disabled]="salvandoCliente" maxlength="2" autocomplete="off" /></label>
+
+                @if (erroCadastroCliente) {
+                  <p class="client-form-error">{{ erroCadastroCliente }}</p>
+                }
+
+                <footer class="client-actions client-create-actions">
+                  <button type="button" [disabled]="salvandoCliente" (click)="voltarBuscaCliente()">VOLTAR</button>
+                  <button type="submit" class="primary" [disabled]="salvandoCliente || temPagamentoAtivo()">
+                    {{ salvandoCliente ? 'SALVANDO...' : 'SALVAR CLIENTE' }}
                   </button>
-                }
-                @if (!clientesEncontrados.length) {
-                  <p>Nenhum cliente encontrado.</p>
-                }
-              }
-            </div>
-
-            <footer class="client-actions">
-              @if (clienteOperacional()) {
-                <button type="button" class="danger" [disabled]="temPagamentoAtivo() || vendaLoading()" (click)="removerClienteVenda()">Remover cliente</button>
-              }
-              <button type="button" (click)="fecharAtalho()">Fechar</button>
-              <button
-                type="button"
-                class="primary"
-                [disabled]="!clienteListaSelecionado || clienteSelecaoBloqueada(clienteListaSelecionado) || temPagamentoAtivo() || vendaLoading()"
-                (click)="confirmarClienteSelecionado()"
-              >
-                Selecionar
-              </button>
-            </footer>
+                </footer>
+              </form>
+            }
           </div>
         } @else if (modalAtalho === 'preco') {
           <div class="modal-search">

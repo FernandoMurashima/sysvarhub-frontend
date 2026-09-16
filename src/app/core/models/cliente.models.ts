@@ -11,13 +11,21 @@ export interface ClienteHubResumo {
   nomeCliente: string;
   apelido: string;
   telefone1: string;
+  telefone2: string;
   email: string;
+  aniversario: string | null;
+  endereco: string;
+  numero: string;
+  complemento: string;
+  cep: string;
+  bairro: string;
   cidade: string;
   estado: string;
   bloqueio: boolean;
   motivoBloqueio: string | null;
   ativo: boolean;
   presenteRetaguarda: boolean;
+  pendenteSincronizacao: boolean;
 }
 
 export interface ClientesConsultaResponse {
@@ -39,13 +47,21 @@ export interface ClienteHubResumoApi {
   nome_cliente: string;
   apelido: string;
   telefone1: string;
+  telefone2?: string;
   email: string;
+  aniversario?: string | null;
+  endereco?: string;
+  numero?: string;
+  complemento?: string;
+  cep?: string;
+  bairro?: string;
   cidade: string;
   estado: string;
   bloqueio: boolean;
   motivo_bloqueio: string | null;
   ativo: boolean;
   presente_retaguarda: boolean;
+  pendente_sincronizacao?: boolean;
 }
 
 export interface ClientesConsultaApiResponse {
@@ -55,6 +71,28 @@ export interface ClientesConsultaApiResponse {
   total: number;
   limit: number;
   clientes: ClienteHubResumoApi[];
+}
+
+export interface ClienteCadastroRequest {
+  tipo_pessoa: ClienteTipoPessoa;
+  documento: string;
+  nome_cliente: string;
+  apelido?: string;
+  telefone1?: string;
+  telefone2?: string;
+  email?: string;
+  aniversario?: string;
+  endereco?: string;
+  numero?: string;
+  complemento?: string;
+  cep?: string;
+  bairro?: string;
+  cidade?: string;
+  estado?: string;
+}
+
+export interface ClienteCadastroApiResponse {
+  cliente: ClienteHubResumoApi;
 }
 
 export function mapCliente(cliente: ClienteHubResumoApi): ClienteHubResumo {
@@ -68,13 +106,21 @@ export function mapCliente(cliente: ClienteHubResumoApi): ClienteHubResumo {
     nomeCliente: cliente.nome_cliente,
     apelido: cliente.apelido,
     telefone1: cliente.telefone1,
+    telefone2: cliente.telefone2 || '',
     email: cliente.email,
+    aniversario: cliente.aniversario || null,
+    endereco: cliente.endereco || '',
+    numero: cliente.numero || '',
+    complemento: cliente.complemento || '',
+    cep: cliente.cep || '',
+    bairro: cliente.bairro || '',
     cidade: cliente.cidade,
     estado: cliente.estado,
     bloqueio: cliente.bloqueio,
     motivoBloqueio: cliente.motivo_bloqueio,
     ativo: cliente.ativo,
     presenteRetaguarda: cliente.presente_retaguarda,
+    pendenteSincronizacao: Boolean(cliente.pendente_sincronizacao),
   };
 }
 

@@ -1,8 +1,9 @@
 import { ComponentFixture, fakeAsync, TestBed, tick } from '@angular/core/testing';
 import { Component, signal } from '@angular/core';
+import { HttpErrorResponse } from '@angular/common/http';
 import { Router } from '@angular/router';
 import { RouterTestingModule } from '@angular/router/testing';
-import { of, throwError } from 'rxjs';
+import { Subject, of, throwError } from 'rxjs';
 
 import { SessaoCaixaHubResumo } from '../../../../core/models/caixa.models';
 import { ClienteHubResumo } from '../../../../core/models/cliente.models';
@@ -69,13 +70,21 @@ const clienteAtivo: ClienteHubResumo = {
   nomeCliente: 'Maria Silva',
   apelido: '',
   telefone1: '21999990000',
+  telefone2: '',
   email: 'maria@example.com',
+  aniversario: null,
+  endereco: '',
+  numero: '',
+  complemento: '',
+  cep: '',
+  bairro: '',
   cidade: 'Rio de Janeiro',
   estado: 'RJ',
   bloqueio: false,
   motivoBloqueio: null,
   ativo: true,
   presenteRetaguarda: true,
+  pendenteSincronizacao: false,
 };
 
 @Component({
@@ -134,7 +143,7 @@ describe('PdvPageComponent', () => {
       }).asReadonly(),
     });
     operatorSession.logout.and.returnValue(of(true));
-    clienteSession = jasmine.createSpyObj<ClienteSessionService>('ClienteSessionService', ['listar']);
+    clienteSession = jasmine.createSpyObj<ClienteSessionService>('ClienteSessionService', ['listar', 'cadastrar']);
     clienteSession.listar.and.returnValue(of({
       clientesVersao: 1,
       clientesSincronizadoEm: '2026-09-14T10:00:00',
@@ -143,6 +152,7 @@ describe('PdvPageComponent', () => {
       limit: 50,
       clientes: [clienteAtivo],
     }));
+    clienteSession.cadastrar.and.returnValue(of({ ...clienteAtivo, clienteUuid: 'novo-cliente', nomeCliente: 'Cliente Novo' }));
     caixaStatusSignal = signal<'inicializando' | 'fechado' | 'aberto' | 'erro'>('aberto');
     sessaoCaixaSignal = signal(sessaoCaixaAbertaStub);
     caixaSession = jasmine.createSpyObj<CaixaSessionService>('CaixaSessionService', ['bootstrap', 'abrir'], {
@@ -691,6 +701,160 @@ describe('PdvPageComponent', () => {
 
     expect(vendaSession.selecionarCliente).not.toHaveBeenCalled();
     expect(fixture.nativeElement.textContent).toContain('Remova os pagamentos antes de alterar o cliente.');
+  });
+
+  it('botao NOVO CLIENTE aparece no F2 e abre formulario com campos obrigatorios', () => {
+    const component = fixture.componentInstance;
+
+    component.abrirCliente();
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('NOVO CLIENTE');
+
+    component.abrirCadastroCliente();
+    fixture.detectChanges();
+
+    const text = fixture.nativeElement.textContent;
+    expect(text).toContain('Pessoa Física');
+    expect(text).toContain('CPF *');
+    expect(text).toContain('Nome *');
+    expect(text).toContain('SALVAR CLIENTE');
+    expect(text).toContain('VOLTAR');
+  });
+
+  it('VOLTAR retorna a busca de clientes', () => {
+    const component = fixture.componentInstance;
+
+    component.abrirCliente();
+    component.abrirCadastroCliente();
+    component.voltarBuscaCliente();
+    fixture.detectChanges();
+
+    expect(component.clienteModalModo).toBe('busca');
+    expect(fixture.nativeElement.textContent).toContain('NOVO CLIENTE');
+    expect(fixture.nativeElement.textContent).not.toContain('SALVAR CLIENTE');
+  });
+
+  it('alternancia PF/PJ troca CPF/CNPJ e Nome/Razao Social', () => {
+    const component = fixture.componentInstance;
+
+    component.abrirCliente();
+    component.abrirCadastroCliente();
+    component.aoTrocarTipoPessoaCliente('PJ');
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.textContent).toContain('CNPJ *');
+    expect(fixture.nativeElement.textContent).toContain('Razão Social *');
+  });
+
+  it('salvar fica desabilitado durante processamento', () => {
+    const cadastro$ = new Subject<ClienteHubResumo>();
+    clienteSession.cadastrar.and.returnValue(cadastro$);
+    const component = fixture.componentInstance;
+
+    component.abrirCliente();
+    component.abrirCadastroCliente();
+    component.clienteCadastro.documento = '12345678901';
+    component.clienteCadastro.nomeCliente = 'Maria Silva';
+    component.salvarClienteCadastro();
+    fixture.detectChanges();
+
+    const botaoSalvar = Array.from(fixture.nativeElement.querySelectorAll('button')).find((button) =>
+      (button as HTMLButtonElement).textContent?.includes('SALVANDO...'),
+    ) as HTMLButtonElement;
+    expect(component.salvandoCliente).toBeTrue();
+    expect(botaoSalvar.disabled).toBeTrue();
+  });
+
+  it('HTTP 400 mantem modal aberto e mostra detail', () => {
+    clienteSession.cadastrar.and.returnValue(throwError(() => new HttpErrorResponse({ status: 400, error: { detail: 'CPF inválido.' } })));
+    const component = fixture.componentInstance;
+
+    component.abrirCliente();
+    component.abrirCadastroCliente();
+    component.clienteCadastro.documento = '12345678901';
+    component.clienteCadastro.nomeCliente = 'Maria Silva';
+    component.salvarClienteCadastro();
+    fixture.detectChanges();
+
+    expect(component.modalAtalho).toBe('cliente');
+    expect(component.erroCadastroCliente).toBe('CPF inválido.');
+    expect(fixture.nativeElement.textContent).toContain('CPF inválido.');
+  });
+
+  it('HTTP 409 mantem modal aberto e mostra detail sem selecionar conflito', () => {
+    clienteSession.cadastrar.and.returnValue(throwError(() => new HttpErrorResponse({ status: 409, error: { detail: 'Já existe um cliente com este CPF/CNPJ.', cliente_uuid: 'existente' } })));
+    const component = fixture.componentInstance;
+
+    component.abrirCliente();
+    component.abrirCadastroCliente();
+    component.clienteCadastro.documento = '12345678901';
+    component.clienteCadastro.nomeCliente = 'Maria Silva';
+    component.salvarClienteCadastro();
+
+    expect(component.modalAtalho).toBe('cliente');
+    expect(component.erroCadastroCliente).toBe('Já existe um cliente com este CPF/CNPJ.');
+    expect(vendaSession.selecionarCliente).not.toHaveBeenCalledWith('existente');
+  });
+
+  it('cadastro bem-sucedido sem venda seleciona cliente sem iniciar venda e fecha modal', () => {
+    const component = fixture.componentInstance;
+    vendaSignal.set(null);
+    vendaStatusSignal.set('sem-venda');
+
+    component.abrirCliente();
+    component.abrirCadastroCliente();
+    component.clienteCadastro.documento = '12345678901';
+    component.clienteCadastro.nomeCliente = 'Maria Silva';
+    component.salvarClienteCadastro();
+
+    expect(clienteSession.cadastrar).toHaveBeenCalled();
+    expect(vendaSession.selecionarCliente).toHaveBeenCalledWith('novo-cliente');
+    expect(vendaSession.iniciarVenda).not.toHaveBeenCalled();
+    expect(component.modalAtalho).toBe('');
+    expect(component.mensagem).toBe('Cliente cadastrado e pré-selecionado.');
+  });
+
+  it('cadastro bem-sucedido com venda mantem mesma venda e seleciona cliente', () => {
+    const component = fixture.componentInstance;
+    const vendaAtual = vendaAbertaStub.venda;
+    vendaSignal.set(vendaAtual);
+
+    component.abrirCliente();
+    component.abrirCadastroCliente();
+    component.clienteCadastro.documento = '12345678901';
+    component.clienteCadastro.nomeCliente = 'Maria Silva';
+    component.salvarClienteCadastro();
+
+    expect(vendaSession.selecionarCliente).toHaveBeenCalledWith('novo-cliente');
+    expect(component.venda()).toBe(vendaAtual);
+    expect(component.mensagem).toBe('Cliente cadastrado e selecionado.');
+  });
+
+  it('falha na selecao depois do POST nao executa segundo POST', () => {
+    vendaSession.selecionarCliente.and.returnValue(of({ ok: false, detail: 'Falha ao selecionar cliente.' }));
+    const component = fixture.componentInstance;
+
+    component.abrirCliente();
+    component.abrirCadastroCliente();
+    component.clienteCadastro.documento = '12345678901';
+    component.clienteCadastro.nomeCliente = 'Maria Silva';
+    component.salvarClienteCadastro();
+
+    expect(clienteSession.cadastrar).toHaveBeenCalledTimes(1);
+    expect(component.erroCadastroCliente).toBe('Cliente cadastrado, mas não foi possível selecioná-lo.');
+    expect(component.modalAtalho).toBe('cliente');
+  });
+
+  it('pagamento ativo bloqueia cadastro antes do POST', () => {
+    const component = fixture.componentInstance;
+    vendaSignal.set({ ...vendaAbertaStub.venda!, pagamentos: [{ uuid: 'pag', formaPagamentoId: 1, formaRetaguardaId: 10, codigo: 'DIN', descricao: 'Dinheiro', tipo: 'DINHEIRO', numParcelas: 1, valor: '199.90', autorizacao: '', origemCaptura: 'MANUAL', criadoEm: '2026-09-14' }] });
+
+    component.abrirCliente();
+    component.abrirCadastroCliente();
+    component.salvarClienteCadastro();
+
+    expect(clienteSession.cadastrar).not.toHaveBeenCalled();
+    expect(component.erroClientes || component.erroCadastroCliente).toBe('Remova os pagamentos antes de alterar o cliente.');
   });
 
   it('ESC fecha modal de cliente e bootstrap restaura cliente da venda', () => {

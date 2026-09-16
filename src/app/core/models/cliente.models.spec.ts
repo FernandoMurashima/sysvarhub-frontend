@@ -12,13 +12,21 @@ describe('cliente models', () => {
       nome_cliente: 'Cliente Local',
       apelido: '',
       telefone1: '',
+      telefone2: '21988887777',
       email: '',
+      aniversario: '1990-01-02',
+      endereco: 'Rua A',
+      numero: '10',
+      complemento: 'Sala 2',
+      cep: '20000000',
+      bairro: 'Centro',
       cidade: '',
       estado: '',
       bloqueio: false,
       motivo_bloqueio: null,
       ativo: true,
       presente_retaguarda: false,
+      pendente_sincronizacao: true,
     });
 
     expect(cliente.clienteUuid).toBe('cliente-uuid');
@@ -28,6 +36,14 @@ describe('cliente models', () => {
     expect(cliente.ativo).toBeTrue();
     expect(cliente.bloqueio).toBeFalse();
     expect(cliente.presenteRetaguarda).toBeFalse();
+    expect(cliente.telefone2).toBe('21988887777');
+    expect(cliente.aniversario).toBe('1990-01-02');
+    expect(cliente.endereco).toBe('Rua A');
+    expect(cliente.numero).toBe('10');
+    expect(cliente.complemento).toBe('Sala 2');
+    expect(cliente.cep).toBe('20000000');
+    expect(cliente.bairro).toBe('Centro');
+    expect(cliente.pendenteSincronizacao).toBeTrue();
   });
 
   it('mapeia resposta de consulta', () => {
@@ -47,13 +63,21 @@ describe('cliente models', () => {
         nome_cliente: 'Cliente PJ',
         apelido: 'PJ',
         telefone1: '21999990000',
+        telefone2: '',
         email: 'cliente@example.com',
+        aniversario: null,
+        endereco: '',
+        numero: '',
+        complemento: '',
+        cep: '',
+        bairro: '',
         cidade: 'Rio',
         estado: 'RJ',
         bloqueio: true,
         motivo_bloqueio: 'Bloqueado',
         ativo: false,
         presente_retaguarda: true,
+        pendente_sincronizacao: false,
       }],
     });
 

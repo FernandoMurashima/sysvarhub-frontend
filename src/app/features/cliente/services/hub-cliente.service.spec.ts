@@ -61,4 +61,53 @@ describe('HubClienteService', () => {
       }],
     });
   });
+
+  it('faz POST correto para cadastrar cliente com body permitido e mapeia resposta 201', () => {
+    const payload = {
+      tipo_pessoa: 'PF' as const,
+      documento: '12345678901',
+      nome_cliente: 'Maria Silva',
+      telefone1: '21999990000',
+      estado: 'RJ',
+    };
+
+    service.cadastrar(payload).subscribe((cliente) => {
+      expect(cliente.clienteUuid).toBe('novo-cliente');
+      expect(cliente.nomeCliente).toBe('Maria Silva');
+      expect(cliente.pendenteSincronizacao).toBeTrue();
+    });
+
+    const request = httpMock.expectOne('/api/terminal/clientes/');
+    expect(request.request.method).toBe('POST');
+    expect(request.request.body).toEqual(payload);
+    expect(Object.keys(request.request.body).sort()).toEqual(['documento', 'estado', 'nome_cliente', 'telefone1', 'tipo_pessoa']);
+    request.flush({
+      cliente: {
+        cliente_uuid: 'novo-cliente',
+        retaguarda_id: null,
+        origem: 'LOCAL',
+        tipo_pessoa: 'PF',
+        documento: '12345678901',
+        cliente_padrao: false,
+        nome_cliente: 'Maria Silva',
+        apelido: '',
+        telefone1: '21999990000',
+        telefone2: '',
+        email: '',
+        aniversario: null,
+        endereco: '',
+        numero: '',
+        complemento: '',
+        cep: '',
+        bairro: '',
+        cidade: '',
+        estado: 'RJ',
+        bloqueio: false,
+        motivo_bloqueio: null,
+        ativo: true,
+        presente_retaguarda: false,
+        pendente_sincronizacao: true,
+      },
+    }, { status: 201, statusText: 'Created' });
+  });
 });

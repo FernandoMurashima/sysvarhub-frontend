@@ -1,13 +1,14 @@
 import { Component, HostListener, inject, OnDestroy, OnInit } from '@angular/core';
+import { HttpErrorResponse } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { Subscription } from 'rxjs';
 
-import { ClienteHubResumo, formatarDocumentoCliente } from '../../../../core/models/cliente.models';
+import { ClienteCadastroRequest, ClienteHubResumo, ClienteTipoPessoa, formatarDocumentoCliente } from '../../../../core/models/cliente.models';
 import { FormaPagamento } from '../../../../core/models/pagamento.models';
 import { VendaClienteResumo, VendaItemHubResumo } from '../../../../core/models/venda.models';
 import { CaixaSessionService } from '../../../caixa/services/caixa-session.service';
-import { ClienteSessionExpiredError, ClienteSessionService } from '../../../cliente/services/cliente-session.service';
+import { ClienteCadastroComunicacaoIncertError, ClienteSessionExpiredError, ClienteSessionService } from '../../../cliente/services/cliente-session.service';
 import { normalizarValorAbertura } from '../../../caixa/services/caixa-valor.parser';
 import { OperatorSessionService } from '../../../operador/services/operator-session.service';
 import { VendaSessionService } from '../../../venda/services/venda-session.service';
@@ -25,6 +26,26 @@ type PdvAtalho =
   | 'despesa'
   | 'pagamentos'
   | 'fechamento';
+
+type ClienteModalModo = 'busca' | 'cadastro';
+
+interface ClienteCadastroForm {
+  tipoPessoa: ClienteTipoPessoa;
+  documento: string;
+  nomeCliente: string;
+  apelido: string;
+  telefone1: string;
+  telefone2: string;
+  email: string;
+  aniversario: string;
+  cep: string;
+  endereco: string;
+  numero: string;
+  complemento: string;
+  bairro: string;
+  cidade: string;
+  estado: string;
+}
 
 @Component({
   selector: 'app-pdv-page',
@@ -65,6 +86,10 @@ export class PdvPageComponent implements OnInit, OnDestroy {
   clienteListaSelecionado: ClienteHubResumo | null = null;
   carregandoClientes = false;
   erroClientes = '';
+  clienteModalModo: ClienteModalModo = 'busca';
+  clienteCadastro: ClienteCadastroForm = this.criarClienteCadastroForm();
+  erroCadastroCliente = '';
+  salvandoCliente = false;
   tabelaPreco = '-';
   catalogoVersao: number | null = null;
   catalogoSincronizadoEm: string | null = null;
@@ -76,6 +101,7 @@ export class PdvPageComponent implements OnInit, OnDestroy {
   private buscaClienteTimer: ReturnType<typeof setTimeout> | null = null;
   private buscaSubscription: Subscription | null = null;
   private clientesSubscription: Subscription | null = null;
+  private cadastroClienteSubscription: Subscription | null = null;
 
   readonly loja = this.facade.loja;
   readonly caixa = this.facade.caixa;
@@ -112,6 +138,7 @@ export class PdvPageComponent implements OnInit, OnDestroy {
     if (this.buscaClienteTimer) clearTimeout(this.buscaClienteTimer);
     this.buscaSubscription?.unsubscribe();
     this.clientesSubscription?.unsubscribe();
+    this.cadastroClienteSubscription?.unsubscribe();
   }
 
   @HostListener('document:keydown.f2', ['$event'])
@@ -283,6 +310,7 @@ export class PdvPageComponent implements OnInit, OnDestroy {
     this.mensagem = '';
     this.buscaCliente = '';
     this.clienteListaSelecionado = null;
+    this.clienteModalModo = 'busca';
     this.consultarClientes('');
   }
 
@@ -307,6 +335,70 @@ export class PdvPageComponent implements OnInit, OnDestroy {
       }
       this.fecharAtalho();
       this.mensagem = clienteAnterior && clienteAnterior !== cliente.clienteUuid ? 'Cliente alterado.' : 'Cliente selecionado.';
+    });
+  }
+
+  abrirCadastroCliente(): void {
+    if (this.temPagamentoAtivo()) {
+      this.erroClientes = 'Remova os pagamentos antes de alterar o cliente.';
+      return;
+    }
+    this.clienteModalModo = 'cadastro';
+    this.erroCadastroCliente = '';
+  }
+
+  voltarBuscaCliente(): void {
+    this.clienteModalModo = 'busca';
+    this.erroCadastroCliente = '';
+  }
+
+  aoTrocarTipoPessoaCliente(tipoPessoa: ClienteTipoPessoa): void {
+    this.clienteCadastro.tipoPessoa = tipoPessoa;
+    this.clienteCadastro.documento = '';
+    this.erroCadastroCliente = '';
+  }
+
+  labelDocumentoCadastro(): string {
+    return this.clienteCadastro.tipoPessoa === 'PF' ? 'CPF' : 'CNPJ';
+  }
+
+  labelNomeCadastro(): string {
+    return this.clienteCadastro.tipoPessoa === 'PF' ? 'Nome' : 'Razão Social';
+  }
+
+  salvarClienteCadastro(event?: Event): void {
+    event?.preventDefault();
+    if (this.salvandoCliente) return;
+    if (this.temPagamentoAtivo()) {
+      this.erroCadastroCliente = 'Remova os pagamentos antes de alterar o cliente.';
+      return;
+    }
+
+    const payload = this.montarPayloadClienteCadastro();
+    const erroValidacao = this.validarPayloadClienteCadastro(payload);
+    if (erroValidacao) {
+      this.erroCadastroCliente = erroValidacao;
+      return;
+    }
+
+    this.salvandoCliente = true;
+    this.erroCadastroCliente = '';
+    this.cadastroClienteSubscription?.unsubscribe();
+    this.cadastroClienteSubscription = this.clienteSession.cadastrar(payload).subscribe({
+      next: (cliente) => this.selecionarClienteAposCadastro(cliente),
+      error: (error: unknown) => {
+        this.salvandoCliente = false;
+        if (error instanceof ClienteSessionExpiredError) {
+          this.modalAtalho = '';
+          this.limparEstadoClienteModal();
+          return;
+        }
+        if (error instanceof ClienteCadastroComunicacaoIncertError) {
+          this.erroCadastroCliente = 'Falha de comunicação com o Hub local.';
+          return;
+        }
+        this.erroCadastroCliente = this.detailErroHttp(error) || 'Falha ao cadastrar cliente.';
+      },
     });
   }
 
@@ -738,11 +830,98 @@ export class PdvPageComponent implements OnInit, OnDestroy {
   private limparEstadoClienteModal(): void {
     if (this.buscaClienteTimer) clearTimeout(this.buscaClienteTimer);
     this.clientesSubscription?.unsubscribe();
+    this.cadastroClienteSubscription?.unsubscribe();
     this.buscaCliente = '';
     this.clientesEncontrados = [];
     this.clienteListaSelecionado = null;
     this.carregandoClientes = false;
     this.erroClientes = '';
+    this.clienteModalModo = 'busca';
+    this.clienteCadastro = this.criarClienteCadastroForm();
+    this.erroCadastroCliente = '';
+    this.salvandoCliente = false;
+  }
+
+  private selecionarClienteAposCadastro(cliente: ClienteHubResumo): void {
+    this.vendaSession.selecionarCliente(cliente.clienteUuid).subscribe((resultado) => {
+      this.salvandoCliente = false;
+      if (!resultado.ok) {
+        this.erroCadastroCliente = 'Cliente cadastrado, mas não foi possível selecioná-lo.';
+        return;
+      }
+      const tinhaVenda = Boolean(this.venda());
+      this.fecharAtalho();
+      this.mensagem = tinhaVenda ? 'Cliente cadastrado e selecionado.' : 'Cliente cadastrado e pré-selecionado.';
+    });
+  }
+
+  private criarClienteCadastroForm(): ClienteCadastroForm {
+    return {
+      tipoPessoa: 'PF',
+      documento: '',
+      nomeCliente: '',
+      apelido: '',
+      telefone1: '',
+      telefone2: '',
+      email: '',
+      aniversario: '',
+      cep: '',
+      endereco: '',
+      numero: '',
+      complemento: '',
+      bairro: '',
+      cidade: '',
+      estado: '',
+    };
+  }
+
+  private montarPayloadClienteCadastro(): ClienteCadastroRequest {
+    const form = this.clienteCadastro;
+    const payload: ClienteCadastroRequest = {
+      tipo_pessoa: form.tipoPessoa,
+      documento: this.apenasDigitos(form.documento),
+      nome_cliente: form.nomeCliente.trim(),
+    };
+    this.adicionarCampoOpcional(payload, 'apelido', form.apelido.trim());
+    this.adicionarCampoOpcional(payload, 'telefone1', this.apenasDigitos(form.telefone1));
+    this.adicionarCampoOpcional(payload, 'telefone2', this.apenasDigitos(form.telefone2));
+    this.adicionarCampoOpcional(payload, 'email', form.email.trim());
+    this.adicionarCampoOpcional(payload, 'aniversario', form.aniversario.trim());
+    this.adicionarCampoOpcional(payload, 'cep', this.apenasDigitos(form.cep));
+    this.adicionarCampoOpcional(payload, 'endereco', form.endereco.trim());
+    this.adicionarCampoOpcional(payload, 'numero', form.numero.trim());
+    this.adicionarCampoOpcional(payload, 'complemento', form.complemento.trim());
+    this.adicionarCampoOpcional(payload, 'bairro', form.bairro.trim());
+    this.adicionarCampoOpcional(payload, 'cidade', form.cidade.trim());
+    this.adicionarCampoOpcional(payload, 'estado', form.estado.trim().toUpperCase());
+    return payload;
+  }
+
+  private validarPayloadClienteCadastro(payload: ClienteCadastroRequest): string {
+    const tamanhoDocumento = payload.tipo_pessoa === 'PF' ? 11 : 14;
+    if (!payload.documento || payload.documento.length !== tamanhoDocumento) return `Informe um ${payload.tipo_pessoa === 'PF' ? 'CPF' : 'CNPJ'} válido.`;
+    if (!payload.nome_cliente) return payload.tipo_pessoa === 'PF' ? 'Informe o nome do cliente.' : 'Informe a razão social.';
+    if (payload.estado && payload.estado.length > 2) return 'UF deve ter no máximo 2 caracteres.';
+    if (payload.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(payload.email)) return 'E-mail inválido.';
+    return '';
+  }
+
+  private adicionarCampoOpcional(payload: ClienteCadastroRequest, campo: keyof ClienteCadastroRequest, valor: string): void {
+    if (valor) {
+      (payload as unknown as Record<string, string>)[campo] = valor;
+    }
+  }
+
+  private apenasDigitos(valor: string): string {
+    return valor.replace(/\D/g, '');
+  }
+
+  private detailErroHttp(error: unknown): string {
+    if (error instanceof HttpErrorResponse) {
+      const body = error.error as { detail?: string } | null;
+      return body?.detail || error.message;
+    }
+    return '';
   }
 
   private tratarResultadoOperacao(resultado: { ok: boolean; detail?: string; estoqueDisponivel?: string }, sucesso: string): void {

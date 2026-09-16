@@ -4,8 +4,12 @@ import { map, Observable } from 'rxjs';
 
 import { HUB_TERMINAL_API_PATH } from '../../../core/api/api.config';
 import {
+  ClienteCadastroApiResponse,
+  ClienteCadastroRequest,
+  ClienteHubResumo,
   ClientesConsultaApiResponse,
   ClientesConsultaResponse,
+  mapCliente,
   mapClientes,
 } from '../../../core/models/cliente.models';
 
@@ -18,5 +22,11 @@ export class HubClienteService {
     const termo = q.trim();
     const options = termo ? { params: new HttpParams().set('q', termo) } : {};
     return this.http.get<ClientesConsultaApiResponse>(this.url, options).pipe(map(mapClientes));
+  }
+
+  cadastrar(payload: ClienteCadastroRequest): Observable<ClienteHubResumo> {
+    return this.http
+      .post<ClienteCadastroApiResponse>(this.url, payload)
+      .pipe(map((response) => mapCliente(response.cliente)));
   }
 }
