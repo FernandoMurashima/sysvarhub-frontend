@@ -111,7 +111,16 @@
         </label>
         <label>
           Vendedor
-          <div class="select-like readonly-like">{{ vendedor }}</div>
+          <div class="select-like readonly-like seller-summary">
+            @if (vendedorOperacional()) {
+              <span>
+                <strong>{{ vendedorOperacional()?.nome }}</strong>
+                <small>{{ vendedorResumo(vendedorOperacional()) }}</small>
+              </span>
+            } @else {
+              -
+            }
+          </div>
         </label>
         <label>
           Tabela de Preço
@@ -355,6 +364,8 @@
               <strong>Consulta de Preço</strong>
             } @else if (modalAtalho === 'cliente') {
               <strong>CLIENTE · F2</strong>
+            } @else if (modalAtalho === 'vendedor') {
+              <strong>VENDEDOR - F3</strong>
             } @else if (modalAtalho === 'cancelar-venda') {
               <strong>Cancelar Venda</strong>
             } @else if (modalAtalho === 'pagamentos') {
@@ -505,6 +516,73 @@
                 </footer>
               </form>
             }
+          </div>
+        } @else if (modalAtalho === 'vendedor') {
+          <div class="seller-modal">
+            <section class="current-client">
+              <span>{{ venda() ? 'Vendedor da venda' : 'Vendedor pré-selecionado' }}</span>
+              @if (vendedorOperacional()) {
+                <strong>{{ vendedorOperacional()?.nome }}</strong>
+                <small>{{ vendedorResumo(vendedorOperacional()) }}</small>
+              } @else {
+                <strong>{{ venda() ? 'Venda sem vendedor' : 'Nenhum vendedor pré-selecionado' }}</strong>
+                <small>{{ venda() ? 'Selecione antes de registrar pagamentos' : 'Venda ainda não iniciada' }}</small>
+              }
+            </section>
+
+            @if (temPagamentoAtivo()) {
+              <p class="client-warning">Remova os pagamentos antes de alterar a venda.</p>
+            }
+
+            <div class="modal-search">
+              <input
+                name="buscaVendedor"
+                [(ngModel)]="buscaVendedor"
+                (ngModelChange)="aoDigitarBuscaVendedor()"
+                placeholder="Matrícula, nome ou apelido"
+                autocomplete="off"
+              />
+            </div>
+
+            <div class="client-results seller-results">
+              @if (carregandoVendedores) {
+                <p>Consultando vendedores...</p>
+              } @else if (erroVendedores) {
+                <p>{{ erroVendedores }}</p>
+              } @else {
+                @for (vendedor of vendedoresEncontrados; track vendedor.id) {
+                  <button
+                    type="button"
+                    [class.selected]="vendedorListaSelecionado?.id === vendedor.id"
+                    (click)="selecionarVendedorLista(vendedor)"
+                    (dblclick)="confirmarVendedorSelecionado()"
+                  >
+                    <span>
+                      <strong>{{ vendedor.nome }}</strong>
+                      <small>{{ vendedorResumo(vendedor) }}</small>
+                    </span>
+                  </button>
+                }
+                @if (!vendedoresEncontrados.length) {
+                  <p>Nenhum vendedor encontrado.</p>
+                }
+              }
+            </div>
+
+            <footer class="client-actions">
+              @if (vendedorOperacional()) {
+                <button type="button" class="danger" [disabled]="temPagamentoAtivo() || vendaLoading()" (click)="removerVendedorVenda()">Remover vendedor</button>
+              }
+              <button type="button" (click)="fecharAtalho()">Fechar</button>
+              <button
+                type="button"
+                class="primary"
+                [disabled]="!vendedorListaSelecionado || temPagamentoAtivo() || vendaLoading()"
+                (click)="confirmarVendedorSelecionado()"
+              >
+                Selecionar
+              </button>
+            </footer>
           </div>
         } @else if (modalAtalho === 'preco') {
           <div class="modal-search">

@@ -1,4 +1,5 @@
 import { mapOperador, OperadorHubPublico, OperadorHubPublicoApi } from './operador.models';
+import { mapVendedor, VendedorHubResumo, VendedorHubResumoApi } from './vendedor.models';
 
 export type VendaSessionStatus = 'inicializando' | 'sem-venda' | 'aberta' | 'erro';
 
@@ -32,6 +33,7 @@ export interface VendaHubResumo {
   pendente: string;
   troco: string;
   cliente: VendaClienteResumo | null;
+  vendedor: VendedorHubResumo | null;
   operadorCriacao: OperadorHubPublico;
   itens: VendaItemHubResumo[];
   pagamentos: VendaPagamentoHubResumo[];
@@ -63,6 +65,7 @@ export interface VendaPagamentoHubResumo {
 export interface VendaAtualResponse {
   venda: VendaHubResumo | null;
   clientePreselecionado: VendaClienteResumo | null;
+  vendedorPreselecionado: VendedorHubResumo | null;
 }
 
 export interface VendaItemAdicionarRequest {
@@ -104,6 +107,7 @@ export interface VendaHubResumoApi {
   pendente?: string;
   troco?: string;
   cliente?: VendaClienteResumoApi | null;
+  vendedor?: VendedorHubResumoApi | null;
   operador_criacao: OperadorHubPublicoApi;
   itens: VendaItemHubResumoApi[];
   pagamentos?: VendaPagamentoHubResumoApi[];
@@ -135,6 +139,7 @@ export interface VendaPagamentoHubResumoApi {
 export interface VendaApiResponse {
   venda: VendaHubResumoApi | null;
   cliente_preselecionado?: VendaClienteResumoApi | null;
+  vendedor_preselecionado?: VendedorHubResumoApi | null;
 }
 
 export function mapVendaAtual(response: VendaApiResponse): VendaAtualResponse {
@@ -142,6 +147,7 @@ export function mapVendaAtual(response: VendaApiResponse): VendaAtualResponse {
   return {
     venda,
     clientePreselecionado: venda ? null : response.cliente_preselecionado ? mapVendaCliente(response.cliente_preselecionado) : null,
+    vendedorPreselecionado: venda ? null : response.vendedor_preselecionado ? mapVendedor(response.vendedor_preselecionado) : null,
   };
 }
 
@@ -158,6 +164,7 @@ export function mapVenda(venda: VendaHubResumoApi): VendaHubResumo {
     pendente: venda.pendente ?? venda.total,
     troco: venda.troco ?? '0.00',
     cliente: venda.cliente ? mapVendaCliente(venda.cliente) : null,
+    vendedor: venda.vendedor ? mapVendedor(venda.vendedor) : null,
     operadorCriacao: mapOperador(venda.operador_criacao),
     itens: venda.itens.map(mapVendaItem),
     pagamentos: (venda.pagamentos ?? []).map(mapVendaPagamento),

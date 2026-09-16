@@ -53,6 +53,14 @@ export class HubVendaService {
     return this.http.delete<VendaApiResponse>(`${this.baseUrl}/cliente/`).pipe(map(mapVendaAtual));
   }
 
+  selecionarVendedor(vendedorId: number): Observable<VendaAtualResponse> {
+    return this.http.put<VendaApiResponse>(`${this.baseUrl}/vendedor/`, { vendedor_id: vendedorId }).pipe(map(mapVendaAtual));
+  }
+
+  removerVendedor(): Observable<VendaAtualResponse> {
+    return this.http.delete<VendaApiResponse>(`${this.baseUrl}/vendedor/`).pipe(map(mapVendaAtual));
+  }
+
   cancelar(): Observable<VendaAtualResponse> {
     return this.http.post<VendaApiResponse>(`${this.baseUrl}/cancelar/`, {}).pipe(map(mapVendaAtual));
   }

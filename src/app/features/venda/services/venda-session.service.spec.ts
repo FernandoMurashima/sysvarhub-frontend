@@ -5,7 +5,7 @@ import { of, throwError } from 'rxjs';
 
 import { FormasPagamentoResponse } from '../../../core/models/pagamento.models';
 import { VendaAtualResponse } from '../../../core/models/venda.models';
-import { vendaAbertaStub, vendaAtualComClientePreselecionadoStub, vendaAtualSemVendaStub } from '../../../testing/terminal-test-data';
+import { vendedorStub, vendaAbertaStub, vendaAtualComClientePreselecionadoStub, vendaAtualComVendedorPreselecionadoStub, vendaAtualSemVendaStub } from '../../../testing/terminal-test-data';
 import { OperatorSessionService } from '../../operador/services/operator-session.service';
 import { HubVendaService } from './hub-venda.service';
 import { VendaSessionService } from './venda-session.service';
@@ -27,6 +27,8 @@ describe('VendaSessionService', () => {
       'listarFormasPagamento',
       'selecionarCliente',
       'removerCliente',
+      'selecionarVendedor',
+      'removerVendedor',
     ]);
     operatorSession = jasmine.createSpyObj<OperatorSessionService>('OperatorSessionService', ['invalidarSessao']);
     router = jasmine.createSpyObj<Router>('Router', ['navigateByUrl']);
@@ -82,6 +84,7 @@ describe('VendaSessionService', () => {
     hubVendaService.iniciarVenda.and.returnValue(of({
       venda: { ...vendaAbertaStub.venda!, cliente: vendaAtualComClientePreselecionadoStub.clientePreselecionado },
       clientePreselecionado: null,
+      vendedorPreselecionado: null,
     }));
 
     service.bootstrap().subscribe(() => {
@@ -132,6 +135,7 @@ describe('VendaSessionService', () => {
         },
       },
       clientePreselecionado: null,
+      vendedorPreselecionado: null,
     };
     const vendaComOutroCliente: VendaAtualResponse = {
       venda: {
@@ -146,9 +150,10 @@ describe('VendaSessionService', () => {
         },
       },
       clientePreselecionado: null,
+      vendedorPreselecionado: null,
     };
     hubVendaService.selecionarCliente.and.returnValues(of(vendaComCliente), of(vendaComOutroCliente));
-    hubVendaService.removerCliente.and.returnValue(of({ venda: { ...vendaAbertaStub.venda!, cliente: null }, clientePreselecionado: null }));
+    hubVendaService.removerCliente.and.returnValue(of({ venda: { ...vendaAbertaStub.venda!, cliente: null }, clientePreselecionado: null, vendedorPreselecionado: null }));
 
     service.selecionarCliente('cliente-uuid').subscribe((primeiro) => {
       expect(primeiro.ok).toBeTrue();
@@ -190,6 +195,7 @@ describe('VendaSessionService', () => {
         clientePadrao: false,
         nomeCliente: 'Cliente Local',
       },
+      vendedorPreselecionado: null,
     };
     hubVendaService.selecionarCliente.and.returnValues(of(vendaAtualSemVendaStub), of(vendaAtualSemVendaStub));
     hubVendaService.atual.and.returnValues(of(vendaAtualComClientePreselecionadoStub), of(outroCliente));
@@ -224,6 +230,7 @@ describe('VendaSessionService', () => {
     hubVendaService.iniciarVenda.and.returnValue(of({
       venda: { ...vendaAbertaStub.venda!, cliente: vendaAtualComClientePreselecionadoStub.clientePreselecionado },
       clientePreselecionado: null,
+      vendedorPreselecionado: null,
     }));
 
     service.bootstrap().subscribe(() => {
@@ -247,6 +254,90 @@ describe('VendaSessionService', () => {
       expect(service.clientePreselecionado()?.nomeCliente).toBe('Maria Silva');
       expect(localStorage.length).toBe(0);
       expect(sessionStorage.length).toBe(0);
+      done();
+    });
+  });
+
+  it('bootstrap sem venda recupera vendedor preselecionado', (done) => {
+    hubVendaService.atual.and.returnValue(of(vendaAtualComVendedorPreselecionadoStub));
+
+    service.bootstrap().subscribe(() => {
+      expect(service.vendedorPreselecionado()?.id).toBe(501);
+      expect(service.venda()).toBeNull();
+      done();
+    });
+  });
+
+  it('selecionar vendedor pre-venda nao cria venda no estado', (done) => {
+    hubVendaService.selecionarVendedor.and.returnValue(of(vendaAtualSemVendaStub));
+    hubVendaService.atual.and.returnValue(of(vendaAtualComVendedorPreselecionadoStub));
+
+    service.selecionarVendedor(501).subscribe((resultado) => {
+      expect(resultado.ok).toBeTrue();
+      expect(service.venda()).toBeNull();
+      expect(service.vendedorPreselecionado()?.id).toBe(501);
+      done();
+    });
+  });
+
+  it('selecionar vendedor em venda mantem uuid', (done) => {
+    const vendaComVendedor = { venda: { ...vendaAbertaStub.venda!, vendedor: vendedorStub }, clientePreselecionado: null, vendedorPreselecionado: null };
+    hubVendaService.selecionarVendedor.and.returnValue(of(vendaComVendedor));
+
+    service.selecionarVendedor(501).subscribe((resultado) => {
+      expect(resultado.ok).toBeTrue();
+      expect(service.venda()?.uuid).toBe(vendaAbertaStub.venda?.uuid);
+      expect(service.venda()?.vendedor?.id).toBe(501);
+      done();
+    });
+  });
+
+  it('remover vendedor limpa somente vendedor', (done) => {
+    const vendaComClienteVendedor = {
+      venda: {
+        ...vendaAbertaStub.venda!,
+        cliente: vendaAtualComClientePreselecionadoStub.clientePreselecionado,
+        vendedor: vendedorStub,
+      },
+      clientePreselecionado: null,
+      vendedorPreselecionado: null,
+    };
+    hubVendaService.atual.and.returnValue(of(vendaComClienteVendedor));
+    hubVendaService.removerVendedor.and.returnValue(of({
+      venda: { ...vendaComClienteVendedor.venda, vendedor: null },
+      clientePreselecionado: null,
+      vendedorPreselecionado: null,
+    }));
+
+    service.bootstrap().subscribe(() => {
+      service.removerVendedor().subscribe((resultado) => {
+        expect(resultado.ok).toBeTrue();
+        expect(service.venda()?.cliente?.clienteUuid).toBe('cliente-uuid');
+        expect(service.venda()?.vendedor).toBeNull();
+        done();
+      });
+    });
+  });
+
+  it('falha incerta de vendedor reconcilia com GET sem repetir PUT', (done) => {
+    hubVendaService.selecionarVendedor.and.returnValue(throwError(() => new HttpErrorResponse({ status: 0 })));
+    hubVendaService.atual.and.returnValue(of({ venda: { ...vendaAbertaStub.venda!, vendedor: vendedorStub }, clientePreselecionado: null, vendedorPreselecionado: null }));
+
+    service.selecionarVendedor(501).subscribe((resultado) => {
+      expect(resultado.ok).toBeTrue();
+      expect(hubVendaService.selecionarVendedor).toHaveBeenCalledTimes(1);
+      expect(hubVendaService.atual).toHaveBeenCalledTimes(1);
+      done();
+    });
+  });
+
+  it('falha incerta de vendedor sem confirmacao informa falha', (done) => {
+    hubVendaService.selecionarVendedor.and.returnValue(throwError(() => new HttpErrorResponse({ status: 0 })));
+    hubVendaService.atual.and.returnValue(of(vendaAtualSemVendaStub));
+
+    service.selecionarVendedor(501).subscribe((resultado) => {
+      expect(resultado.ok).toBeFalse();
+      expect(resultado.detail).toBe('Não foi possível confirmar a alteração do vendedor.');
       done();
     });
   });

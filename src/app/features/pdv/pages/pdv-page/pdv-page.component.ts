@@ -7,11 +7,13 @@ import { Subscription } from 'rxjs';
 import { ClienteCadastroRequest, ClienteHubResumo, ClienteTipoPessoa, formatarDocumentoCliente } from '../../../../core/models/cliente.models';
 import { FormaPagamento } from '../../../../core/models/pagamento.models';
 import { VendaClienteResumo, VendaItemHubResumo } from '../../../../core/models/venda.models';
+import { VendedorHubResumo } from '../../../../core/models/vendedor.models';
 import { CaixaSessionService } from '../../../caixa/services/caixa-session.service';
 import { ClienteCadastroComunicacaoIncertError, ClienteSessionExpiredError, ClienteSessionService } from '../../../cliente/services/cliente-session.service';
 import { normalizarValorAbertura } from '../../../caixa/services/caixa-valor.parser';
 import { OperatorSessionService } from '../../../operador/services/operator-session.service';
 import { VendaSessionService } from '../../../venda/services/venda-session.service';
+import { HubVendedorService } from '../../../vendedor/services/hub-vendedor.service';
 import { formatarMoedaString, normalizarValorPagamento, somarMoedasString } from '../../../venda/services/pagamento-valor.parser';
 import { PdvProdutoConsulta } from '../../models/pdv-produto-consulta.model';
 import { PdvHubFacade } from '../../services/pdv-hub.facade';
@@ -60,6 +62,7 @@ export class PdvPageComponent implements OnInit, OnDestroy {
   private readonly caixaSession = inject(CaixaSessionService);
   private readonly vendaSession = inject(VendaSessionService);
   private readonly clienteSession = inject(ClienteSessionService);
+  private readonly vendedorService = inject(HubVendedorService);
   private readonly router = inject(Router);
 
   busca = '';
@@ -90,17 +93,23 @@ export class PdvPageComponent implements OnInit, OnDestroy {
   clienteCadastro: ClienteCadastroForm = this.criarClienteCadastroForm();
   erroCadastroCliente = '';
   salvandoCliente = false;
+  buscaVendedor = '';
+  vendedoresEncontrados: VendedorHubResumo[] = [];
+  vendedorListaSelecionado: VendedorHubResumo | null = null;
+  carregandoVendedores = false;
+  erroVendedores = '';
   tabelaPreco = '-';
   catalogoVersao: number | null = null;
   catalogoSincronizadoEm: string | null = null;
   valorAbertura = '0,00';
   erroAbertura = '';
   abrindoCaixa = false;
-  readonly vendedor = '-';
   private buscaTimer: ReturnType<typeof setTimeout> | null = null;
   private buscaClienteTimer: ReturnType<typeof setTimeout> | null = null;
+  private buscaVendedorTimer: ReturnType<typeof setTimeout> | null = null;
   private buscaSubscription: Subscription | null = null;
   private clientesSubscription: Subscription | null = null;
+  private vendedoresSubscription: Subscription | null = null;
   private cadastroClienteSubscription: Subscription | null = null;
 
   readonly loja = this.facade.loja;
@@ -113,6 +122,7 @@ export class PdvPageComponent implements OnInit, OnDestroy {
   readonly vendaStatus = this.vendaSession.status;
   readonly venda = this.vendaSession.venda;
   readonly clientePreselecionado = this.vendaSession.clientePreselecionado;
+  readonly vendedorPreselecionado = this.vendaSession.vendedorPreselecionado;
   readonly vendaLoading = this.vendaSession.loadingOperacao;
 
   ngOnInit(): void {
@@ -136,8 +146,10 @@ export class PdvPageComponent implements OnInit, OnDestroy {
   ngOnDestroy(): void {
     if (this.buscaTimer) clearTimeout(this.buscaTimer);
     if (this.buscaClienteTimer) clearTimeout(this.buscaClienteTimer);
+    if (this.buscaVendedorTimer) clearTimeout(this.buscaVendedorTimer);
     this.buscaSubscription?.unsubscribe();
     this.clientesSubscription?.unsubscribe();
+    this.vendedoresSubscription?.unsubscribe();
     this.cadastroClienteSubscription?.unsubscribe();
   }
 
@@ -195,12 +207,16 @@ export class PdvPageComponent implements OnInit, OnDestroy {
 
   @HostListener('document:keydown.enter', ['$event'])
   atalhoEnter(event: KeyboardEvent): void {
-    if (this.modalAtalho !== 'cliente') return;
-    if (this.clienteModalModo !== 'busca') return;
+    if (this.modalAtalho !== 'cliente' && this.modalAtalho !== 'vendedor') return;
+    if (this.modalAtalho === 'cliente' && this.clienteModalModo !== 'busca') return;
     const target = event.target as HTMLElement | null;
     if (target?.tagName?.toLowerCase() === 'input') return;
     event.preventDefault();
-    this.confirmarClienteSelecionado();
+    if (this.modalAtalho === 'cliente') {
+      this.confirmarClienteSelecionado();
+      return;
+    }
+    this.confirmarVendedorSelecionado();
   }
 
   aoDigitarBusca(): void {
@@ -290,6 +306,11 @@ export class PdvPageComponent implements OnInit, OnDestroy {
       return;
     }
 
+    if (atalho === 'vendedor') {
+      this.abrirVendedor();
+      return;
+    }
+
     if (atalho === 'fechamento') {
       this.mensagem = 'Fechamento de caixa será integrado em etapa posterior.';
       return;
@@ -304,6 +325,7 @@ export class PdvPageComponent implements OnInit, OnDestroy {
     this.buscaModal = '';
     this.produtosPreco = [];
     this.limparEstadoClienteModal();
+    this.limparEstadoVendedorModal();
   }
 
   abrirCliente(): void {
@@ -313,6 +335,14 @@ export class PdvPageComponent implements OnInit, OnDestroy {
     this.clienteListaSelecionado = null;
     this.clienteModalModo = 'busca';
     this.consultarClientes('');
+  }
+
+  abrirVendedor(): void {
+    this.modalAtalho = 'vendedor';
+    this.mensagem = '';
+    this.buscaVendedor = '';
+    this.vendedorListaSelecionado = null;
+    this.consultarVendedores('');
   }
 
   aoDigitarBuscaCliente(): void {
@@ -416,6 +446,52 @@ export class PdvPageComponent implements OnInit, OnDestroy {
     });
   }
 
+  aoDigitarBuscaVendedor(): void {
+    if (this.buscaVendedorTimer) clearTimeout(this.buscaVendedorTimer);
+    this.buscaVendedorTimer = setTimeout(() => this.consultarVendedores(this.buscaVendedor), 250);
+  }
+
+  selecionarVendedorLista(vendedor: VendedorHubResumo): void {
+    this.vendedorListaSelecionado = vendedor;
+  }
+
+  confirmarVendedorSelecionado(): void {
+    const vendedor = this.vendedorListaSelecionado;
+    if (!vendedor || this.temPagamentoAtivo()) return;
+
+    const vendaAntes = this.venda();
+    const vendedorAnterior = this.vendedorOperacional()?.id || null;
+    this.vendaSession.selecionarVendedor(vendedor.id).subscribe((resultado) => {
+      if (!resultado.ok) {
+        this.erroVendedores = resultado.detail || 'Falha ao selecionar vendedor.';
+        return;
+      }
+      this.fecharAtalho();
+      if (!vendaAntes) {
+        this.mensagem = 'Vendedor pré-selecionado.';
+      } else if (vendedorAnterior && vendedorAnterior !== vendedor.id) {
+        this.mensagem = 'Vendedor alterado.';
+      } else {
+        this.mensagem = 'Vendedor selecionado.';
+      }
+    });
+  }
+
+  removerVendedorVenda(): void {
+    if (this.temPagamentoAtivo()) {
+      this.erroVendedores = 'Remova os pagamentos antes de alterar a venda.';
+      return;
+    }
+    this.vendaSession.removerVendedor().subscribe((resultado) => {
+      if (!resultado.ok) {
+        this.erroVendedores = resultado.detail || 'Falha ao remover vendedor.';
+        return;
+      }
+      this.fecharAtalho();
+      this.mensagem = 'Vendedor removido.';
+    });
+  }
+
   clienteSelecaoBloqueada(cliente: ClienteHubResumo): boolean {
     return !cliente.ativo || cliente.bloqueio;
   }
@@ -433,6 +509,18 @@ export class PdvPageComponent implements OnInit, OnDestroy {
   clienteOperacional(): VendaClienteResumo | null {
     const venda = this.venda();
     return venda ? venda.cliente : this.clientePreselecionado();
+  }
+
+  vendedorOperacional(): VendedorHubResumo | null {
+    const venda = this.venda();
+    return venda ? venda.vendedor : this.vendedorPreselecionado();
+  }
+
+  vendedorResumo(vendedor: VendedorHubResumo | null | undefined): string {
+    if (!vendedor) return '-';
+    return [vendedor.matricula ? `Matrícula ${vendedor.matricula}` : '', vendedor.apelido, vendedor.cargo?.descricao || '']
+      .filter(Boolean)
+      .join(' · ') || '-';
   }
 
   clienteCidadeUf(cliente: ClienteHubResumo): string {
@@ -615,6 +703,10 @@ export class PdvPageComponent implements OnInit, OnDestroy {
       this.mensagem = 'Inclua itens na venda antes de adicionar pagamento.';
       return;
     }
+    if (!this.vendedorOperacional()) {
+      this.mensagem = 'Selecione um vendedor antes de registrar pagamentos.';
+      return;
+    }
     this.modalAtalho = 'pagamentos';
     this.filtroPagamento = filtro;
     this.carregarFormasPagamento(filtro);
@@ -669,6 +761,10 @@ export class PdvPageComponent implements OnInit, OnDestroy {
     const venda = this.venda();
     if (!venda || !venda.itens.length || !venda.pagamentos.length || venda.pendente !== '0.00') {
       this.mensagem = 'Finalize somente após itens e pagamento completo.';
+      return;
+    }
+    if (!this.vendedorOperacional()) {
+      this.mensagem = 'Selecione um vendedor antes de finalizar a venda.';
       return;
     }
     this.confirmandoFinalizacao = true;
@@ -828,6 +924,26 @@ export class PdvPageComponent implements OnInit, OnDestroy {
     });
   }
 
+  private consultarVendedores(termo: string): void {
+    this.vendedoresSubscription?.unsubscribe();
+    this.carregandoVendedores = true;
+    this.erroVendedores = '';
+    this.vendedoresSubscription = this.vendedorService.consultar(termo).subscribe({
+      next: (resultado) => {
+        this.vendedoresEncontrados = resultado.vendedores;
+        const operacional = this.vendedorOperacional();
+        this.vendedorListaSelecionado = resultado.vendedores.find((vendedor) => vendedor.id === operacional?.id) || null;
+        this.carregandoVendedores = false;
+      },
+      error: () => {
+        this.vendedoresEncontrados = [];
+        this.vendedorListaSelecionado = null;
+        this.carregandoVendedores = false;
+        this.erroVendedores = 'Falha de comunicação com o Hub local.';
+      },
+    });
+  }
+
   private limparEstadoClienteModal(): void {
     if (this.buscaClienteTimer) clearTimeout(this.buscaClienteTimer);
     this.clientesSubscription?.unsubscribe();
@@ -841,6 +957,16 @@ export class PdvPageComponent implements OnInit, OnDestroy {
     this.clienteCadastro = this.criarClienteCadastroForm();
     this.erroCadastroCliente = '';
     this.salvandoCliente = false;
+  }
+
+  private limparEstadoVendedorModal(): void {
+    if (this.buscaVendedorTimer) clearTimeout(this.buscaVendedorTimer);
+    this.vendedoresSubscription?.unsubscribe();
+    this.buscaVendedor = '';
+    this.vendedoresEncontrados = [];
+    this.vendedorListaSelecionado = null;
+    this.carregandoVendedores = false;
+    this.erroVendedores = '';
   }
 
   private selecionarClienteAposCadastro(cliente: ClienteHubResumo): void {

@@ -22,6 +22,15 @@ describe('venda models', () => {
           cliente_padrao: false,
           nome_cliente: 'Cliente Teste',
         },
+        vendedor: {
+          id: 501,
+          matricula: '000501',
+          nome: 'Ana Vendedora',
+          apelido: 'Ana',
+          cargo: { id: 5, codigo: 'VENDEDOR', descricao: 'Vendedor' },
+          comissionado: true,
+          comissao_percentual: '3.00',
+        },
         operador_criacao: { usuario_id: 99, codigo: 'caixa.barra', nome: 'Juliana', tipo: 'Caixa', perfil: null },
         itens: [{
           uuid: 'item',
@@ -70,6 +79,8 @@ describe('venda models', () => {
     expect(venda?.cliente?.clienteUuid).toBe('cliente-uuid');
     expect(venda?.cliente?.retaguardaId).toBe(123);
     expect(venda?.cliente?.nomeCliente).toBe('Cliente Teste');
+    expect(venda?.vendedor?.id).toBe(501);
+    expect(venda?.vendedor?.comissaoPercentual).toBe('3.00');
     expect(venda?.pagamentos[0].formaPagamentoId).toBe(1);
   });
 
@@ -84,15 +95,17 @@ describe('venda models', () => {
         desconto_geral: '0.00',
         total: '0.00',
         cliente: null,
+        vendedor: null,
         operador_criacao: { usuario_id: 99, codigo: 'caixa.barra', nome: 'Juliana', tipo: 'Caixa', perfil: null },
         itens: [],
       },
     }).venda;
 
     expect(venda?.cliente).toBeNull();
+    expect(venda?.vendedor).toBeNull();
   });
 
-  it('mapeia venda null com cliente_preselecionado', () => {
+  it('mapeia venda null com cliente_preselecionado e vendedor_preselecionado', () => {
     const response = mapVendaAtual({
       venda: null,
       cliente_preselecionado: {
@@ -103,11 +116,22 @@ describe('venda models', () => {
         cliente_padrao: false,
         nome_cliente: 'Cliente Teste',
       },
+      vendedor_preselecionado: {
+        id: 501,
+        matricula: '000501',
+        nome: 'Ana Vendedora',
+        apelido: 'Ana',
+        cargo: null,
+        comissionado: true,
+        comissao_percentual: '3.00',
+      },
     });
 
     expect(response.venda).toBeNull();
     expect(response.clientePreselecionado?.clienteUuid).toBe('cliente-uuid');
     expect(response.clientePreselecionado?.nomeCliente).toBe('Cliente Teste');
+    expect(response.vendedorPreselecionado?.id).toBe(501);
+    expect(response.vendedorPreselecionado?.cargo).toBeNull();
   });
 
   it('mapeia venda existente com cliente_preselecionado null', () => {
@@ -121,13 +145,16 @@ describe('venda models', () => {
         desconto_geral: '0.00',
         total: '0.00',
         cliente: null,
+        vendedor: null,
         operador_criacao: { usuario_id: 99, codigo: 'caixa.barra', nome: 'Juliana', tipo: 'Caixa', perfil: null },
         itens: [],
       },
       cliente_preselecionado: null,
+      vendedor_preselecionado: null,
     });
 
     expect(response.venda?.uuid).toBe('venda');
     expect(response.clientePreselecionado).toBeNull();
+    expect(response.vendedorPreselecionado).toBeNull();
   });
 });

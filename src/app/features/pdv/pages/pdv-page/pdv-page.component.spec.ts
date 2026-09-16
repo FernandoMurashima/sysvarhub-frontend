@@ -7,11 +7,13 @@ import { Subject, of, throwError } from 'rxjs';
 
 import { SessaoCaixaHubResumo } from '../../../../core/models/caixa.models';
 import { ClienteHubResumo } from '../../../../core/models/cliente.models';
+import { VendedorHubResumo } from '../../../../core/models/vendedor.models';
 import { CaixaSessionService } from '../../../caixa/services/caixa-session.service';
 import { ClienteSessionExpiredError, ClienteSessionService } from '../../../cliente/services/cliente-session.service';
 import { OperatorSessionService } from '../../../operador/services/operator-session.service';
 import { VendaSessionService } from '../../../venda/services/venda-session.service';
-import { clientePreselecionadoStub, sessaoCaixaAbertaStub, vendaAbertaStub } from '../../../../testing/terminal-test-data';
+import { clientePreselecionadoStub, sessaoCaixaAbertaStub, vendedorStub, vendaAbertaStub } from '../../../../testing/terminal-test-data';
+import { HubVendedorService } from '../../../vendedor/services/hub-vendedor.service';
 import { PdvCatalogoConsulta, PdvProdutoConsulta } from '../../models/pdv-produto-consulta.model';
 import { PdvHubFacade } from '../../services/pdv-hub.facade';
 import { PdvPageComponent } from './pdv-page.component';
@@ -98,12 +100,14 @@ describe('PdvPageComponent', () => {
   let facade: jasmine.SpyObj<PdvHubFacade>;
   let operatorSession: jasmine.SpyObj<OperatorSessionService>;
   let clienteSession: jasmine.SpyObj<ClienteSessionService>;
+  let vendedorService: jasmine.SpyObj<HubVendedorService>;
   let caixaSession: jasmine.SpyObj<CaixaSessionService>;
   let vendaSession: jasmine.SpyObj<VendaSessionService>;
   let caixaStatusSignal = signal<'inicializando' | 'fechado' | 'aberto' | 'erro'>('aberto');
   let sessaoCaixaSignal = signal<SessaoCaixaHubResumo | null>(sessaoCaixaAbertaStub);
   let vendaSignal = signal(vendaAbertaStub.venda);
   let clientePreselecionadoSignal = signal(null as typeof clientePreselecionadoStub | null);
+  let vendedorPreselecionadoSignal = signal(null as VendedorHubResumo | null);
   let vendaStatusSignal = signal<'inicializando' | 'sem-venda' | 'aberta' | 'erro'>('aberta');
   let vendaLoadingSignal = signal(false);
   let router: Router;
@@ -153,6 +157,15 @@ describe('PdvPageComponent', () => {
       clientes: [clienteAtivo],
     }));
     clienteSession.cadastrar.and.returnValue(of({ ...clienteAtivo, clienteUuid: 'novo-cliente', nomeCliente: 'Cliente Novo' }));
+    vendedorService = jasmine.createSpyObj<HubVendedorService>('HubVendedorService', ['consultar']);
+    vendedorService.consultar.and.returnValue(of({
+      vendedoresVersao: 1,
+      vendedoresSincronizadoEm: '2026-09-16T10:00:00',
+      q: '',
+      total: 1,
+      limit: 50,
+      vendedores: [vendedorStub],
+    }));
     caixaStatusSignal = signal<'inicializando' | 'fechado' | 'aberto' | 'erro'>('aberto');
     sessaoCaixaSignal = signal(sessaoCaixaAbertaStub);
     caixaSession = jasmine.createSpyObj<CaixaSessionService>('CaixaSessionService', ['bootstrap', 'abrir'], {
@@ -163,11 +176,13 @@ describe('PdvPageComponent', () => {
     caixaSession.abrir.and.returnValue(of({ ok: true }));
     vendaSignal = signal(vendaAbertaStub.venda);
     clientePreselecionadoSignal = signal(null as typeof clientePreselecionadoStub | null);
+    vendedorPreselecionadoSignal = signal(null as VendedorHubResumo | null);
     vendaStatusSignal = signal<'inicializando' | 'sem-venda' | 'aberta' | 'erro'>('aberta');
     vendaLoadingSignal = signal(false);
-    vendaSession = jasmine.createSpyObj<VendaSessionService>('VendaSessionService', ['bootstrap', 'iniciarVenda', 'adicionarItem', 'alterarQuantidade', 'removerItem', 'cancelarVenda', 'limparEstado', 'listarFormasPagamento', 'adicionarPagamento', 'removerPagamento', 'finalizarVenda', 'selecionarCliente', 'removerCliente'], {
+    vendaSession = jasmine.createSpyObj<VendaSessionService>('VendaSessionService', ['bootstrap', 'iniciarVenda', 'adicionarItem', 'alterarQuantidade', 'removerItem', 'cancelarVenda', 'limparEstado', 'listarFormasPagamento', 'adicionarPagamento', 'removerPagamento', 'finalizarVenda', 'selecionarCliente', 'removerCliente', 'selecionarVendedor', 'removerVendedor'], {
       venda: vendaSignal.asReadonly(),
       clientePreselecionado: clientePreselecionadoSignal.asReadonly(),
+      vendedorPreselecionado: vendedorPreselecionadoSignal.asReadonly(),
       status: vendaStatusSignal.asReadonly(),
       loadingOperacao: vendaLoadingSignal.asReadonly(),
     });
@@ -183,6 +198,8 @@ describe('PdvPageComponent', () => {
     vendaSession.finalizarVenda.and.returnValue(of({ ok: true }));
     vendaSession.selecionarCliente.and.returnValue(of({ ok: true }));
     vendaSession.removerCliente.and.returnValue(of({ ok: true }));
+    vendaSession.selecionarVendedor.and.returnValue(of({ ok: true }));
+    vendaSession.removerVendedor.and.returnValue(of({ ok: true }));
 
     await TestBed.configureTestingModule({
       imports: [PdvPageComponent, RouterTestingModule.withRoutes([{ path: 'operador', component: EmptyRouteComponent }])],
@@ -190,6 +207,7 @@ describe('PdvPageComponent', () => {
         { provide: PdvHubFacade, useValue: facade },
         { provide: OperatorSessionService, useValue: operatorSession },
         { provide: ClienteSessionService, useValue: clienteSession },
+        { provide: HubVendedorService, useValue: vendedorService },
         { provide: CaixaSessionService, useValue: caixaSession },
         { provide: VendaSessionService, useValue: vendaSession },
       ],
@@ -451,6 +469,7 @@ describe('PdvPageComponent', () => {
   it('mantem F2-F10 visuais e F9 abre pagamentos locais', () => {
     const component = fixture.componentInstance;
     const text = fixture.nativeElement.textContent;
+    vendaSignal.set({ ...vendaAbertaStub.venda!, vendedor: vendedorStub });
 
     ['F2', 'F3', 'F4', 'F5', 'F6', 'F7', 'F8', 'F9', 'F10'].forEach((atalho) => {
       expect(text).toContain(atalho);
@@ -968,5 +987,104 @@ describe('PdvPageComponent', () => {
     expect(suporte?.textContent).toContain('Suporte');
     expect(suporte?.tagName.toLowerCase()).toBe('a');
     expect(topActions?.textContent).toContain('Suporte');
+  });
+
+  it('F3 abre modal e consulta vendedores sem autoselecionar operador', fakeAsync(() => {
+    const component = fixture.componentInstance;
+
+    component.atalhoF3(new KeyboardEvent('keydown', { key: 'F3' }));
+    tick();
+    fixture.detectChanges();
+
+    expect(component.modalAtalho).toBe('vendedor');
+    expect(vendedorService.consultar).toHaveBeenCalledWith('');
+    expect(fixture.nativeElement.textContent).toContain('VENDEDOR - F3');
+    expect(fixture.nativeElement.textContent).toContain('Ana Vendedora');
+    expect(component.vendedorOperacional()).toBeNull();
+    expect(fixture.nativeElement.textContent).not.toContain('Juliana Rocha Vendedora');
+  }));
+
+  it('busca vendedor por matricula nome ou apelido com debounce', fakeAsync(() => {
+    const component = fixture.componentInstance;
+
+    component.abrirVendedor();
+    component.buscaVendedor = '000501';
+    component.aoDigitarBuscaVendedor();
+    tick(249);
+    expect(vendedorService.consultar).toHaveBeenCalledTimes(1);
+    tick(1);
+
+    expect(vendedorService.consultar).toHaveBeenCalledWith('000501');
+  }));
+
+  it('seleciona vendedor pre-venda e mostra mensagem de pre-selecao', () => {
+    const component = fixture.componentInstance;
+    vendaSignal.set(null);
+
+    component.abrirVendedor();
+    component.selecionarVendedorLista(vendedorStub);
+    component.confirmarVendedorSelecionado();
+
+    expect(vendaSession.selecionarVendedor).toHaveBeenCalledWith(501);
+    expect(component.modalAtalho).toBe('');
+    expect(component.mensagem).toBe('Vendedor pré-selecionado.');
+  });
+
+  it('seleciona vendedor com venda aberta mantendo venda cliente itens e totais', () => {
+    const component = fixture.componentInstance;
+    vendaSignal.set({ ...vendaAbertaStub.venda!, cliente: clientePreselecionadoStub, vendedor: null });
+
+    component.abrirVendedor();
+    component.selecionarVendedorLista(vendedorStub);
+    component.confirmarVendedorSelecionado();
+
+    expect(vendaSession.selecionarVendedor).toHaveBeenCalledWith(501);
+    expect(vendaSignal()?.uuid).toBe('venda-hub-uuid');
+    expect(vendaSignal()?.cliente?.clienteUuid).toBe('cliente-uuid');
+    expect(vendaSignal()?.itens[0].skuId).toBe(10825);
+    expect(vendaSignal()?.total).toBe('199.90');
+    expect(component.mensagem).toBe('Vendedor selecionado.');
+  });
+
+  it('remove vendedor operacional', () => {
+    const component = fixture.componentInstance;
+    vendaSignal.set({ ...vendaAbertaStub.venda!, vendedor: vendedorStub });
+
+    component.abrirVendedor();
+    component.removerVendedorVenda();
+
+    expect(vendaSession.removerVendedor).toHaveBeenCalled();
+    expect(component.mensagem).toBe('Vendedor removido.');
+  });
+
+  it('pagamento ativo bloqueia alterar vendedor', () => {
+    const component = fixture.componentInstance;
+    vendaSignal.set({ ...vendaAbertaStub.venda!, vendedor: vendedorStub, pagamentos: [{ uuid: 'pag', formaPagamentoId: 1, formaRetaguardaId: 10, codigo: 'DIN', descricao: 'Dinheiro', tipo: 'DINHEIRO', numParcelas: 1, valor: '199.90', autorizacao: '', origemCaptura: 'MANUAL', criadoEm: '2026-09-14' }] });
+
+    component.abrirVendedor();
+    component.selecionarVendedorLista(vendedorStub);
+    component.confirmarVendedorSelecionado();
+
+    expect(vendaSession.selecionarVendedor).not.toHaveBeenCalled();
+  });
+
+  it('F9 sem vendedor bloqueia pagamentos', () => {
+    const component = fixture.componentInstance;
+    vendaSignal.set({ ...vendaAbertaStub.venda!, vendedor: null });
+
+    component.abrirPagamentos('TODAS');
+
+    expect(component.modalAtalho).not.toBe('pagamentos');
+    expect(component.mensagem).toBe('Selecione um vendedor antes de registrar pagamentos.');
+  });
+
+  it('F9 com vendedor mantem fluxo atual', () => {
+    const component = fixture.componentInstance;
+    vendaSignal.set({ ...vendaAbertaStub.venda!, vendedor: vendedorStub });
+
+    component.abrirPagamentos('TODAS');
+
+    expect(component.modalAtalho).toBe('pagamentos');
+    expect(vendaSession.listarFormasPagamento).toHaveBeenCalled();
   });
 });

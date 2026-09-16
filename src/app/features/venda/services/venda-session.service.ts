@@ -5,6 +5,7 @@ import { catchError, map, Observable, of, switchMap, tap, throwError } from 'rxj
 
 import { VendaAtualResponse, VendaClienteResumo, VendaHubResumo, VendaSessionStatus } from '../../../core/models/venda.models';
 import { AdicionarPagamentoRequest, FormasPagamentoResponse } from '../../../core/models/pagamento.models';
+import { VendedorHubResumo } from '../../../core/models/vendedor.models';
 import { OperatorSessionService } from '../../operador/services/operator-session.service';
 import { HubVendaService } from './hub-venda.service';
 
@@ -30,12 +31,14 @@ export class VendaSessionService {
   private readonly statusSignal = signal<VendaSessionStatus>('inicializando');
   private readonly vendaSignal = signal<VendaHubResumo | null>(null);
   private readonly clientePreselecionadoSignal = signal<VendaClienteResumo | null>(null);
+  private readonly vendedorPreselecionadoSignal = signal<VendedorHubResumo | null>(null);
   private readonly loadingOperacaoSignal = signal(false);
   private intencaoPagamentoPendente: PagamentoIntencao | null = null;
 
   readonly status = this.statusSignal.asReadonly();
   readonly venda = this.vendaSignal.asReadonly();
   readonly clientePreselecionado = this.clientePreselecionadoSignal.asReadonly();
+  readonly vendedorPreselecionado = this.vendedorPreselecionadoSignal.asReadonly();
   readonly loadingOperacao = this.loadingOperacaoSignal.asReadonly();
 
   bootstrap(): Observable<boolean> {
@@ -79,6 +82,14 @@ export class VendaSessionService {
 
   removerCliente(): Observable<VendaOperacaoResultado> {
     return this.executarOperacaoCliente(this.hubVendaService.removerCliente());
+  }
+
+  selecionarVendedor(vendedorId: number): Observable<VendaOperacaoResultado> {
+    return this.executarOperacaoVendedor(this.hubVendaService.selecionarVendedor(vendedorId), 'selecionar', vendedorId);
+  }
+
+  removerVendedor(): Observable<VendaOperacaoResultado> {
+    return this.executarOperacaoVendedor(this.hubVendaService.removerVendedor(), 'remover');
   }
 
   cancelarVenda(): Observable<VendaOperacaoResultado> {
@@ -134,6 +145,7 @@ export class VendaSessionService {
         if (response.venda?.status === 'FINALIZADA') {
           this.vendaSignal.set(null);
           this.clientePreselecionadoSignal.set(null);
+          this.vendedorPreselecionadoSignal.set(null);
           this.statusSignal.set('sem-venda');
           return;
         }
@@ -148,6 +160,7 @@ export class VendaSessionService {
   limparEstado(): void {
     this.vendaSignal.set(null);
     this.clientePreselecionadoSignal.set(null);
+    this.vendedorPreselecionadoSignal.set(null);
     this.statusSignal.set('sem-venda');
     this.loadingOperacaoSignal.set(false);
     this.intencaoPagamentoPendente = null;
@@ -176,6 +189,7 @@ export class VendaSessionService {
   private definirEstado(response: VendaAtualResponse): void {
     this.vendaSignal.set(response.venda);
     this.clientePreselecionadoSignal.set(response.venda ? null : response.clientePreselecionado);
+    this.vendedorPreselecionadoSignal.set(response.venda ? null : response.vendedorPreselecionado);
     this.statusSignal.set(response.venda ? 'aberta' : 'sem-venda');
   }
 
@@ -253,6 +267,46 @@ export class VendaSessionService {
     }
     this.carregarAtual().subscribe();
     return of({ ok: false, detail: 'Não foi possível confirmar a alteração do cliente. O estado da venda foi atualizado.' });
+  }
+
+  private executarOperacaoVendedor(request$: Observable<VendaAtualResponse>, tipo: 'selecionar' | 'remover', vendedorId?: number): Observable<VendaOperacaoResultado> {
+    this.loadingOperacaoSignal.set(true);
+    return request$.pipe(
+      switchMap((response) => (response.venda ? of(response) : this.hubVendaService.atual())),
+      tap((response) => this.definirEstado(response)),
+      map(() => ({ ok: true })),
+      catchError((error: unknown) => this.tratarErroVendedor(error, tipo, vendedorId)),
+      tap(() => this.loadingOperacaoSignal.set(false)),
+    );
+  }
+
+  private tratarErroVendedor(error: unknown, tipo: 'selecionar' | 'remover', vendedorId?: number): Observable<VendaOperacaoResultado> {
+    if (this.isAuthenticationError(error)) {
+      this.tratarSessaoOperadorExpirada();
+      return of({ ok: false, detail: 'Sessão de operador expirada.' });
+    }
+    if (error instanceof HttpErrorResponse && (error.status === 400 || error.status === 409)) {
+      return of({ ok: false, detail: error.error?.detail || 'Vendedor inválido para a venda.' });
+    }
+    return this.hubVendaService.atual().pipe(
+      tap((response) => this.definirEstado(response)),
+      map((response) => this.vendedorReconciliado(response, tipo, vendedorId)
+        ? { ok: true }
+        : { ok: false, detail: 'Não foi possível confirmar a alteração do vendedor.' }),
+      catchError((erroReconciliacao: unknown) => {
+        if (this.isAuthenticationError(erroReconciliacao)) {
+          this.tratarSessaoOperadorExpirada();
+          return of({ ok: false, detail: 'Sessão de operador expirada.' });
+        }
+        return of({ ok: false, detail: 'Não foi possível confirmar a alteração do vendedor.' });
+      }),
+    );
+  }
+
+  private vendedorReconciliado(response: VendaAtualResponse, tipo: 'selecionar' | 'remover', vendedorId?: number): boolean {
+    const vendedorAtual = response.venda ? response.venda.vendedor : response.vendedorPreselecionado;
+    if (tipo === 'remover') return vendedorAtual === null;
+    return vendedorAtual?.id === vendedorId;
   }
 
   private tratarErroPagamento(error: unknown): Observable<VendaOperacaoResultado> {

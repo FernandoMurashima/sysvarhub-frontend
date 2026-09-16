@@ -97,6 +97,42 @@ describe('HubVendaService', () => {
     remover.flush({ venda: null });
   });
 
+  it('seleciona e remove vendedor da venda', () => {
+    service.selecionarVendedor(501).subscribe((response) => expect(response.venda?.vendedor?.id).toBe(501));
+    const selecionar = httpMock.expectOne('/api/terminal/venda/vendedor/');
+    expect(selecionar.request.method).toBe('PUT');
+    expect(selecionar.request.body).toEqual({ vendedor_id: 501 });
+    selecionar.flush({
+      venda: {
+        uuid: 'venda',
+        status: 'ABERTA',
+        criada_em: '2026-09-14T10:00:00',
+        subtotal: '0.00',
+        desconto_itens: '0.00',
+        desconto_geral: '0.00',
+        total: '0.00',
+        cliente: null,
+        vendedor: {
+          id: 501,
+          matricula: '000501',
+          nome: 'Ana Vendedora',
+          apelido: 'Ana',
+          cargo: null,
+          comissionado: true,
+          comissao_percentual: '3.00',
+        },
+        operador_criacao: { usuario_id: 1, codigo: '001', nome: 'Operador', tipo: 'Caixa', perfil: null },
+        itens: [],
+        pagamentos: [],
+      },
+    });
+
+    service.removerVendedor().subscribe();
+    const remover = httpMock.expectOne('/api/terminal/venda/vendedor/');
+    expect(remover.request.method).toBe('DELETE');
+    remover.flush({ venda: null });
+  });
+
   it('lista formas e opera pagamentos/finalizacao', () => {
     service.listarFormasPagamento().subscribe((response) => expect(response.formas[0].codigo).toBe('DIN'));
     const formas = httpMock.expectOne('/api/terminal/formas-pagamento/');

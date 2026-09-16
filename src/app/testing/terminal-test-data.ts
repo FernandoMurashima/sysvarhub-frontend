@@ -115,6 +115,7 @@ export const vendaAbertaStub: VendaAtualResponse = {
     pendente: '199.90',
     troco: '0.00',
     cliente: null,
+    vendedor: null,
     operadorCriacao: operadorLoginResponseStub.operador,
     itens: [
       {
@@ -138,11 +139,13 @@ export const vendaAbertaStub: VendaAtualResponse = {
     pagamentos: [],
   },
   clientePreselecionado: null,
+  vendedorPreselecionado: null,
 };
 
 export const vendaAtualSemVendaStub: VendaAtualResponse = {
   venda: null,
   clientePreselecionado: null,
+  vendedorPreselecionado: null,
 };
 
 export const clientePreselecionadoStub = {
@@ -157,4 +160,21 @@ export const clientePreselecionadoStub = {
 export const vendaAtualComClientePreselecionadoStub: VendaAtualResponse = {
   venda: null,
   clientePreselecionado: clientePreselecionadoStub,
+  vendedorPreselecionado: null,
+};
+
+export const vendedorStub = {
+  id: 501,
+  matricula: '000501',
+  nome: 'Ana Vendedora',
+  apelido: 'Ana',
+  cargo: { id: 5, codigo: 'VENDEDOR', descricao: 'Vendedor' },
+  comissionado: true,
+  comissaoPercentual: '3.00',
+};
+
+export const vendaAtualComVendedorPreselecionadoStub: VendaAtualResponse = {
+  venda: null,
+  clientePreselecionado: null,
+  vendedorPreselecionado: vendedorStub,
 };
