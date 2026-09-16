@@ -49,6 +49,7 @@ export class ClienteSessionService {
           }),
           catchError((reconciliacaoError: unknown) => {
             if (this.isAuthenticationError(reconciliacaoError)) return throwError(() => this.expirarSessao());
+            if (this.isErroComunicacaoIncerta(reconciliacaoError)) return throwError(() => new ClienteCadastroComunicacaoIncertError());
             return throwError(() => reconciliacaoError);
           }),
         );

@@ -182,6 +182,20 @@ describe('ClienteSessionService', () => {
     });
   });
 
+  it('GET de reconciliacao com status 0 retorna erro de comunicacao incerta sem repetir chamadas', (done) => {
+    hubClienteService.cadastrar.and.returnValue(throwError(() => new HttpErrorResponse({ status: 0 })));
+    hubClienteService.listar.and.returnValue(throwError(() => new HttpErrorResponse({ status: 0 })));
+
+    service.cadastrar({ tipo_pessoa: 'PF', documento: '12345678901', nome_cliente: 'Maria Silva' }).subscribe({
+      error: (error) => {
+        expect(error instanceof ClienteCadastroComunicacaoIncertError).toBeTrue();
+        expect(hubClienteService.cadastrar).toHaveBeenCalledTimes(1);
+        expect(hubClienteService.listar).toHaveBeenCalledTimes(1);
+        done();
+      },
+    });
+  });
+
   it('GET de reconciliacao 401/403 invalida operador', (done) => {
     hubClienteService.cadastrar.and.returnValue(throwError(() => new HttpErrorResponse({ status: 0 })));
     hubClienteService.listar.and.returnValue(throwError(() => new HttpErrorResponse({ status: 403 })));

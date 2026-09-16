@@ -476,6 +476,64 @@ describe('PdvPageComponent', () => {
     expect(fixture.nativeElement.textContent).not.toContain('Recurso ainda não integrado ao Hub');
   });
 
+  it('ENTER no modo busca continua confirmando cliente selecionado', () => {
+    const component = fixture.componentInstance;
+
+    component.abrirCliente();
+    fixture.detectChanges();
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+
+    expect(component.clienteModalModo).toBe('busca');
+    expect(vendaSession.selecionarCliente).toHaveBeenCalledWith('cliente-uuid');
+  });
+
+  it('ENTER no modo cadastro nao seleciona cliente antigo nem fecha modal', () => {
+    const component = fixture.componentInstance;
+
+    component.abrirCliente();
+    expect(component.clienteListaSelecionado?.clienteUuid).toBe('cliente-uuid');
+    component.abrirCadastroCliente();
+    fixture.detectChanges();
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+
+    expect(vendaSession.selecionarCliente).not.toHaveBeenCalled();
+    expect(component.modalAtalho).toBe('cliente');
+    expect(component.clienteModalModo).toBe('cadastro');
+  });
+
+  it('ENTER sobre SALVAR CLIENTE nao seleciona cliente antigo pelo listener global', () => {
+    const component = fixture.componentInstance;
+
+    component.abrirCliente();
+    component.abrirCadastroCliente();
+    fixture.detectChanges();
+    const botaoSalvar = Array.from(fixture.nativeElement.querySelectorAll('button')).find((button) =>
+      (button as HTMLButtonElement).textContent?.includes('SALVAR CLIENTE'),
+    ) as HTMLButtonElement;
+
+    botaoSalvar.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+
+    expect(vendaSession.selecionarCliente).not.toHaveBeenCalled();
+    expect(component.modalAtalho).toBe('cliente');
+  });
+
+  it('ENTER sobre PF/PJ nao seleciona cliente antigo pelo listener global', () => {
+    const component = fixture.componentInstance;
+
+    component.abrirCliente();
+    component.abrirCadastroCliente();
+    fixture.detectChanges();
+    const botaoPessoaJuridica = Array.from(fixture.nativeElement.querySelectorAll('button')).find((button) =>
+      (button as HTMLButtonElement).textContent?.includes('Pessoa Jurídica'),
+    ) as HTMLButtonElement;
+
+    botaoPessoaJuridica.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+
+    expect(vendaSession.selecionarCliente).not.toHaveBeenCalled();
+    expect(component.modalAtalho).toBe('cliente');
+    expect(component.clienteModalModo).toBe('cadastro');
+  });
+
   it('busca cliente com debounce', fakeAsync(() => {
     const component = fixture.componentInstance;
     component.abrirCliente();

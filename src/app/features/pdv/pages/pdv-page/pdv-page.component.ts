@@ -196,8 +196,9 @@ export class PdvPageComponent implements OnInit, OnDestroy {
   @HostListener('document:keydown.enter', ['$event'])
   atalhoEnter(event: KeyboardEvent): void {
     if (this.modalAtalho !== 'cliente') return;
+    if (this.clienteModalModo !== 'busca') return;
     const target = event.target as HTMLElement | null;
-    if (target?.tagName.toLowerCase() === 'input') return;
+    if (target?.tagName?.toLowerCase() === 'input') return;
     event.preventDefault();
     this.confirmarClienteSelecionado();
   }
