@@ -777,6 +777,9 @@ describe('PdvPageComponent', () => {
     expect(text).toContain('Nome *');
     expect(text).toContain('SALVAR CLIENTE');
     expect(text).toContain('VOLTAR');
+    expect(fixture.nativeElement.querySelector('input[name="telefoneCadastro"]')).toBeNull();
+    expect(fixture.nativeElement.querySelector('input[name="telefone2Cadastro"]')).toBeNull();
+    expect(fixture.nativeElement.querySelectorAll('.client-create-form .client-form-row').length).toBe(7);
   });
 
   it('VOLTAR retorna a busca de clientes', () => {

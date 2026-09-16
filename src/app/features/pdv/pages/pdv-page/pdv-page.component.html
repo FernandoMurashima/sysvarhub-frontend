@@ -460,20 +460,38 @@
                   <button type="button" [class.active]="clienteCadastro.tipoPessoa === 'PJ'" [disabled]="salvandoCliente" (click)="aoTrocarTipoPessoaCliente('PJ')">Pessoa Jurídica</button>
                 </div>
 
-                <label>{{ labelDocumentoCadastro() }} *<input name="documentoCadastro" [(ngModel)]="clienteCadastro.documento" [disabled]="salvandoCliente" autocomplete="off" inputmode="numeric" /></label>
-                <label>{{ labelNomeCadastro() }} *<input name="nomeCadastro" [(ngModel)]="clienteCadastro.nomeCliente" [disabled]="salvandoCliente" autocomplete="off" /></label>
-                <label>Apelido<input name="apelidoCadastro" [(ngModel)]="clienteCadastro.apelido" [disabled]="salvandoCliente" autocomplete="off" /></label>
-                <label>Telefone<input name="telefoneCadastro" [(ngModel)]="clienteCadastro.telefone1" [disabled]="salvandoCliente" autocomplete="off" inputmode="tel" /></label>
-                <label>Telefone 2<input name="telefone2Cadastro" [(ngModel)]="clienteCadastro.telefone2" [disabled]="salvandoCliente" autocomplete="off" inputmode="tel" /></label>
-                <label>E-mail<input name="emailCadastro" [(ngModel)]="clienteCadastro.email" [disabled]="salvandoCliente" autocomplete="off" inputmode="email" /></label>
-                <label>Aniversário<input name="aniversarioCadastro" [(ngModel)]="clienteCadastro.aniversario" [disabled]="salvandoCliente" type="date" /></label>
-                <label>CEP<input name="cepCadastro" [(ngModel)]="clienteCadastro.cep" [disabled]="salvandoCliente" autocomplete="off" inputmode="numeric" /></label>
-                <label>Endereço<input name="enderecoCadastro" [(ngModel)]="clienteCadastro.endereco" [disabled]="salvandoCliente" autocomplete="off" /></label>
-                <label>Número<input name="numeroCadastro" [(ngModel)]="clienteCadastro.numero" [disabled]="salvandoCliente" autocomplete="off" /></label>
-                <label>Complemento<input name="complementoCadastro" [(ngModel)]="clienteCadastro.complemento" [disabled]="salvandoCliente" autocomplete="off" /></label>
-                <label>Bairro<input name="bairroCadastro" [(ngModel)]="clienteCadastro.bairro" [disabled]="salvandoCliente" autocomplete="off" /></label>
-                <label>Cidade<input name="cidadeCadastro" [(ngModel)]="clienteCadastro.cidade" [disabled]="salvandoCliente" autocomplete="off" /></label>
-                <label>UF<input name="estadoCadastro" [(ngModel)]="clienteCadastro.estado" [disabled]="salvandoCliente" maxlength="2" autocomplete="off" /></label>
+                <div class="client-form-row line-1">
+                  <label>{{ labelNomeCadastro() }} *<input name="nomeCadastro" [(ngModel)]="clienteCadastro.nomeCliente" [disabled]="salvandoCliente" autocomplete="off" /></label>
+                  <label>Apelido<input name="apelidoCadastro" [(ngModel)]="clienteCadastro.apelido" [disabled]="salvandoCliente" autocomplete="off" /></label>
+                </div>
+
+                <div class="client-form-row line-2">
+                  <label>{{ labelDocumentoCadastro() }} *<input name="documentoCadastro" [(ngModel)]="clienteCadastro.documento" [disabled]="salvandoCliente" autocomplete="off" inputmode="numeric" /></label>
+                  <label>E-mail<input name="emailCadastro" [(ngModel)]="clienteCadastro.email" [disabled]="salvandoCliente" autocomplete="off" inputmode="email" /></label>
+                </div>
+
+                <div class="client-form-row line-3">
+                  <label>Endereço<input name="enderecoCadastro" [(ngModel)]="clienteCadastro.endereco" [disabled]="salvandoCliente" autocomplete="off" /></label>
+                  <label>Número<input name="numeroCadastro" [(ngModel)]="clienteCadastro.numero" [disabled]="salvandoCliente" autocomplete="off" /></label>
+                </div>
+
+                <div class="client-form-row line-4">
+                  <label>Complemento<input name="complementoCadastro" [(ngModel)]="clienteCadastro.complemento" [disabled]="salvandoCliente" autocomplete="off" /></label>
+                </div>
+
+                <div class="client-form-row line-5">
+                  <label>Bairro<input name="bairroCadastro" [(ngModel)]="clienteCadastro.bairro" [disabled]="salvandoCliente" autocomplete="off" /></label>
+                  <label>Cidade<input name="cidadeCadastro" [(ngModel)]="clienteCadastro.cidade" [disabled]="salvandoCliente" autocomplete="off" /></label>
+                  <label>UF<input name="estadoCadastro" [(ngModel)]="clienteCadastro.estado" [disabled]="salvandoCliente" maxlength="2" autocomplete="off" /></label>
+                </div>
+
+                <div class="client-form-row line-6">
+                  <label>CEP<input name="cepCadastro" [(ngModel)]="clienteCadastro.cep" [disabled]="salvandoCliente" autocomplete="off" inputmode="numeric" /></label>
+                </div>
+
+                <div class="client-form-row line-7">
+                  <label>Aniversário<input name="aniversarioCadastro" [(ngModel)]="clienteCadastro.aniversario" [disabled]="salvandoCliente" type="date" /></label>
+                </div>
 
                 @if (erroCadastroCliente) {
                   <p class="client-form-error">{{ erroCadastroCliente }}</p>
