@@ -107,6 +107,17 @@ describe('operatorSessionInterceptor', () => {
     request.flush({});
   });
 
+  it('envia header em consulta de vendedores usando token atual', () => {
+    sessionStore.getToken.and.returnValue('sessao-operador-atual');
+
+    http.get('/api/terminal/vendedores/').subscribe();
+    const request = httpMock.expectOne('/api/terminal/vendedores/');
+
+    expect(request.request.method).toBe('GET');
+    expect(request.request.headers.get('X-Sysvar-Operador-Session')).toBe('sessao-operador-atual');
+    request.flush({});
+  });
+
   it('nao envia header em pareamento nem URL externa', () => {
     sessionStore.getToken.and.returnValue('sessao-operador-ficticia');
 

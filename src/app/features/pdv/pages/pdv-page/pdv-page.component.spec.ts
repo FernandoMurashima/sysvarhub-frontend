@@ -13,7 +13,7 @@ import { ClienteSessionExpiredError, ClienteSessionService } from '../../../clie
 import { OperatorSessionService } from '../../../operador/services/operator-session.service';
 import { VendaSessionService } from '../../../venda/services/venda-session.service';
 import { clientePreselecionadoStub, sessaoCaixaAbertaStub, vendedorStub, vendaAbertaStub } from '../../../../testing/terminal-test-data';
-import { HubVendedorService } from '../../../vendedor/services/hub-vendedor.service';
+import { VendedorSessionExpiredError, VendedorSessionService } from '../../../vendedor/services/vendedor-session.service';
 import { PdvCatalogoConsulta, PdvProdutoConsulta } from '../../models/pdv-produto-consulta.model';
 import { PdvHubFacade } from '../../services/pdv-hub.facade';
 import { PdvPageComponent } from './pdv-page.component';
@@ -100,7 +100,7 @@ describe('PdvPageComponent', () => {
   let facade: jasmine.SpyObj<PdvHubFacade>;
   let operatorSession: jasmine.SpyObj<OperatorSessionService>;
   let clienteSession: jasmine.SpyObj<ClienteSessionService>;
-  let vendedorService: jasmine.SpyObj<HubVendedorService>;
+  let vendedorSession: jasmine.SpyObj<VendedorSessionService>;
   let caixaSession: jasmine.SpyObj<CaixaSessionService>;
   let vendaSession: jasmine.SpyObj<VendaSessionService>;
   let caixaStatusSignal = signal<'inicializando' | 'fechado' | 'aberto' | 'erro'>('aberto');
@@ -157,8 +157,8 @@ describe('PdvPageComponent', () => {
       clientes: [clienteAtivo],
     }));
     clienteSession.cadastrar.and.returnValue(of({ ...clienteAtivo, clienteUuid: 'novo-cliente', nomeCliente: 'Cliente Novo' }));
-    vendedorService = jasmine.createSpyObj<HubVendedorService>('HubVendedorService', ['consultar']);
-    vendedorService.consultar.and.returnValue(of({
+    vendedorSession = jasmine.createSpyObj<VendedorSessionService>('VendedorSessionService', ['listar']);
+    vendedorSession.listar.and.returnValue(of({
       vendedoresVersao: 1,
       vendedoresSincronizadoEm: '2026-09-16T10:00:00',
       q: '',
@@ -207,7 +207,7 @@ describe('PdvPageComponent', () => {
         { provide: PdvHubFacade, useValue: facade },
         { provide: OperatorSessionService, useValue: operatorSession },
         { provide: ClienteSessionService, useValue: clienteSession },
-        { provide: HubVendedorService, useValue: vendedorService },
+        { provide: VendedorSessionService, useValue: vendedorSession },
         { provide: CaixaSessionService, useValue: caixaSession },
         { provide: VendaSessionService, useValue: vendaSession },
       ],
@@ -997,7 +997,7 @@ describe('PdvPageComponent', () => {
     fixture.detectChanges();
 
     expect(component.modalAtalho).toBe('vendedor');
-    expect(vendedorService.consultar).toHaveBeenCalledWith('');
+    expect(vendedorSession.listar).toHaveBeenCalledWith('');
     expect(fixture.nativeElement.textContent).toContain('VENDEDOR - F3');
     expect(fixture.nativeElement.textContent).toContain('Ana Vendedora');
     expect(component.vendedorOperacional()).toBeNull();
@@ -1011,11 +1011,31 @@ describe('PdvPageComponent', () => {
     component.buscaVendedor = '000501';
     component.aoDigitarBuscaVendedor();
     tick(249);
-    expect(vendedorService.consultar).toHaveBeenCalledTimes(1);
+    expect(vendedorSession.listar).toHaveBeenCalledTimes(1);
     tick(1);
 
-    expect(vendedorService.consultar).toHaveBeenCalledWith('000501');
+    expect(vendedorSession.listar).toHaveBeenCalledWith('000501');
   }));
+
+  it('fecha modal F3 quando sessao de vendedor expira', () => {
+    const component = fixture.componentInstance;
+    vendedorSession.listar.and.returnValue(throwError(() => new VendedorSessionExpiredError()));
+
+    component.abrirVendedor();
+
+    expect(component.modalAtalho).toBe('');
+    expect(component.erroVendedores).toBe('');
+  });
+
+  it('erro comum de consulta F3 mostra falha de comunicacao', () => {
+    const component = fixture.componentInstance;
+    vendedorSession.listar.and.returnValue(throwError(() => new Error('rede')));
+
+    component.abrirVendedor();
+
+    expect(component.modalAtalho).toBe('vendedor');
+    expect(component.erroVendedores).toBe('Falha de comunicação com o Hub local.');
+  });
 
   it('seleciona vendedor pre-venda e mostra mensagem de pre-selecao', () => {
     const component = fixture.componentInstance;

@@ -13,7 +13,7 @@ import { ClienteCadastroComunicacaoIncertError, ClienteSessionExpiredError, Clie
 import { normalizarValorAbertura } from '../../../caixa/services/caixa-valor.parser';
 import { OperatorSessionService } from '../../../operador/services/operator-session.service';
 import { VendaSessionService } from '../../../venda/services/venda-session.service';
-import { HubVendedorService } from '../../../vendedor/services/hub-vendedor.service';
+import { VendedorSessionExpiredError, VendedorSessionService } from '../../../vendedor/services/vendedor-session.service';
 import { formatarMoedaString, normalizarValorPagamento, somarMoedasString } from '../../../venda/services/pagamento-valor.parser';
 import { PdvProdutoConsulta } from '../../models/pdv-produto-consulta.model';
 import { PdvHubFacade } from '../../services/pdv-hub.facade';
@@ -62,7 +62,7 @@ export class PdvPageComponent implements OnInit, OnDestroy {
   private readonly caixaSession = inject(CaixaSessionService);
   private readonly vendaSession = inject(VendaSessionService);
   private readonly clienteSession = inject(ClienteSessionService);
-  private readonly vendedorService = inject(HubVendedorService);
+  private readonly vendedorSession = inject(VendedorSessionService);
   private readonly router = inject(Router);
 
   busca = '';
@@ -928,14 +928,19 @@ export class PdvPageComponent implements OnInit, OnDestroy {
     this.vendedoresSubscription?.unsubscribe();
     this.carregandoVendedores = true;
     this.erroVendedores = '';
-    this.vendedoresSubscription = this.vendedorService.consultar(termo).subscribe({
+    this.vendedoresSubscription = this.vendedorSession.listar(termo).subscribe({
       next: (resultado) => {
         this.vendedoresEncontrados = resultado.vendedores;
         const operacional = this.vendedorOperacional();
         this.vendedorListaSelecionado = resultado.vendedores.find((vendedor) => vendedor.id === operacional?.id) || null;
         this.carregandoVendedores = false;
       },
-      error: () => {
+      error: (error: unknown) => {
+        if (error instanceof VendedorSessionExpiredError) {
+          this.modalAtalho = '';
+          this.limparEstadoVendedorModal();
+          return;
+        }
         this.vendedoresEncontrados = [];
         this.vendedorListaSelecionado = null;
         this.carregandoVendedores = false;
