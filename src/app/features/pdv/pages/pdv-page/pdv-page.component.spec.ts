@@ -235,12 +235,17 @@ describe('PdvPageComponent', () => {
     }));
     caixaStatusSignal = signal<'inicializando' | 'fechado' | 'aberto' | 'erro'>('aberto');
     sessaoCaixaSignal = signal(sessaoCaixaAbertaStub);
-    caixaSession = jasmine.createSpyObj<CaixaSessionService>('CaixaSessionService', ['bootstrap', 'abrir'], {
+    caixaSession = jasmine.createSpyObj<CaixaSessionService>('CaixaSessionService', ['bootstrap', 'abrir', 'fechar'], {
       status: caixaStatusSignal.asReadonly(),
       sessao: sessaoCaixaSignal.asReadonly(),
     });
     caixaSession.bootstrap.and.returnValue(of(true));
     caixaSession.abrir.and.returnValue(of({ ok: true }));
+    caixaSession.fechar.and.returnValue(of({
+      ok: true,
+      sessao: { ...sessaoCaixaAbertaStub, status: 'FECHADO', valorEsperadoFechamento: '399.70', valorContadoFechamento: '399.70', diferencaFechamento: '0.00', situacaoFechamento: 'OK' },
+      fechamento: { valorEsperado: '399.70', valorContado: '399.70', diferenca: '0.00', situacao: 'OK', resumo: resumoCaixaStub },
+    }));
     tiposDespesaService = jasmine.createSpyObj<HubTiposDespesaPdvService>('HubTiposDespesaPdvService', ['listar']);
     tiposDespesaService.listar.and.returnValue(of({
       tiposDespesaPdvVersao: 1,
@@ -475,12 +480,164 @@ describe('PdvPageComponent', () => {
     expect(fixture.nativeElement.textContent).not.toContain('ABERTURA DE CAIXA');
   });
 
-  it('F10 nao chama fechamento de caixa', () => {
+  it('F10 abre fechamento e consulta resumo local', () => {
     const component = fixture.componentInstance;
 
     component.atalhoF10(new KeyboardEvent('keydown', { key: 'F10' }));
 
-    expect(component.mensagem).toBe('Fechamento de caixa será integrado em etapa posterior.');
+    expect(component.modalAtalho).toBe('fechamento');
+    expect(resumoCaixaService.obter).toHaveBeenCalled();
+    expect(caixaSession.fechar).not.toHaveBeenCalled();
+  });
+
+  it('botao F10 abre fechamento', () => {
+    const button = Array.from(fixture.nativeElement.querySelectorAll('button') as NodeListOf<HTMLButtonElement>)
+      .find((item): item is HTMLButtonElement => item.textContent?.includes('Fechar Caixa') ?? false);
+
+    button?.click();
+
+    expect(fixture.componentInstance.modalAtalho).toBe('fechamento');
+  });
+
+  it('F10 mostra resumo essencial e composicao do dinheiro', () => {
+    fixture.componentInstance.abrirFechamentoCaixa();
+    fixture.detectChanges();
+    const text = fixture.nativeElement.textContent;
+
+    expect(text).toContain('FECHAMENTO DE CAIXA · F10');
+    expect(fixture.nativeElement.textContent).toContain('DINHEIRO ESPERADO');
+    expect(fixture.nativeElement.textContent).toContain('R$ 399,70');
+    expect(fixture.nativeElement.textContent).toContain('+ Vendas em dinheiro');
+    expect(fixture.nativeElement.textContent).toContain('+ Suprimentos');
+    expect(fixture.nativeElement.textContent).toContain('- Sangrias');
+    expect(fixture.nativeElement.textContent).toContain('- Despesas');
+  });
+
+  it('F10 mostra estado de carregamento enquanto consulta resumo', () => {
+    const resumoSubject = new Subject<ResumoCaixa>();
+    resumoCaixaService.obter.and.returnValue(resumoSubject.asObservable());
+
+    fixture.componentInstance.abrirFechamentoCaixa();
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.textContent).toContain('Carregando...');
+    resumoSubject.next(resumoCaixaStub);
+    resumoSubject.complete();
+  });
+
+  it('valor contado e obrigatorio antes da confirmacao', () => {
+    const component = fixture.componentInstance;
+    component.abrirFechamentoCaixa();
+
+    component.prepararFechamentoCaixa(new Event('submit'));
+
+    expect(component.erroFechamentoCaixa).toBe('Informe o valor contado em dinheiro.');
+    expect(component.confirmandoFechamentoCaixa).toBeFalse();
+    expect(caixaSession.fechar).not.toHaveBeenCalled();
+  });
+
+  it('primeiro passo pede confirmacao e voltar nao faz POST', () => {
+    const component = fixture.componentInstance;
+    component.abrirFechamentoCaixa();
+    component.valorContadoFechamento = '399,70';
+
+    component.prepararFechamentoCaixa(new Event('submit'));
+    expect(component.confirmandoFechamentoCaixa).toBeTrue();
+    component.voltarConfirmacaoFechamento();
+
+    expect(component.confirmandoFechamentoCaixa).toBeFalse();
+    expect(caixaSession.fechar).not.toHaveBeenCalled();
+  });
+
+  it('confirmar envia exatamente um fechamento com string decimal e observacao', () => {
+    const component = fixture.componentInstance;
+    component.abrirFechamentoCaixa();
+    component.valorContadoFechamento = '399,70';
+    component.observacaoFechamento = 'Conferencia final';
+    component.prepararFechamentoCaixa(new Event('submit'));
+
+    component.confirmarFechamentoCaixa();
+    component.confirmarFechamentoCaixa();
+
+    expect(caixaSession.fechar).toHaveBeenCalledTimes(1);
+    expect(caixaSession.fechar).toHaveBeenCalledWith('399.70', 'Conferencia final');
+  });
+
+  it('fechamento com sucesso mostra valores oficiais do backend e limpa venda', () => {
+    const component = fixture.componentInstance;
+    component.abrirFechamentoCaixa();
+    component.valorContadoFechamento = '409,70';
+    caixaSession.fechar.and.returnValue(of({
+      ok: true,
+      sessao: { ...sessaoCaixaAbertaStub, status: 'FECHADO' },
+      fechamento: { valorEsperado: '399.70', valorContado: '409.70', diferenca: '10.00', situacao: 'SOBRA', resumo: resumoCaixaStub },
+    }));
+
+    component.prepararFechamentoCaixa(new Event('submit'));
+    component.confirmarFechamentoCaixa();
+    fixture.detectChanges();
+
+    const text = fixture.nativeElement.textContent;
+    expect(text).toContain('CAIXA FECHADO COM SUCESSO');
+    expect(text).toContain('R$ 399,70');
+    expect(text).toContain('R$ 409,70');
+    expect(text).toContain('R$ 10,00');
+    expect(text).toContain('SOBRA');
+    expect(vendaSession.limparEstado).toHaveBeenCalled();
+  });
+
+  it('resultado FALTA preserva sinal negativo visual', () => {
+    const component = fixture.componentInstance;
+    component.abrirFechamentoCaixa();
+    caixaSession.fechar.and.returnValue(of({
+      ok: true,
+      sessao: { ...sessaoCaixaAbertaStub, status: 'FECHADO' },
+      fechamento: { valorEsperado: '399.70', valorContado: '389.70', diferenca: '-10.00', situacao: 'FALTA', resumo: resumoCaixaStub },
+    }));
+
+    component.valorContadoFechamento = '389,70';
+    component.prepararFechamentoCaixa(new Event('submit'));
+    component.confirmarFechamentoCaixa();
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.textContent).toContain('-R$ 10,00');
+    expect(fixture.nativeElement.textContent).toContain('FALTA');
+  });
+
+  it('400, 409 e status 0 mostram detail sem fechar modal', () => {
+    const component = fixture.componentInstance;
+    component.abrirFechamentoCaixa();
+    component.valorContadoFechamento = '399,70';
+    caixaSession.fechar.and.returnValues(
+      of({ ok: false, detail: 'Valor contado inválido.' }),
+      of({ ok: false, detail: 'Existe venda em andamento neste caixa.' }),
+      of({ ok: false, detail: 'Falha de comunicação com o Hub local.' }),
+    );
+
+    component.prepararFechamentoCaixa(new Event('submit'));
+    component.confirmarFechamentoCaixa();
+    expect(component.erroFechamentoCaixa).toBe('Valor contado inválido.');
+    expect(component.modalAtalho).toBe('fechamento');
+
+    component.prepararFechamentoCaixa(new Event('submit'));
+    component.confirmarFechamentoCaixa();
+    expect(component.erroFechamentoCaixa).toBe('Existe venda em andamento neste caixa.');
+
+    component.prepararFechamentoCaixa(new Event('submit'));
+    component.confirmarFechamentoCaixa();
+    expect(component.erroFechamentoCaixa).toBe('Falha de comunicação com o Hub local.');
+  });
+
+  it('concluir fecha resultado sem reabrir caixa', () => {
+    const component = fixture.componentInstance;
+    component.abrirFechamentoCaixa();
+    component.valorContadoFechamento = '399,70';
+    component.prepararFechamentoCaixa(new Event('submit'));
+    component.confirmarFechamentoCaixa();
+
+    component.concluirFechamentoCaixa();
+
+    expect(component.modalAtalho).toBe('');
     expect(caixaSession.abrir).not.toHaveBeenCalled();
   });
 

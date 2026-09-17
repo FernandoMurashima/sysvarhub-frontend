@@ -52,11 +52,21 @@ describe('HubCaixaService', () => {
     });
   });
 
-  it('fechar existe e usa endpoint correto', () => {
-    service.fechar().subscribe();
+  it('fechar envia valor contado e observacao e mapeia resposta', (done) => {
+    service.fechar('249.90', 'Conferencia final').subscribe((response) => {
+      expect(response.status).toBe('ok');
+      expect(response.sessao.status).toBe('FECHADO');
+      expect(response.fechamento.valorEsperado).toBe('249.90');
+      expect(response.fechamento.valorContado).toBe('249.90');
+      expect(response.fechamento.diferenca).toBe('0.00');
+      expect(response.fechamento.situacao).toBe('OK');
+      expect(response.fechamento.resumo.dinheiro.esperado).toBe('249.90');
+      done();
+    });
 
     const request = httpMock.expectOne('/api/terminal/caixa/fechar/');
     expect(request.request.method).toBe('POST');
+    expect(request.request.body).toEqual({ valor_contado: '249.90', observacao: 'Conferencia final' });
     request.flush({
       status: 'ok',
       sessao: {
@@ -70,6 +80,35 @@ describe('HubCaixaService', () => {
         operador_abertura: { usuario_id: 90, codigo: 'caixa.barra', nome: 'Juliana Rocha', tipo: 'Caixa', perfil: null },
         terminal_fechamento: null,
         operador_fechamento: null,
+        valor_esperado_fechamento: '249.90',
+        valor_contado_fechamento: '249.90',
+        diferenca_fechamento: '0.00',
+        situacao_fechamento: 'OK',
+        observacao_fechamento: 'Conferencia final',
+      },
+      fechamento: {
+        valor_esperado: '249.90',
+        valor_contado: '249.90',
+        diferenca: '0.00',
+        situacao: 'OK',
+        resumo: {
+          sessao: {
+            uuid: 'sessao',
+            status: 'ABERTO',
+            valor_abertura: '100.00',
+            aberto_em: '2026-09-13T12:00:00',
+            fechado_em: null,
+            caixa: { id: 29, codigo: 'CX-BARRA', descricao: 'Caixa Loja Barra', ativo: true },
+            terminal_abertura: { uuid: 'terminal', codigo: 'PDV-01', nome: 'PDV 01' },
+            operador_abertura: { usuario_id: 90, codigo: 'caixa.barra', nome: 'Juliana Rocha', tipo: 'Caixa', perfil: null },
+            terminal_fechamento: null,
+            operador_fechamento: null,
+          },
+          vendas: { quantidade: 1, total: '249.90', valor_recebido: '249.90', troco: '0.00' },
+          pagamentos: { formas: [], dinheiro_bruto: '249.90', troco: '0.00', dinheiro_liquido: '249.90' },
+          movimentacoes: { despesas: { quantidade: 0, total: '0.00' }, sangrias: { quantidade: 0, total: '0.00' }, suprimentos: { quantidade: 0, total: '0.00' }, itens: [] },
+          dinheiro: { valor_abertura: '0.00', vendas_dinheiro_bruto: '249.90', troco: '0.00', vendas_dinheiro_liquido: '249.90', suprimentos: '0.00', sangrias: '0.00', despesas: '0.00', esperado: '249.90' },
+        },
       },
     });
   });

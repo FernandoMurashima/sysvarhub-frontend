@@ -5,6 +5,7 @@ import { Router, RouterLink } from '@angular/router';
 import { Subscription } from 'rxjs';
 
 import { ClienteCadastroRequest, ClienteHubResumo, ClienteTipoPessoa, formatarDocumentoCliente } from '../../../../core/models/cliente.models';
+import { CaixaFechamentoResultado } from '../../../../core/models/caixa.models';
 import { TipoMovimentacaoCaixa } from '../../../../core/models/movimentacao-caixa.models';
 import { FormaPagamento } from '../../../../core/models/pagamento.models';
 import { ResumoCaixa } from '../../../../core/models/resumo-caixa.models';
@@ -129,6 +130,12 @@ export class PdvPageComponent implements OnInit, OnDestroy {
   resumoCaixa: ResumoCaixa | null = null;
   carregandoResumoCaixa = false;
   erroResumoCaixa = '';
+  valorContadoFechamento = '';
+  observacaoFechamento = '';
+  erroFechamentoCaixa = '';
+  confirmandoFechamentoCaixa = false;
+  fechandoCaixa = false;
+  resultadoFechamentoCaixa: CaixaFechamentoResultado | null = null;
   private buscaTimer: ReturnType<typeof setTimeout> | null = null;
   private buscaClienteTimer: ReturnType<typeof setTimeout> | null = null;
   private buscaVendedorTimer: ReturnType<typeof setTimeout> | null = null;
@@ -343,7 +350,7 @@ export class PdvPageComponent implements OnInit, OnDestroy {
     }
 
     if (atalho === 'fechamento') {
-      this.mensagem = 'Fechamento de caixa será integrado em etapa posterior.';
+      this.abrirFechamentoCaixa();
       return;
     }
 
@@ -362,6 +369,7 @@ export class PdvPageComponent implements OnInit, OnDestroy {
   }
 
   fecharAtalho(): void {
+    if (this.modalAtalho === 'fechamento' && (this.fechandoCaixa || this.resultadoFechamentoCaixa)) return;
     this.modalAtalho = '';
     this.buscaModal = '';
     this.produtosPreco = [];
@@ -369,6 +377,7 @@ export class PdvPageComponent implements OnInit, OnDestroy {
     this.limparEstadoVendedorModal();
     this.limparEstadoMovimentacaoCaixa();
     this.limparEstadoResumoCaixa();
+    this.limparEstadoFechamentoCaixa();
   }
 
   abrirResumoCaixa(): void {
@@ -379,8 +388,102 @@ export class PdvPageComponent implements OnInit, OnDestroy {
 
   atualizarResumoCaixa(event?: Event): void {
     event?.preventDefault();
-    if (this.carregandoResumoCaixa) return;
+    if (this.carregandoResumoCaixa || this.resultadoFechamentoCaixa) return;
     this.carregarResumoCaixa();
+  }
+
+  abrirFechamentoCaixa(): void {
+    this.modalAtalho = 'fechamento';
+    this.mensagem = '';
+    this.limparEstadoFechamentoCaixa();
+    this.carregarResumoCaixa();
+  }
+
+  prepararFechamentoCaixa(event?: Event): void {
+    event?.preventDefault();
+    if (this.fechandoCaixa || this.resultadoFechamentoCaixa) return;
+
+    const valorContado = normalizarValorAbertura(this.valorContadoFechamento);
+    if (!valorContado) {
+      this.erroFechamentoCaixa = 'Informe o valor contado em dinheiro.';
+      return;
+    }
+    if (this.observacaoFechamento.length > 500) {
+      this.erroFechamentoCaixa = 'Observação deve ter no máximo 500 caracteres.';
+      return;
+    }
+
+    this.valorContadoFechamento = valorContado;
+    this.erroFechamentoCaixa = '';
+    this.confirmandoFechamentoCaixa = true;
+  }
+
+  voltarConfirmacaoFechamento(): void {
+    if (this.fechandoCaixa) return;
+    this.confirmandoFechamentoCaixa = false;
+  }
+
+  confirmarFechamentoCaixa(): void {
+    if (this.fechandoCaixa || this.resultadoFechamentoCaixa) return;
+
+    const valorContado = normalizarValorAbertura(this.valorContadoFechamento);
+    if (!valorContado) {
+      this.confirmandoFechamentoCaixa = false;
+      this.erroFechamentoCaixa = 'Informe o valor contado em dinheiro.';
+      return;
+    }
+
+    this.fechandoCaixa = true;
+    this.erroFechamentoCaixa = '';
+    this.caixaSession.fechar(valorContado, this.observacaoFechamento.trim()).subscribe((resultado) => {
+      this.fechandoCaixa = false;
+      if (!resultado.ok || !resultado.fechamento) {
+        this.confirmandoFechamentoCaixa = false;
+        this.erroFechamentoCaixa = resultado.detail || 'Falha de comunicação com o Hub local.';
+        return;
+      }
+
+      this.resultadoFechamentoCaixa = resultado.fechamento;
+      this.confirmandoFechamentoCaixa = false;
+      this.vendaSession.limparEstado();
+      this.itemSelecionadoUuid = null;
+      this.produtoSelecionado = null;
+      this.produtos = [];
+      this.busca = '';
+      this.mensagem = 'Caixa fechado com sucesso.';
+    });
+  }
+
+  concluirFechamentoCaixa(): void {
+    if (!this.resultadoFechamentoCaixa) return;
+    this.modalAtalho = '';
+    this.buscaModal = '';
+    this.produtosPreco = [];
+    this.limparEstadoClienteModal();
+    this.limparEstadoVendedorModal();
+    this.limparEstadoMovimentacaoCaixa();
+    this.limparEstadoResumoCaixa();
+    this.limparEstadoFechamentoCaixa();
+  }
+
+  classeSituacaoFechamento(situacao: string | null | undefined): string {
+    if (situacao === 'OK') return 'ok';
+    if (situacao === 'SOBRA') return 'sobra';
+    if (situacao === 'FALTA') return 'falta';
+    return '';
+  }
+
+  limiteObservacaoFechamentoRestante(): number {
+    return Math.max(0, 500 - this.observacaoFechamento.length);
+  }
+
+  private limparEstadoFechamentoCaixa(): void {
+    this.valorContadoFechamento = '';
+    this.observacaoFechamento = '';
+    this.erroFechamentoCaixa = '';
+    this.confirmandoFechamentoCaixa = false;
+    this.fechandoCaixa = false;
+    this.resultadoFechamentoCaixa = null;
   }
 
   abrirMovimentacaoCaixa(): void {

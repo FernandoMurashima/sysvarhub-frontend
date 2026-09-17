@@ -374,12 +374,14 @@
               <strong>Movimentação de Caixa · F8</strong>
             } @else if (modalAtalho === 'resumo') {
               <strong>RESUMO DO CAIXA · F4</strong>
+            } @else if (modalAtalho === 'fechamento') {
+              <strong>FECHAMENTO DE CAIXA · F10</strong>
             } @else {
               <strong>Recurso ainda não integrado ao Hub</strong>
             }
             <span>{{ data }} · {{ caixa() }}</span>
           </div>
-          <button type="button" (click)="fecharAtalho()">Fechar</button>
+          <button type="button" [disabled]="modalAtalho === 'fechamento' && (fechandoCaixa || !!resultadoFechamentoCaixa)" (click)="fecharAtalho()">Fechar</button>
         </header>
 
         @if (modalAtalho === 'despesa') {
@@ -549,6 +551,113 @@
                   <p class="summary-empty">Nenhuma movimentação de caixa nesta sessão.</p>
                 }
               </section>
+            }
+          </div>
+        } @else if (modalAtalho === 'fechamento') {
+          <div class="cash-summary-modal cash-closing-modal">
+            @if (resultadoFechamentoCaixa) {
+              <section class="closing-success">
+                <strong>CAIXA FECHADO COM SUCESSO</strong>
+                <div class="closing-result-grid">
+                  <article><span>Dinheiro esperado</span><b>{{ formatarMoeda(resultadoFechamentoCaixa.valorEsperado) }}</b></article>
+                  <article><span>Valor contado</span><b>{{ formatarMoeda(resultadoFechamentoCaixa.valorContado) }}</b></article>
+                  <article><span>Diferença</span><b>{{ formatarMoeda(resultadoFechamentoCaixa.diferenca) }}</b></article>
+                  <article [class]="'closing-situation ' + classeSituacaoFechamento(resultadoFechamentoCaixa.situacao)">
+                    <span>Situação</span><b>{{ resultadoFechamentoCaixa.situacao }}</b>
+                  </article>
+                </div>
+                <footer class="client-actions">
+                  <button type="button" class="primary" (click)="concluirFechamentoCaixa()">CONCLUIR</button>
+                </footer>
+              </section>
+            } @else {
+              <div class="summary-toolbar">
+                <span>Resumo local da sessão aberta</span>
+                <button type="button" [disabled]="carregandoResumoCaixa || fechandoCaixa" (click)="atualizarResumoCaixa($event)">
+                  {{ carregandoResumoCaixa ? 'Atualizando...' : 'ATUALIZAR' }}
+                </button>
+              </div>
+
+              @if (carregandoResumoCaixa && !resumoCaixa) {
+                <p class="summary-loading">Carregando...</p>
+              } @else if (erroResumoCaixa) {
+                <p class="client-form-error summary-error">{{ erroResumoCaixa }}</p>
+              } @else if (resumoCaixa) {
+                <section class="summary-session">
+                  <article>
+                    <span>Caixa</span>
+                    <strong>{{ resumoCaixa.sessao.caixa.codigo }} · {{ resumoCaixa.sessao.caixa.descricao }}</strong>
+                  </article>
+                  <article>
+                    <span>Operador</span>
+                    <strong>{{ operador()?.nome || resumoCaixa.sessao.operadorAbertura.nome }}</strong>
+                  </article>
+                  <article>
+                    <span>Aberto em</span>
+                    <strong>{{ formatarDataHora(resumoCaixa.sessao.abertoEm) }}</strong>
+                  </article>
+                </section>
+
+                <section class="summary-hero">
+                  <article>
+                    <span>VALOR DE ABERTURA</span>
+                    <strong>{{ formatarMoeda(resumoCaixa.dinheiro.valorAbertura) }}</strong>
+                  </article>
+                  <article>
+                    <span>VENDAS</span>
+                    <strong>{{ resumoCaixa.vendas.quantidade }} · {{ formatarMoeda(resumoCaixa.vendas.total) }}</strong>
+                  </article>
+                  <article class="expected">
+                    <span>DINHEIRO ESPERADO</span>
+                    <strong>{{ formatarMoeda(resumoCaixa.dinheiro.esperado) }}</strong>
+                  </article>
+                </section>
+
+                <section class="summary-formula closing-formula">
+                  <h4>Composição do dinheiro</h4>
+                  <p><span>Valor de abertura</span><strong>{{ formatarMoeda(resumoCaixa.dinheiro.valorAbertura) }}</strong></p>
+                  <p><span>+ Vendas em dinheiro</span><strong>{{ formatarMoeda(resumoCaixa.dinheiro.vendasDinheiroLiquido) }}</strong></p>
+                  <p><span>+ Suprimentos</span><strong>{{ formatarMoeda(resumoCaixa.dinheiro.suprimentos) }}</strong></p>
+                  <p><span>- Sangrias</span><strong>{{ formatarMoeda(resumoCaixa.dinheiro.sangrias) }}</strong></p>
+                  <p><span>- Despesas</span><strong>{{ formatarMoeda(resumoCaixa.dinheiro.despesas) }}</strong></p>
+                  <p class="result"><span>= Dinheiro esperado</span><strong>{{ formatarMoeda(resumoCaixa.dinheiro.esperado) }}</strong></p>
+                </section>
+
+                <form class="closing-form" (submit)="prepararFechamentoCaixa($event)">
+                  <label>
+                    VALOR CONTADO EM DINHEIRO
+                    <input name="valorContadoFechamento" [(ngModel)]="valorContadoFechamento" inputmode="decimal" autocomplete="off" [disabled]="fechandoCaixa || confirmandoFechamentoCaixa" placeholder="0,00" />
+                  </label>
+                  <label>
+                    OBSERVAÇÃO
+                    <textarea name="observacaoFechamento" [(ngModel)]="observacaoFechamento" maxlength="500" [disabled]="fechandoCaixa || confirmandoFechamentoCaixa"></textarea>
+                    <small>{{ limiteObservacaoFechamentoRestante() }} caracteres restantes</small>
+                  </label>
+
+                  @if (erroFechamentoCaixa) {
+                    <p class="client-form-error">{{ erroFechamentoCaixa }}</p>
+                  }
+
+                  @if (confirmandoFechamentoCaixa) {
+                    <div class="closing-confirmation">
+                      <strong>Confirma o fechamento deste caixa?</strong>
+                      <div>
+                        <button type="button" [disabled]="fechandoCaixa" (click)="voltarConfirmacaoFechamento()">VOLTAR</button>
+                        <button type="button" class="danger" [disabled]="fechandoCaixa" (click)="confirmarFechamentoCaixa()">
+                          {{ fechandoCaixa ? 'FECHANDO...' : 'CONFIRMAR FECHAMENTO' }}
+                        </button>
+                      </div>
+                    </div>
+                  } @else {
+                    <div class="modal-actions">
+                      <button type="button" [disabled]="fechandoCaixa" (click)="fecharAtalho()">VOLTAR</button>
+                      <button type="submit" [disabled]="fechandoCaixa || carregandoResumoCaixa">
+                        FECHAR CAIXA
+                      </button>
+                    </div>
+                  }
+                </form>
+              }
             }
           </div>
         } @else if (modalAtalho === 'cliente') {

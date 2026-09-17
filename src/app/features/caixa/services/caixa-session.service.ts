@@ -3,7 +3,7 @@ import { inject, Injectable, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { catchError, map, Observable, of, tap } from 'rxjs';
 
-import { CaixaHubResumo, CaixaSessionStatus, mapSessaoCaixa, SessaoCaixaHubResumo } from '../../../core/models/caixa.models';
+import { CaixaFecharResultado, CaixaHubResumo, CaixaSessionStatus, mapSessaoCaixa, SessaoCaixaHubResumo } from '../../../core/models/caixa.models';
 import { OperatorSessionService } from '../../operador/services/operator-session.service';
 import { HubCaixaService } from './hub-caixa.service';
 
@@ -51,6 +51,14 @@ export class CaixaSessionService {
     );
   }
 
+  fechar(valorContado: string, observacao = ''): Observable<CaixaFecharResultado> {
+    return this.hubCaixaService.fechar(valorContado, observacao).pipe(
+      tap((response) => this.definirFechado(response.sessao)),
+      map((response) => ({ ok: true, sessao: response.sessao, fechamento: response.fechamento })),
+      catchError((error: unknown) => this.tratarErroFechamento(error)),
+    );
+  }
+
   limparEstado(): void {
     this.caixaSignal.set(null);
     this.sessaoSignal.set(null);
@@ -61,6 +69,12 @@ export class CaixaSessionService {
     this.caixaSignal.set(sessao.caixa);
     this.sessaoSignal.set(sessao);
     this.statusSignal.set('aberto');
+  }
+
+  private definirFechado(sessao: SessaoCaixaHubResumo): void {
+    this.caixaSignal.set(sessao.caixa);
+    this.sessaoSignal.set(sessao);
+    this.statusSignal.set('fechado');
   }
 
   private tratarErroStatus(error: unknown): Observable<boolean> {
@@ -89,6 +103,23 @@ export class CaixaSessionService {
     }
 
     this.statusSignal.set('erro');
+    return of({ ok: false, detail: 'Falha de comunicação com o Hub local.' });
+  }
+
+  private tratarErroFechamento(error: unknown): Observable<CaixaFecharResultado> {
+    if (this.isAuthenticationError(error)) {
+      this.tratarSessaoOperadorExpirada();
+      return of({ ok: false, detail: 'Sessão de operador expirada.' });
+    }
+
+    if (error instanceof HttpErrorResponse && (error.status === 400 || error.status === 409)) {
+      return of({ ok: false, detail: error.error?.detail || 'Falha ao fechar caixa.' });
+    }
+
+    if (error instanceof HttpErrorResponse && error.status === 0) {
+      return of({ ok: false, detail: 'Falha de comunicação com o Hub local.' });
+    }
+
     return of({ ok: false, detail: 'Falha de comunicação com o Hub local.' });
   }
 

@@ -3,8 +3,10 @@ import {
   OperadorHubPublico,
   OperadorHubPublicoApi,
 } from './operador.models';
+import type { ResumoCaixa, ResumoCaixaApi } from './resumo-caixa.models';
 
 export type CaixaSessionStatus = 'inicializando' | 'fechado' | 'aberto' | 'erro';
+export type CaixaFechamentoSituacao = 'OK' | 'SOBRA' | 'FALTA';
 
 export interface CaixaHubResumo {
   id: number;
@@ -30,6 +32,11 @@ export interface SessaoCaixaHubResumo {
   operadorAbertura: OperadorHubPublico;
   terminalFechamento: TerminalCaixaResumo | null;
   operadorFechamento: OperadorHubPublico | null;
+  valorEsperadoFechamento?: string | null;
+  valorContadoFechamento?: string | null;
+  diferencaFechamento?: string | null;
+  situacaoFechamento?: CaixaFechamentoSituacao | '' | null;
+  observacaoFechamento?: string | null;
 }
 
 export interface CaixaStatusResponse {
@@ -40,6 +47,28 @@ export interface CaixaStatusResponse {
 
 export interface CaixaAbrirRequest {
   valor_abertura: string;
+}
+
+export interface CaixaFechamentoRequest {
+  valor_contado: string;
+  observacao: string;
+}
+
+export type CaixaFechamentoResumoSnapshot = ResumoCaixa;
+
+export interface CaixaFechamentoResultado {
+  valorEsperado: string;
+  valorContado: string;
+  diferenca: string;
+  situacao: CaixaFechamentoSituacao;
+  resumo: CaixaFechamentoResumoSnapshot;
+}
+
+export interface CaixaFecharResultado {
+  ok: boolean;
+  detail?: string;
+  sessao?: SessaoCaixaHubResumo;
+  fechamento?: CaixaFechamentoResultado;
 }
 
 export interface CaixaHubResumoApi {
@@ -66,6 +95,25 @@ export interface SessaoCaixaHubResumoApi {
   operador_abertura: OperadorHubPublicoApi;
   terminal_fechamento: TerminalCaixaResumoApi | null;
   operador_fechamento: OperadorHubPublicoApi | null;
+  valor_esperado_fechamento?: string | null;
+  valor_contado_fechamento?: string | null;
+  diferenca_fechamento?: string | null;
+  situacao_fechamento?: CaixaFechamentoSituacao | '' | null;
+  observacao_fechamento?: string | null;
+}
+
+export interface CaixaFechamentoResultadoApi {
+  valor_esperado: string;
+  valor_contado: string;
+  diferenca: string;
+  situacao: CaixaFechamentoSituacao;
+  resumo: ResumoCaixaApi;
+}
+
+export interface CaixaFechamentoResponseApi {
+  status: 'ok';
+  sessao: SessaoCaixaHubResumoApi;
+  fechamento: CaixaFechamentoResultadoApi;
 }
 
 export interface CaixaStatusResponseApi {
@@ -103,8 +151,14 @@ export function mapSessaoCaixa(api: SessaoCaixaHubResumoApi): SessaoCaixaHubResu
     operadorAbertura: mapOperador(api.operador_abertura),
     terminalFechamento: api.terminal_fechamento ? mapTerminalCaixaResumo(api.terminal_fechamento) : null,
     operadorFechamento: api.operador_fechamento ? mapOperador(api.operador_fechamento) : null,
+    valorEsperadoFechamento: api.valor_esperado_fechamento ?? null,
+    valorContadoFechamento: api.valor_contado_fechamento ?? null,
+    diferencaFechamento: api.diferenca_fechamento ?? null,
+    situacaoFechamento: api.situacao_fechamento ?? null,
+    observacaoFechamento: api.observacao_fechamento ?? null,
   };
 }
+
 
 export function mapCaixaStatus(api: CaixaStatusResponseApi): CaixaStatusResponse {
   return {

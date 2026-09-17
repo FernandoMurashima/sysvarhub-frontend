@@ -71,6 +71,100 @@ describe('CaixaSessionService', () => {
     });
   });
 
+  it('fechar com sucesso muda status para fechado e retorna resultado', (done) => {
+    hubCaixaService.fechar.and.returnValue(of({
+      status: 'ok',
+      sessao: { ...sessaoCaixaAbertaStub, status: 'FECHADO', valorEsperadoFechamento: '249.90', valorContadoFechamento: '249.90', diferencaFechamento: '0.00', situacaoFechamento: 'OK' },
+      fechamento: { valorEsperado: '249.90', valorContado: '249.90', diferenca: '0.00', situacao: 'OK', resumo: {
+        sessao: sessaoCaixaAbertaStub,
+        vendas: { quantidade: 0, total: '0.00', valorRecebido: '0.00', troco: '0.00' },
+        pagamentos: { formas: [], dinheiroBruto: '0.00', troco: '0.00', dinheiroLiquido: '0.00' },
+        movimentacoes: { despesas: { quantidade: 0, total: '0.00' }, sangrias: { quantidade: 0, total: '0.00' }, suprimentos: { quantidade: 0, total: '0.00' }, itens: [] },
+        dinheiro: { valorAbertura: '100.00', vendasDinheiroBruto: '0.00', troco: '0.00', vendasDinheiroLiquido: '0.00', suprimentos: '0.00', sangrias: '0.00', despesas: '0.00', esperado: '100.00' },
+      } },
+    }));
+
+    service.fechar('249.90', '').subscribe((resultado) => {
+      expect(resultado.ok).toBeTrue();
+      expect(resultado.fechamento?.situacao).toBe('OK');
+      expect(service.status()).toBe('fechado');
+      expect(service.sessao()?.status).toBe('FECHADO');
+      done();
+    });
+  });
+
+  it('fechar envia valor contado e observacao ao Hub local', (done) => {
+    hubCaixaService.fechar.and.returnValue(of({
+      status: 'ok',
+      sessao: { ...sessaoCaixaAbertaStub, status: 'FECHADO' },
+      fechamento: { valorEsperado: '100.00', valorContado: '110.00', diferenca: '10.00', situacao: 'SOBRA', resumo: {
+        sessao: sessaoCaixaAbertaStub,
+        vendas: { quantidade: 0, total: '0.00', valorRecebido: '0.00', troco: '0.00' },
+        pagamentos: { formas: [], dinheiroBruto: '0.00', troco: '0.00', dinheiroLiquido: '0.00' },
+        movimentacoes: { despesas: { quantidade: 0, total: '0.00' }, sangrias: { quantidade: 0, total: '0.00' }, suprimentos: { quantidade: 0, total: '0.00' }, itens: [] },
+        dinheiro: { valorAbertura: '100.00', vendasDinheiroBruto: '0.00', troco: '0.00', vendasDinheiroLiquido: '0.00', suprimentos: '0.00', sangrias: '0.00', despesas: '0.00', esperado: '100.00' },
+      } },
+    }));
+
+    service.fechar('110.00', 'Sobra conferida').subscribe(() => {
+      expect(hubCaixaService.fechar).toHaveBeenCalledOnceWith('110.00', 'Sobra conferida');
+      done();
+    });
+  });
+
+  it('409 em fechar retorna detail e nao transforma em sucesso', (done) => {
+    hubCaixaService.fechar.and.returnValue(throwError(() => new HttpErrorResponse({
+      status: 409,
+      error: { detail: 'Existe venda em andamento neste caixa.' },
+    })));
+
+    service.fechar('100.00').subscribe((resultado) => {
+      expect(resultado.ok).toBeFalse();
+      expect(resultado.detail).toBe('Existe venda em andamento neste caixa.');
+      expect(service.status()).toBe('inicializando');
+      done();
+    });
+  });
+
+  it('status 0 em fechar retorna falha do Hub local', (done) => {
+    hubCaixaService.fechar.and.returnValue(throwError(() => new HttpErrorResponse({ status: 0 })));
+
+    service.fechar('100.00').subscribe((resultado) => {
+      expect(resultado.ok).toBeFalse();
+      expect(resultado.detail).toBe('Falha de comunicação com o Hub local.');
+      expect(operatorSession.invalidarSessao).not.toHaveBeenCalled();
+      done();
+    });
+  });
+
+  it('401 em fechar invalida somente operador e navega para operador', (done) => {
+    carregarEstadoAberto();
+    hubCaixaService.fechar.and.returnValue(throwError(() => new HttpErrorResponse({ status: 401 })));
+
+    service.fechar('100.00').subscribe((resultado) => {
+      expect(resultado.ok).toBeFalse();
+      expect(operatorSession.invalidarSessao).toHaveBeenCalled();
+      expect(service.status()).toBe('inicializando');
+      expect(router.navigateByUrl).toHaveBeenCalledOnceWith('/operador');
+      expect(router.navigateByUrl).not.toHaveBeenCalledWith('/pareamento');
+      done();
+    });
+  });
+
+  it('403 em fechar invalida somente operador e navega para operador', (done) => {
+    carregarEstadoAberto();
+    hubCaixaService.fechar.and.returnValue(throwError(() => new HttpErrorResponse({ status: 403 })));
+
+    service.fechar('100.00').subscribe((resultado) => {
+      expect(resultado.ok).toBeFalse();
+      expect(operatorSession.invalidarSessao).toHaveBeenCalled();
+      expect(service.status()).toBe('inicializando');
+      expect(router.navigateByUrl).toHaveBeenCalledOnceWith('/operador');
+      expect(router.navigateByUrl).not.toHaveBeenCalledWith('/pareamento');
+      done();
+    });
+  });
+
   it('abrir 409 com sessao recupera estado aberto', (done) => {
     hubCaixaService.abrir.and.returnValue(throwError(() => new HttpErrorResponse({
       status: 409,

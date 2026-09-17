@@ -4,6 +4,8 @@ import { map, Observable } from 'rxjs';
 
 import { HUB_TERMINAL_API_PATH } from '../../../core/api/api.config';
 import {
+  CaixaFechamentoResponseApi,
+  CaixaFechamentoResultado,
   CaixaStatusResponse,
   CaixaStatusResponseApi,
   mapCaixaStatus,
@@ -11,6 +13,7 @@ import {
   SessaoCaixaHubResumo,
   SessaoCaixaHubResumoApi,
 } from '../../../core/models/caixa.models';
+import { mapResumoCaixa } from '../../../core/models/resumo-caixa.models';
 
 @Injectable({ providedIn: 'root' })
 export class HubCaixaService {
@@ -30,9 +33,24 @@ export class HubCaixaService {
       .pipe(map(mapSessaoCaixa));
   }
 
-  fechar(): Observable<{ status: 'ok'; sessao: SessaoCaixaHubResumo }> {
+  fechar(valorContado: string, observacao = ''): Observable<{ status: 'ok'; sessao: SessaoCaixaHubResumo; fechamento: CaixaFechamentoResultado }> {
     return this.http
-      .post<{ status: 'ok'; sessao: SessaoCaixaHubResumoApi }>(`${HUB_TERMINAL_API_PATH}/caixa/fechar/`, {})
-      .pipe(map((response) => ({ status: response.status, sessao: mapSessaoCaixa(response.sessao) })));
+      .post<CaixaFechamentoResponseApi>(`${HUB_TERMINAL_API_PATH}/caixa/fechar/`, {
+        valor_contado: valorContado,
+        observacao: observacao ?? '',
+      })
+      .pipe(
+        map((response) => ({
+          status: response.status,
+          sessao: mapSessaoCaixa(response.sessao),
+          fechamento: {
+            valorEsperado: response.fechamento.valor_esperado,
+            valorContado: response.fechamento.valor_contado,
+            diferenca: response.fechamento.diferenca,
+            situacao: response.fechamento.situacao,
+            resumo: mapResumoCaixa(response.fechamento.resumo),
+          },
+        })),
+      );
   }
 }
