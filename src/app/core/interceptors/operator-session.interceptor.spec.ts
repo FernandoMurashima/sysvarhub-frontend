@@ -62,14 +62,18 @@ describe('operatorSessionInterceptor', () => {
 
     http.get('/api/terminal/caixa/status/').subscribe();
     http.post('/api/terminal/caixa/abrir/', {}).subscribe();
+    http.get('/api/terminal/caixa/resumo/').subscribe();
 
     const status = httpMock.expectOne('/api/terminal/caixa/status/');
     const abrir = httpMock.expectOne('/api/terminal/caixa/abrir/');
+    const resumo = httpMock.expectOne('/api/terminal/caixa/resumo/');
 
     expect(status.request.headers.get('X-Sysvar-Operador-Session')).toBe('sessao-operador-ficticia');
     expect(abrir.request.headers.get('X-Sysvar-Operador-Session')).toBe('sessao-operador-ficticia');
+    expect(resumo.request.headers.get('X-Sysvar-Operador-Session')).toBe('sessao-operador-ficticia');
     status.flush({});
     abrir.flush({});
+    resumo.flush({});
   });
 
   it('envia header em endpoints de venda', () => {

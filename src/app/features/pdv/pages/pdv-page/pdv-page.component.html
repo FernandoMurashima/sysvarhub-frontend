@@ -372,6 +372,8 @@
               <strong>Pagamentos</strong>
             } @else if (modalAtalho === 'despesa') {
               <strong>Movimentação de Caixa · F8</strong>
+            } @else if (modalAtalho === 'resumo') {
+              <strong>RESUMO DO CAIXA · F4</strong>
             } @else {
               <strong>Recurso ainda não integrado ao Hub</strong>
             }
@@ -434,6 +436,121 @@
               </button>
             </div>
           </form>
+        } @else if (modalAtalho === 'resumo') {
+          <div class="cash-summary-modal">
+            <div class="summary-toolbar">
+              <span>Resumo local da sessão aberta</span>
+              <button type="button" [disabled]="carregandoResumoCaixa" (click)="atualizarResumoCaixa($event)">
+                {{ carregandoResumoCaixa ? 'Atualizando...' : 'ATUALIZAR' }}
+              </button>
+            </div>
+
+            @if (carregandoResumoCaixa && !resumoCaixa) {
+              <p class="summary-loading">Carregando...</p>
+            } @else if (erroResumoCaixa) {
+              <p class="client-form-error summary-error">{{ erroResumoCaixa }}</p>
+            } @else if (resumoCaixa) {
+              <section class="summary-session">
+                <article>
+                  <span>Caixa</span>
+                  <strong>{{ resumoCaixa.sessao.caixa.codigo }} · {{ resumoCaixa.sessao.caixa.descricao }}</strong>
+                </article>
+                <article>
+                  <span>Aberto em</span>
+                  <strong>{{ formatarDataHora(resumoCaixa.sessao.abertoEm) }}</strong>
+                </article>
+                <article>
+                  <span>Operador de abertura</span>
+                  <strong>{{ resumoCaixa.sessao.operadorAbertura.nome }}</strong>
+                </article>
+              </section>
+
+              <section class="summary-hero">
+                <article>
+                  <span>ABERTURA</span>
+                  <strong>{{ formatarMoeda(resumoCaixa.dinheiro.valorAbertura) }}</strong>
+                </article>
+                <article>
+                  <span>VENDAS</span>
+                  <strong>{{ formatarMoeda(resumoCaixa.vendas.total) }}</strong>
+                </article>
+                <article class="expected">
+                  <span>DINHEIRO ESPERADO</span>
+                  <strong>{{ formatarMoeda(resumoCaixa.dinheiro.esperado) }}</strong>
+                </article>
+              </section>
+
+              <section class="summary-grid">
+                <article class="summary-block">
+                  <h4>Vendas</h4>
+                  <p><span>Quantidade</span><strong>{{ resumoCaixa.vendas.quantidade }}</strong></p>
+                  <p><span>Total vendido</span><strong>{{ formatarMoeda(resumoCaixa.vendas.total) }}</strong></p>
+                  <p><span>Valor recebido</span><strong>{{ formatarMoeda(resumoCaixa.vendas.valorRecebido) }}</strong></p>
+                  <p><span>Troco</span><strong>{{ formatarMoeda(resumoCaixa.vendas.troco) }}</strong></p>
+                </article>
+
+                <article class="summary-block">
+                  <h4>Formas de pagamento</h4>
+                  @if (resumoCaixa.pagamentos.formas.length) {
+                    <div class="summary-payment-table">
+                      <div class="head"><span>Forma</span><span>Tipo</span><span>Qtd.</span><span>Valor</span></div>
+                      @for (forma of resumoCaixa.pagamentos.formas; track forma.id + '-' + forma.codigo + '-' + forma.tipo) {
+                        <div>
+                          <span>{{ forma.descricao }}</span>
+                          <span>{{ forma.tipo }}</span>
+                          <span>{{ forma.quantidade }}</span>
+                          <strong>{{ formatarMoeda(forma.valor) }}</strong>
+                        </div>
+                      }
+                    </div>
+                  } @else {
+                    <p class="summary-empty">Nenhum pagamento registrado nesta sessão.</p>
+                  }
+                  <div class="summary-money-lines">
+                    <p><span>Dinheiro bruto</span><strong>{{ formatarMoeda(resumoCaixa.pagamentos.dinheiroBruto) }}</strong></p>
+                    <p><span>(-) Troco</span><strong>{{ formatarMoeda(resumoCaixa.pagamentos.troco) }}</strong></p>
+                    <p><span>Dinheiro líquido</span><strong>{{ formatarMoeda(resumoCaixa.pagamentos.dinheiroLiquido) }}</strong></p>
+                  </div>
+                </article>
+              </section>
+
+              <section class="summary-movements">
+                <article><span>DESPESAS</span><strong>{{ resumoCaixa.movimentacoes.despesas.quantidade }}</strong><b>{{ formatarMoeda(resumoCaixa.movimentacoes.despesas.total) }}</b></article>
+                <article><span>SANGRIAS</span><strong>{{ resumoCaixa.movimentacoes.sangrias.quantidade }}</strong><b>{{ formatarMoeda(resumoCaixa.movimentacoes.sangrias.total) }}</b></article>
+                <article><span>SUPRIMENTOS</span><strong>{{ resumoCaixa.movimentacoes.suprimentos.quantidade }}</strong><b>{{ formatarMoeda(resumoCaixa.movimentacoes.suprimentos.total) }}</b></article>
+              </section>
+
+              <section class="summary-formula">
+                <h4>Composição do dinheiro</h4>
+                <p><span>Valor de abertura</span><strong>{{ formatarMoeda(resumoCaixa.dinheiro.valorAbertura) }}</strong></p>
+                <p><span>+ Vendas em dinheiro</span><strong>{{ formatarMoeda(resumoCaixa.dinheiro.vendasDinheiroLiquido) }}</strong></p>
+                <p><span>+ Suprimentos</span><strong>{{ formatarMoeda(resumoCaixa.dinheiro.suprimentos) }}</strong></p>
+                <p><span>- Sangrias</span><strong>{{ formatarMoeda(resumoCaixa.dinheiro.sangrias) }}</strong></p>
+                <p><span>- Despesas</span><strong>{{ formatarMoeda(resumoCaixa.dinheiro.despesas) }}</strong></p>
+                <p class="result"><span>= Dinheiro esperado</span><strong>{{ formatarMoeda(resumoCaixa.dinheiro.esperado) }}</strong></p>
+              </section>
+
+              <section class="summary-items">
+                <h4>Movimentações da sessão</h4>
+                @if (resumoCaixa.movimentacoes.itens.length) {
+                  <div class="summary-movement-table">
+                    <div class="head"><span>Hora</span><span>Tipo</span><span>Documento</span><span>Histórico</span><span>Valor</span></div>
+                    @for (movimento of resumoCaixa.movimentacoes.itens; track movimento.uuid) {
+                      <div>
+                        <span>{{ formatarDataHora(movimento.ocorridoEm) }}</span>
+                        <strong>{{ movimento.tipo }}</strong>
+                        <span>{{ movimento.documento || '-' }}</span>
+                        <span>{{ movimento.historico || '-' }}</span>
+                        <strong>{{ formatarMoeda(movimento.valor) }}</strong>
+                      </div>
+                    }
+                  </div>
+                } @else {
+                  <p class="summary-empty">Nenhuma movimentação de caixa nesta sessão.</p>
+                }
+              </section>
+            }
+          </div>
         } @else if (modalAtalho === 'cliente') {
           <div class="client-modal">
             <section class="current-client">

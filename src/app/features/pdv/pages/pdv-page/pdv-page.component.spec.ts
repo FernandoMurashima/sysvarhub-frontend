@@ -7,9 +7,11 @@ import { Subject, of, throwError } from 'rxjs';
 
 import { SessaoCaixaHubResumo } from '../../../../core/models/caixa.models';
 import { ClienteHubResumo } from '../../../../core/models/cliente.models';
+import { ResumoCaixa } from '../../../../core/models/resumo-caixa.models';
 import { VendedorHubResumo } from '../../../../core/models/vendedor.models';
 import { CaixaSessionService } from '../../../caixa/services/caixa-session.service';
 import { HubMovimentacoesCaixaService } from '../../../caixa/services/hub-movimentacoes-caixa.service';
+import { HubResumoCaixaService } from '../../../caixa/services/hub-resumo-caixa.service';
 import { HubTiposDespesaPdvService } from '../../../caixa/services/hub-tipos-despesa-pdv.service';
 import { ClienteSessionExpiredError, ClienteSessionService } from '../../../cliente/services/cliente-session.service';
 import { OperatorSessionService } from '../../../operador/services/operator-session.service';
@@ -91,6 +93,66 @@ const clienteAtivo: ClienteHubResumo = {
   pendenteSincronizacao: false,
 };
 
+const resumoCaixaStub: ResumoCaixa = {
+  sessao: {
+    uuid: 'sessao-caixa-uuid',
+    status: 'ABERTO',
+    valorAbertura: '100.00',
+    abertoEm: '2026-09-17T09:00:00',
+    fechadoEm: null,
+    caixa: { id: 29, codigo: 'CX-01', descricao: 'Caixa 01', ativo: true },
+    terminalAbertura: { uuid: 'terminal-uuid', codigo: 'PDV-01', nome: 'PDV 01' },
+    operadorAbertura: { usuarioId: 99, codigo: 'caixa.barra', nome: 'Juliana Rocha', tipo: 'Caixa', perfil: null },
+    terminalFechamento: null,
+    operadorFechamento: null,
+  },
+  vendas: {
+    quantidade: 3,
+    total: '599.70',
+    valorRecebido: '600.00',
+    troco: '0.30',
+  },
+  pagamentos: {
+    formas: [
+      { id: 1, codigo: 'DIN', descricao: 'Dinheiro', tipo: 'DINHEIRO', quantidade: 2, valor: '300.00' },
+      { id: 2, codigo: 'PIX', descricao: 'Pix', tipo: 'PIX', quantidade: 1, valor: '199.90' },
+      { id: 3, codigo: 'VIS', descricao: 'Visa', tipo: 'CARTAO', quantidade: 1, valor: '100.00' },
+    ],
+    dinheiroBruto: '300.00',
+    troco: '0.30',
+    dinheiroLiquido: '299.70',
+  },
+  movimentacoes: {
+    despesas: { quantidade: 1, total: '10.00' },
+    sangrias: { quantidade: 1, total: '20.00' },
+    suprimentos: { quantidade: 1, total: '30.00' },
+    itens: [{
+      uuid: 'mov-1',
+      tipo: 'SANGRIA',
+      status: 'EFETIVA',
+      valor: '20.00',
+      documento: 'SANG-1',
+      historico: 'Retirada',
+      ocorridoEm: '2026-09-17T10:00:00',
+      caixa: { id: 29, codigo: 'CX-01', descricao: 'Caixa 01', ativo: true },
+      sessaoCaixaUuid: 'sessao-caixa-uuid',
+      terminal: { uuid: 'terminal-uuid', codigo: 'PDV-01', nome: 'PDV 01' },
+      operador: { usuarioId: 99, codigo: 'caixa.barra', nome: 'Juliana Rocha', tipo: 'Caixa', perfil: null },
+      tipoDespesa: null,
+    }],
+  },
+  dinheiro: {
+    valorAbertura: '100.00',
+    vendasDinheiroBruto: '300.00',
+    troco: '0.30',
+    vendasDinheiroLiquido: '299.70',
+    suprimentos: '30.00',
+    sangrias: '20.00',
+    despesas: '10.00',
+    esperado: '399.70',
+  },
+};
+
 @Component({
   standalone: true,
   template: '',
@@ -106,6 +168,7 @@ describe('PdvPageComponent', () => {
   let caixaSession: jasmine.SpyObj<CaixaSessionService>;
   let tiposDespesaService: jasmine.SpyObj<HubTiposDespesaPdvService>;
   let movimentacoesCaixaService: jasmine.SpyObj<HubMovimentacoesCaixaService>;
+  let resumoCaixaService: jasmine.SpyObj<HubResumoCaixaService>;
   let vendaSession: jasmine.SpyObj<VendaSessionService>;
   let caixaStatusSignal = signal<'inicializando' | 'fechado' | 'aberto' | 'erro'>('aberto');
   let sessaoCaixaSignal = signal<SessaoCaixaHubResumo | null>(sessaoCaixaAbertaStub);
@@ -219,6 +282,8 @@ describe('PdvPageComponent', () => {
       operador: { usuarioId: 99, codigo: 'caixa.barra', nome: 'Juliana Rocha', tipo: 'Caixa', perfil: null },
       tipoDespesa: null,
     }));
+    resumoCaixaService = jasmine.createSpyObj<HubResumoCaixaService>('HubResumoCaixaService', ['obter']);
+    resumoCaixaService.obter.and.returnValue(of(resumoCaixaStub));
     vendaSignal = signal(vendaAbertaStub.venda);
     clientePreselecionadoSignal = signal(null as typeof clientePreselecionadoStub | null);
     vendedorPreselecionadoSignal = signal(null as VendedorHubResumo | null);
@@ -256,6 +321,7 @@ describe('PdvPageComponent', () => {
         { provide: CaixaSessionService, useValue: caixaSession },
         { provide: HubTiposDespesaPdvService, useValue: tiposDespesaService },
         { provide: HubMovimentacoesCaixaService, useValue: movimentacoesCaixaService },
+        { provide: HubResumoCaixaService, useValue: resumoCaixaService },
         { provide: VendaSessionService, useValue: vendaSession },
       ],
     }).compileComponents();
@@ -527,6 +593,148 @@ describe('PdvPageComponent', () => {
     expect(component.modalAtalho).toBe('pagamentos');
     expect(vendaSession.listarFormasPagamento).toHaveBeenCalled();
     expect(facade.buscarCatalogo).not.toHaveBeenCalled();
+  });
+
+  it('F4 teclado abre resumo e consulta endpoint pelo service', () => {
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'F4' }));
+    fixture.detectChanges();
+
+    expect(fixture.componentInstance.modalAtalho).toBe('resumo');
+    expect(resumoCaixaService.obter).toHaveBeenCalled();
+    expect(fixture.nativeElement.textContent).toContain('RESUMO DO CAIXA · F4');
+  });
+
+  it('botao F4 abre resumo', () => {
+    const botoes = Array.from(fixture.nativeElement.querySelectorAll('button')) as HTMLButtonElement[];
+    const botaoF4 = botoes.find((botao) => botao.textContent?.includes('F4'));
+
+    botaoF4?.click();
+    fixture.detectChanges();
+
+    expect(fixture.componentInstance.modalAtalho).toBe('resumo');
+    expect(resumoCaixaService.obter).toHaveBeenCalled();
+  });
+
+  it('resumo mostra carregando enquanto consulta esta pendente', () => {
+    const subject = new Subject<ResumoCaixa>();
+    resumoCaixaService.obter.and.returnValue(subject.asObservable());
+
+    fixture.componentInstance.abrirAtalho(new Event('click'), 'resumo');
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.textContent).toContain('Carregando...');
+    subject.next(resumoCaixaStub);
+    subject.complete();
+  });
+
+  it('renderiza dados completos do resumo do caixa', () => {
+    fixture.componentInstance.abrirAtalho(new Event('click'), 'resumo');
+    fixture.detectChanges();
+    const text = fixture.nativeElement.textContent;
+
+    expect(text).toContain('CX-01 · Caixa 01');
+    expect(text).toContain('Juliana Rocha');
+    expect(text).toContain('ABERTURA');
+    expect(text).toContain('R$ 100,00');
+    expect(text).toContain('Quantidade');
+    expect(text).toContain('3');
+    expect(text).toContain('R$ 599,70');
+    expect(text).toContain('R$ 600,00');
+    expect(text).toContain('R$ 0,30');
+    expect(text).toContain('Dinheiro');
+    expect(text).toContain('DINHEIRO');
+    expect(text).toContain('Pix');
+    expect(text).toContain('Visa');
+    expect(text).toContain('Dinheiro bruto');
+    expect(text).toContain('Dinheiro líquido');
+    expect(text).toContain('DESPESAS');
+    expect(text).toContain('SANGRIAS');
+    expect(text).toContain('SUPRIMENTOS');
+    expect(text).toContain('DINHEIRO ESPERADO');
+    expect(text).toContain('R$ 399,70');
+    expect(text).toContain('SANG-1');
+    expect(text).toContain('Retirada');
+  });
+
+  it('resumo trata formas e movimentacoes vazias', () => {
+    resumoCaixaService.obter.and.returnValue(of({
+      ...resumoCaixaStub,
+      pagamentos: { ...resumoCaixaStub.pagamentos, formas: [] },
+      movimentacoes: { ...resumoCaixaStub.movimentacoes, itens: [] },
+    }));
+
+    fixture.componentInstance.abrirAtalho(new Event('click'), 'resumo');
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.textContent).toContain('Nenhum pagamento registrado nesta sessão.');
+    expect(fixture.nativeElement.textContent).toContain('Nenhuma movimentação de caixa nesta sessão.');
+  });
+
+  it('botao Atualizar executa nova consulta sem fechar modal', () => {
+    fixture.componentInstance.abrirAtalho(new Event('click'), 'resumo');
+    fixture.detectChanges();
+    const botaoAtualizar = Array.from(fixture.nativeElement.querySelectorAll('button'))
+      .find((botao) => (botao as HTMLButtonElement).textContent?.includes('ATUALIZAR')) as HTMLButtonElement;
+
+    botaoAtualizar.click();
+    fixture.detectChanges();
+
+    expect(resumoCaixaService.obter).toHaveBeenCalledTimes(2);
+    expect(fixture.componentInstance.modalAtalho).toBe('resumo');
+  });
+
+  it('resumo exibe detail de erro 400 e 409', () => {
+    resumoCaixaService.obter.and.returnValue(throwError(() => new HttpErrorResponse({ status: 409, error: { detail: 'Caixa não está aberto.' } })));
+    fixture.componentInstance.abrirAtalho(new Event('click'), 'resumo');
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('Caixa não está aberto.');
+
+    resumoCaixaService.obter.and.returnValue(throwError(() => new HttpErrorResponse({ status: 400, error: { detail: 'Caixa inativo.' } })));
+    fixture.componentInstance.atualizarResumoCaixa();
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('Caixa inativo.');
+  });
+
+  it('resumo com 401/403 invalida somente operador, fecha modal e navega operador', () => {
+    resumoCaixaService.obter.and.returnValue(throwError(() => new HttpErrorResponse({ status: 401 })));
+
+    fixture.componentInstance.abrirAtalho(new Event('click'), 'resumo');
+
+    expect(operatorSession.invalidarSessao).toHaveBeenCalled();
+    expect(router.navigateByUrl).toHaveBeenCalledWith('/operador');
+    expect(fixture.componentInstance.modalAtalho).toBe('');
+  });
+
+  it('resumo com status 0 mostra falha do Hub local', () => {
+    resumoCaixaService.obter.and.returnValue(throwError(() => new HttpErrorResponse({ status: 0 })));
+
+    fixture.componentInstance.abrirAtalho(new Event('click'), 'resumo');
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.textContent).toContain('Falha de comunicação com o Hub local.');
+  });
+
+  it('fechar e ESC limpam estado do resumo', () => {
+    fixture.componentInstance.abrirAtalho(new Event('click'), 'resumo');
+    expect(fixture.componentInstance.resumoCaixa).not.toBeNull();
+
+    fixture.componentInstance.fecharAtalho();
+    expect(fixture.componentInstance.resumoCaixa).toBeNull();
+    expect(fixture.componentInstance.erroResumoCaixa).toBe('');
+
+    fixture.componentInstance.abrirAtalho(new Event('click'), 'resumo');
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    expect(fixture.componentInstance.modalAtalho).toBe('');
+    expect(fixture.componentInstance.resumoCaixa).toBeNull();
+  });
+
+  it('resumo nao aciona operacoes mutaveis do PDV', () => {
+    fixture.componentInstance.abrirAtalho(new Event('click'), 'resumo');
+
+    expect(movimentacoesCaixaService.registrar).not.toHaveBeenCalled();
+    expect(vendaSession.adicionarPagamento).not.toHaveBeenCalled();
+    expect(vendaSession.finalizarVenda).not.toHaveBeenCalled();
+    expect(vendaSession.cancelarVenda).not.toHaveBeenCalled();
   });
 
   it('F8 abre modal de movimentacao iniciando em DESPESA e carrega tipos locais', () => {

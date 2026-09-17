@@ -136,8 +136,8 @@ describe('terminalAuthInterceptor', () => {
   it('401 em endpoint de caixa nao limpa Terminal', () => {
     credentialStore.getToken.and.returnValue('token-ficticio');
 
-    http.get('/api/terminal/caixa/status/').subscribe({ error: () => undefined });
-    const request = httpMock.expectOne('/api/terminal/caixa/status/');
+    http.get('/api/terminal/caixa/resumo/').subscribe({ error: () => undefined });
+    const request = httpMock.expectOne('/api/terminal/caixa/resumo/');
     request.flush({}, { status: 401, statusText: 'Unauthorized' });
 
     expect(request.request.headers.get('Authorization')).toBe('Terminal token-ficticio');
