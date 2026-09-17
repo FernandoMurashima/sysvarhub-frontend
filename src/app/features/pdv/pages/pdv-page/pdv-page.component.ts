@@ -34,7 +34,10 @@ type PdvAtalho =
   | 'preco'
   | 'despesa'
   | 'pagamentos'
-  | 'fechamento';
+  | 'fechamento'
+  | 'abertura-caixa'
+  | 'consulta-vendas'
+  | 'fechar-pdv';
 
 type ClienteModalModo = 'busca' | 'cadastro';
 
@@ -137,6 +140,7 @@ export class PdvPageComponent implements OnInit, OnDestroy {
   fechandoCaixa = false;
   resultadoFechamentoCaixa: CaixaFechamentoResultado | null = null;
   caixaEncerradoNestaSessao = false;
+  exibindoAberturaCaixa = false;
   private buscaTimer: ReturnType<typeof setTimeout> | null = null;
   private buscaClienteTimer: ReturnType<typeof setTimeout> | null = null;
   private buscaVendedorTimer: ReturnType<typeof setTimeout> | null = null;
@@ -237,8 +241,28 @@ export class PdvPageComponent implements OnInit, OnDestroy {
     this.abrirAtalho(event, 'fechamento');
   }
 
+  @HostListener('document:keydown.f11', ['$event'])
+  atalhoF11(event: KeyboardEvent): void {
+    this.abrirAtalho(event, 'abertura-caixa');
+  }
+
+  @HostListener('document:keydown.f12', ['$event'])
+  atalhoF12(event: KeyboardEvent): void {
+    this.abrirAtalho(event, 'consulta-vendas');
+  }
+
+  @HostListener('document:keydown.f13', ['$event'])
+  atalhoF13(event: KeyboardEvent): void {
+    this.abrirAtalho(event, 'fechar-pdv');
+  }
+
   @HostListener('document:keydown.escape', ['$event'])
   atalhoEscape(event: KeyboardEvent): void {
+    if (this.exibindoAberturaCaixa && !this.abrindoCaixa) {
+      event.preventDefault();
+      this.fecharAberturaCaixa();
+      return;
+    }
     if (!this.modalAtalho) return;
     event.preventDefault();
     this.fecharAtalho();
@@ -355,6 +379,21 @@ export class PdvPageComponent implements OnInit, OnDestroy {
       return;
     }
 
+    if (atalho === 'abertura-caixa') {
+      this.abrirModalAberturaCaixa();
+      return;
+    }
+
+    if (atalho === 'consulta-vendas') {
+      this.mensagem = 'Consulta de vendas ainda não implementada.';
+      return;
+    }
+
+    if (atalho === 'fechar-pdv') {
+      this.fecharPdv();
+      return;
+    }
+
     if (atalho === 'despesa') {
       this.abrirMovimentacaoCaixa();
       return;
@@ -394,10 +433,30 @@ export class PdvPageComponent implements OnInit, OnDestroy {
   }
 
   deveExibirAberturaCaixa(): boolean {
-    return this.caixaStatus() === 'fechado' && !this.caixaEncerradoNestaSessao && !this.fechandoCaixa && !this.resultadoFechamentoCaixa;
+    return this.exibindoAberturaCaixa && this.caixaStatus() === 'fechado' && !this.fechandoCaixa && !this.resultadoFechamentoCaixa;
+  }
+
+  abrirModalAberturaCaixa(): void {
+    if (this.caixaStatus() === 'aberto') {
+      this.mensagem = 'Caixa já está aberto.';
+      return;
+    }
+    this.modalAtalho = '';
+    this.exibindoAberturaCaixa = true;
+    this.erroAbertura = '';
+  }
+
+  fecharAberturaCaixa(): void {
+    if (this.abrindoCaixa) return;
+    this.exibindoAberturaCaixa = false;
+    this.erroAbertura = '';
   }
 
   abrirFechamentoCaixa(): void {
+    if (this.caixaStatus() !== 'aberto') {
+      this.mensagem = 'Caixa não está aberto.';
+      return;
+    }
     this.modalAtalho = 'fechamento';
     this.mensagem = '';
     this.limparEstadoFechamentoCaixa();
@@ -797,8 +856,20 @@ export class PdvPageComponent implements OnInit, OnDestroy {
         return;
       }
       this.valorAbertura = '0,00';
+      this.exibindoAberturaCaixa = false;
       this.mensagem = 'Caixa aberto. Inicie a venda para incluir produtos.';
       this.vendaSession.bootstrap().subscribe();
+    });
+  }
+
+  fecharPdv(): void {
+    if (this.venda()) {
+      this.mensagem = 'Existe venda em andamento neste PDV.';
+      return;
+    }
+
+    this.operatorSession.logout().subscribe(() => {
+      void this.router.navigateByUrl('/operador');
     });
   }
 

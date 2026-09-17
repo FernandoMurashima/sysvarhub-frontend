@@ -460,11 +460,24 @@ describe('PdvPageComponent', () => {
     expect(component.carrinho.length).toBe(0);
   });
 
-  it('fechado mostra modal bloqueante com contexto e abre caixa', () => {
+  it('bootstrap com caixa fechado nao mostra abertura automaticamente e mantem tela principal', () => {
+    caixaStatusSignal.set('fechado');
+    sessaoCaixaSignal.set(null);
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.textContent).not.toContain('ABERTURA DE CAIXA');
+    expect(fixture.nativeElement.textContent).toContain('ITENS DE VENDA');
+    expect(fixture.nativeElement.textContent).toContain('CAIXA FECHADO');
+  });
+
+  it('F11 com caixa fechado mostra modal existente de abertura e abre caixa', () => {
     caixaStatusSignal.set('fechado');
     sessaoCaixaSignal.set(null);
     fixture.detectChanges();
     const component = fixture.componentInstance;
+
+    component.abrirAtalho(new Event('click'), 'abertura-caixa');
+    fixture.detectChanges();
 
     expect(fixture.nativeElement.textContent).toContain('ABERTURA DE CAIXA');
     expect(fixture.nativeElement.textContent).toContain('Filial 1');
@@ -478,12 +491,25 @@ describe('PdvPageComponent', () => {
     expect(caixaSession.abrir).toHaveBeenCalledWith('100.00');
   });
 
+  it('F11 com caixa aberto nao abre nova sessao', () => {
+    const component = fixture.componentInstance;
+
+    component.abrirAtalho(new Event('click'), 'abertura-caixa');
+    fixture.detectChanges();
+
+    expect(component.exibindoAberturaCaixa).toBeFalse();
+    expect(fixture.nativeElement.textContent).not.toContain('ABERTURA DE CAIXA');
+    expect(caixaSession.abrir).not.toHaveBeenCalled();
+    expect(component.mensagem).toBe('Caixa já está aberto.');
+  });
+
   it('modal mostra erro 400 e loading de abertura', () => {
     caixaStatusSignal.set('fechado');
     sessaoCaixaSignal.set(null);
     caixaSession.abrir.and.returnValue(of({ ok: false, detail: 'Valor de abertura inválido.' }));
     const component = fixture.componentInstance;
 
+    component.abrirModalAberturaCaixa();
     component.valorAbertura = '100,00';
     component.abrirCaixa(new Event('submit'));
     fixture.detectChanges();
@@ -498,6 +524,64 @@ describe('PdvPageComponent', () => {
     expect(fixture.nativeElement.textContent).not.toContain('ABERTURA DE CAIXA');
   });
 
+  it('atalhos F11 F12 e F13 aparecem', () => {
+    const text = fixture.nativeElement.textContent;
+
+    expect(text).toContain('F11');
+    expect(text).toContain('Abrir Caixa');
+    expect(text).toContain('F12');
+    expect(text).toContain('Consulta de Vendas');
+    expect(text).toContain('F13');
+    expect(text).toContain('Fechar PDV');
+  });
+
+  it('F12 informa que consulta de vendas ainda nao foi implementada', () => {
+    const component = fixture.componentInstance;
+
+    component.abrirAtalho(new Event('click'), 'consulta-vendas');
+
+    expect(component.modalAtalho).toBe('');
+    expect(component.mensagem).toBe('Consulta de vendas ainda não implementada.');
+  });
+
+  it('F13 sai do PDV pelo fluxo de operador sem fechar caixa', () => {
+    const component = fixture.componentInstance;
+    vendaSignal.set(null);
+
+    component.abrirAtalho(new Event('click'), 'fechar-pdv');
+
+    expect(operatorSession.logout).toHaveBeenCalled();
+    expect(router.navigateByUrl).toHaveBeenCalledWith('/operador');
+    expect(router.navigateByUrl).not.toHaveBeenCalledWith('/pareamento');
+    expect(caixaSession.fechar).not.toHaveBeenCalled();
+  });
+
+  it('F13 com venda em andamento impede saida acidental', () => {
+    const component = fixture.componentInstance;
+
+    component.abrirAtalho(new Event('click'), 'fechar-pdv');
+
+    expect(operatorSession.logout).not.toHaveBeenCalled();
+    expect(router.navigateByUrl).not.toHaveBeenCalledWith('/operador');
+    expect(component.mensagem).toBe('Existe venda em andamento neste PDV.');
+  });
+
+  it('atalhos de teclado F11 F12 e F13 acionam o mesmo fluxo', () => {
+    const component = fixture.componentInstance;
+    caixaStatusSignal.set('fechado');
+    vendaSignal.set(null);
+
+    component.atalhoF11(new KeyboardEvent('keydown', { key: 'F11' }));
+    expect(component.exibindoAberturaCaixa).toBeTrue();
+
+    component.fecharAberturaCaixa();
+    component.atalhoF12(new KeyboardEvent('keydown', { key: 'F12' }));
+    expect(component.mensagem).toBe('Consulta de vendas ainda não implementada.');
+
+    component.atalhoF13(new KeyboardEvent('keydown', { key: 'F13' }));
+    expect(operatorSession.logout).toHaveBeenCalled();
+  });
+
   it('F10 abre fechamento e consulta resumo local', () => {
     const component = fixture.componentInstance;
 
@@ -506,6 +590,17 @@ describe('PdvPageComponent', () => {
     expect(component.modalAtalho).toBe('fechamento');
     expect(resumoCaixaService.obter).toHaveBeenCalled();
     expect(caixaSession.fechar).not.toHaveBeenCalled();
+  });
+
+  it('F10 com caixa fechado nao tenta fechar caixa sem sessao aberta', () => {
+    const component = fixture.componentInstance;
+    caixaStatusSignal.set('fechado');
+
+    component.atalhoF10(new KeyboardEvent('keydown', { key: 'F10' }));
+
+    expect(component.modalAtalho).toBe('');
+    expect(resumoCaixaService.obter).not.toHaveBeenCalled();
+    expect(component.mensagem).toBe('Caixa não está aberto.');
   });
 
   it('botao F10 abre fechamento', () => {
@@ -680,7 +775,7 @@ describe('PdvPageComponent', () => {
     expect(caixaSession.fechar).toHaveBeenCalledTimes(1);
   });
 
-  it('nova instancia com caixa fechado e flag inicial false mostra abertura normalmente', () => {
+  it('nova instancia com caixa fechado e flag inicial false permanece na tela principal', () => {
     caixaStatusSignal.set('fechado');
     sessaoCaixaSignal.set(null);
 
@@ -688,7 +783,9 @@ describe('PdvPageComponent', () => {
     novaFixture.detectChanges();
 
     expect(novaFixture.componentInstance.caixaEncerradoNestaSessao).toBeFalse();
-    expect(novaFixture.nativeElement.textContent).toContain('ABERTURA DE CAIXA');
+    expect(novaFixture.nativeElement.textContent).toContain('ITENS DE VENDA');
+    expect(novaFixture.nativeElement.textContent).toContain('CAIXA FECHADO');
+    expect(novaFixture.nativeElement.textContent).not.toContain('ABERTURA DE CAIXA');
   });
 
   it('ENTER com resultado exato seleciona produto', () => {
@@ -762,6 +859,15 @@ describe('PdvPageComponent', () => {
     expect(component.mensagem).toBe('Abra o caixa antes de registrar movimentação.');
   });
 
+  it('consulta de preco continua acessivel com caixa fechado', () => {
+    const component = fixture.componentInstance;
+    caixaStatusSignal.set('fechado');
+
+    component.abrirAtalho(new Event('click'), 'preco');
+
+    expect(component.modalAtalho).toBe('preco');
+  });
+
   it('sem venda inclusao de produto nao chama adicionarItem', () => {
     const component = fixture.componentInstance;
     vendaSignal.set(null);
@@ -797,12 +903,12 @@ describe('PdvPageComponent', () => {
     expect(fixture.nativeElement.textContent).not.toContain('399,90');
   });
 
-  it('mantem F2-F10 visuais e F9 abre pagamentos locais', () => {
+  it('mantem F2-F13 visuais e F9 abre pagamentos locais', () => {
     const component = fixture.componentInstance;
     const text = fixture.nativeElement.textContent;
     vendaSignal.set({ ...vendaAbertaStub.venda!, vendedor: vendedorStub });
 
-    ['F2', 'F3', 'F4', 'F5', 'F6', 'F7', 'F8', 'F9', 'F10'].forEach((atalho) => {
+    ['F2', 'F3', 'F4', 'F5', 'F6', 'F7', 'F8', 'F9', 'F10', 'F11', 'F12', 'F13'].forEach((atalho) => {
       expect(text).toContain(atalho);
     });
 

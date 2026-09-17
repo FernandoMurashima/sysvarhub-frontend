@@ -147,6 +147,9 @@
         <button type="button" (click)="abrirAtalho($event, 'despesa')">F8<br /><span>Despesa</span></button>
         <button type="button" (click)="abrirAtalho($event, 'pagamentos')">F9<br /><span>Pagamentos</span></button>
         <button type="button" (click)="abrirAtalho($event, 'fechamento')">F10<br /><span>Fechar Caixa</span></button>
+        <button type="button" (click)="abrirAtalho($event, 'abertura-caixa')">F11<br /><span>Abrir Caixa</span></button>
+        <button type="button" (click)="abrirAtalho($event, 'consulta-vendas')">F12<br /><span>Consulta de Vendas</span></button>
+        <button type="button" (click)="abrirAtalho($event, 'fechar-pdv')">F13<br /><span>Fechar PDV</span></button>
       </div>
     </aside>
 
@@ -321,6 +324,7 @@
             <strong>ABERTURA DE CAIXA</strong>
             <span>{{ data }} · {{ caixa() }}</span>
           </div>
+          <button type="button" [disabled]="abrindoCaixa" (click)="fecharAberturaCaixa()">Fechar</button>
         </header>
 
         <form class="caixa-opening-form" (submit)="abrirCaixa($event)">
