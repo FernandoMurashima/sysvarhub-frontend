@@ -51,6 +51,7 @@
         </div>
       </div>
       <button class="switch-operator" type="button" (click)="trocarOperador()">Trocar operador</button>
+      <button class="switch-operator day-close-button" type="button" (click)="abrirFechamentoDia()">Fechamento do Dia</button>
       <a routerLink="/suporte" class="home-button">Suporte</a>
       <div class="clock">
         <strong>{{ hora }}</strong>
@@ -355,6 +356,162 @@
             {{ abrindoCaixa ? 'Abrindo...' : 'Abrir Caixa' }}
           </button>
         </form>
+      </section>
+    </div>
+  }
+
+  @if (exibindoFechamentoDia) {
+    <div class="pdv-modal-backdrop">
+      <section class="pdv-modal day-closing-modal">
+        <header>
+          <div>
+            <strong>FECHAMENTO DO DIA DA LOJA</strong>
+            <span>Conferência consolidada da loja · Central offline não necessária</span>
+          </div>
+          <button type="button" [disabled]="fechandoDia" (click)="fecharFechamentoDia()">Fechar</button>
+        </header>
+
+        <div class="day-closing-content">
+          <div class="summary-toolbar">
+            <label>
+              Data operacional
+              <input
+                type="date"
+                name="dataOperacionalFechamentoDia"
+                [(ngModel)]="dataOperacionalFechamentoDia"
+                [disabled]="carregandoFechamentoDia || fechandoDia"
+                (change)="aoTrocarDataFechamentoDia()"
+              />
+            </label>
+            <button type="button" [disabled]="carregandoFechamentoDia || fechandoDia" (click)="carregarFechamentoDia()">
+              {{ carregandoFechamentoDia ? 'Consultando...' : 'ATUALIZAR' }}
+            </button>
+          </div>
+
+          @if (carregandoFechamentoDia && !previaFechamentoDia && !resultadoFechamentoDia) {
+            <p class="summary-loading">Consultando fechamento do dia...</p>
+          }
+
+          @if (erroFechamentoDia) {
+            <p class="client-form-error summary-error">{{ erroFechamentoDia }}</p>
+          }
+
+          @if (resultadoFechamentoDia) {
+            <section class="closing-success day-closing-result">
+              <strong>FECHAMENTO DO DIA CONCLUÍDO</strong>
+              <div class="closing-result-grid">
+                <article><span>Data</span><b>{{ formatarDataOperacional(resultadoFechamentoDia.dataOperacional) }}</b></article>
+                <article><span>Total sistema</span><b>{{ formatarMoeda(resultadoFechamentoDia.totalSistema) }}</b></article>
+                <article><span>Total conferido</span><b>{{ formatarMoeda(resultadoFechamentoDia.totalConferido) }}</b></article>
+                <article><span>Diferença total</span><b>{{ formatarMoeda(resultadoFechamentoDia.diferencaTotal) }}</b></article>
+                <article [class]="'closing-situation ' + classeSituacaoFechamento(resultadoFechamentoDia.situacao)">
+                  <span>Situação geral</span><b>{{ resultadoFechamentoDia.situacao }}</b>
+                </article>
+                <article><span>Fechado em</span><b>{{ formatarDataHora(resultadoFechamentoDia.fechadoEm) }}</b></article>
+                <article><span>Operador</span><b>{{ resultadoFechamentoDia.operadorFechamento.nome }}</b></article>
+                <article><span>Terminal</span><b>{{ resultadoFechamentoDia.terminalFechamento.codigo }}</b></article>
+              </div>
+              @if (resultadoFechamentoDia.observacao) {
+                <p class="day-closing-observation"><span>Observação</span><strong>{{ resultadoFechamentoDia.observacao }}</strong></p>
+              }
+              <div class="day-closing-table result-table">
+                <div class="head"><span>Forma</span><span>Sistema</span><span>Conferido</span><span>Diferença</span><span>Situação</span></div>
+                @for (forma of resultadoFechamentoDia.formasPagamento; track forma.tipo) {
+                  <div>
+                    <strong>{{ forma.descricao }}</strong>
+                    <span>{{ formatarMoeda(forma.valorSistema) }}</span>
+                    <span>{{ formatarMoeda(forma.valorConferido) }}</span>
+                    <span>{{ formatarMoeda(forma.diferenca) }}</span>
+                    <b [class]="'closing-situation ' + classeSituacaoFechamento(forma.situacao)">{{ forma.situacao }}</b>
+                  </div>
+                }
+              </div>
+            </section>
+          } @else if (previaFechamentoDia) {
+            <section class="summary-session day-closing-summary">
+              <article><span>Data operacional</span><strong>{{ formatarDataOperacional(previaFechamentoDia.dataOperacional) }}</strong></article>
+              <article><span>Vendas</span><strong>{{ previaFechamentoDia.vendas.quantidade }} · {{ formatarMoeda(previaFechamentoDia.vendas.total) }}</strong></article>
+              <article><span>Caixas</span><strong>{{ previaFechamentoDia.caixas.sessoes }} sessões · {{ previaFechamentoDia.caixas.abertos }} abertos · {{ previaFechamentoDia.caixas.fechados }} fechados</strong></article>
+              <article><span>Movimentações</span><strong>D {{ formatarMoeda(previaFechamentoDia.movimentacoes.despesas) }} · S {{ formatarMoeda(previaFechamentoDia.movimentacoes.sangrias) }} · SUP {{ formatarMoeda(previaFechamentoDia.movimentacoes.suprimentos) }}</strong></article>
+            </section>
+
+            @if (previaFechamentoDia.impedimentos.length) {
+              <section class="day-closing-blockers">
+                @for (impedimento of previaFechamentoDia.impedimentos; track impedimento) {
+                  <p>{{ impedimento }}</p>
+                }
+              </section>
+            }
+
+            <form class="day-closing-form" (submit)="prepararFechamentoDia($event)">
+              <div class="day-closing-table">
+                <div class="head"><span>Forma</span><span>Sistema</span><span>Conferido</span><span>Diferença</span><span>Situação</span></div>
+                @for (forma of previaFechamentoDia.formasPagamento; track forma.tipo) {
+                  <div class="day-closing-row">
+                    <span>
+                      <strong>{{ forma.descricao }}</strong>
+                      <small>{{ forma.tipo }} · {{ forma.quantidade }} lançamento(s)</small>
+                      @if (forma.detalhes.length) {
+                        <button type="button" class="link-button" (click)="alternarDetalhesFechamentoDia(forma.tipo)">
+                          {{ detalhesFechamentoDiaAbertos(forma.tipo) ? 'Ocultar detalhes' : 'Ver detalhes' }}
+                        </button>
+                      }
+                    </span>
+                    <strong>{{ formatarMoeda(forma.valorSistema) }}</strong>
+                    <input
+                      [name]="'valorConferido' + forma.tipo"
+                      [ngModel]="valorConferidoDia(forma.tipo)"
+                      (ngModelChange)="atualizarValorConferidoDia(forma.tipo, $event)"
+                      inputmode="decimal"
+                      autocomplete="off"
+                      placeholder="0,00"
+                      [disabled]="fechandoDia || previaFechamentoDia.fechado"
+                    />
+                    <strong>{{ diferencaVisualFechamentoDia(forma) === null ? '-' : formatarMoeda(diferencaVisualFechamentoDia(forma)) }}</strong>
+                    <b [class]="'closing-situation ' + classeSituacaoFechamento(situacaoVisualFechamentoDia(forma))">{{ situacaoVisualFechamentoDia(forma) }}</b>
+                  </div>
+                  @if (detalhesFechamentoDiaAbertos(forma.tipo)) {
+                    <div class="day-closing-details">
+                      @for (detalhe of forma.detalhes; track detalhe.retaguardaFormaPagamentoId + '-' + detalhe.codigo + '-' + detalhe.descricao) {
+                        <p>
+                          <span>{{ detalhe.codigo }} · {{ detalhe.descricao }}</span>
+                          <small>{{ detalhe.adquirente || '-' }} · {{ detalhe.quantidade }} lançamento(s)</small>
+                          <strong>{{ formatarMoeda(detalhe.valor) }}</strong>
+                        </p>
+                      }
+                    </div>
+                  }
+                } @empty {
+                  <p class="summary-empty">Nenhuma venda ou pagamento para a data operacional.</p>
+                }
+              </div>
+
+              <label class="day-closing-note">
+                Observação
+                <textarea name="observacaoFechamentoDia" [(ngModel)]="observacaoFechamentoDia" maxlength="500" [disabled]="fechandoDia"></textarea>
+                <small>{{ limitarObservacaoFechamentoDiaRestante() }} caracteres restantes</small>
+              </label>
+
+              @if (confirmandoFechamentoDia) {
+                <section class="modal-confirm inline-confirm">
+                  <strong>Confirmar fechamento do dia {{ formatarDataOperacional(previaFechamentoDia.dataOperacional) }}?</strong>
+                  <span>O fechamento ficará registrado para auditoria da loja.</span>
+                  <div>
+                    <button type="button" [disabled]="fechandoDia" (click)="voltarConfirmacaoFechamentoDia()">Voltar</button>
+                    <button type="button" class="danger" [disabled]="fechandoDia" (click)="confirmarFechamentoDia()">
+                      {{ fechandoDia ? 'Fechando...' : 'Confirmar Fechamento' }}
+                    </button>
+                  </div>
+                </section>
+              } @else {
+                <footer class="client-actions">
+                  <button type="button" (click)="fecharFechamentoDia()">VOLTAR</button>
+                  <button type="submit" class="primary" [disabled]="!podePrepararFechamentoDia()">FECHAR DIA</button>
+                </footer>
+              }
+            </form>
+          }
+        </div>
       </section>
     </div>
   }

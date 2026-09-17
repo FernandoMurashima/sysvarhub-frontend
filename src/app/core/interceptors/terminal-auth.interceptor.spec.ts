@@ -169,6 +169,18 @@ describe('terminalAuthInterceptor', () => {
     expect(router.navigateByUrl).not.toHaveBeenCalled();
   });
 
+  it('401 em fechamento do dia nao limpa Terminal nem navega pareamento', () => {
+    credentialStore.getToken.and.returnValue('token-ficticio');
+
+    http.get('/api/terminal/fechamento-dia/?data=2026-09-17').subscribe({ error: () => undefined });
+    const request = httpMock.expectOne('/api/terminal/fechamento-dia/?data=2026-09-17');
+    request.flush({}, { status: 401, statusText: 'Unauthorized' });
+
+    expect(request.request.headers.get('Authorization')).toBe('Terminal token-ficticio');
+    expect(credentialStore.clearToken).not.toHaveBeenCalled();
+    expect(router.navigateByUrl).not.toHaveBeenCalled();
+  });
+
   it('401 em clientes nao limpa Terminal nem navega pareamento', () => {
     credentialStore.getToken.and.returnValue('token-ficticio');
 

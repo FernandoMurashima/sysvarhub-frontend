@@ -137,6 +137,21 @@ describe('operatorSessionInterceptor', () => {
     movimentacoes.flush({});
   });
 
+  it('envia header no fechamento do dia', () => {
+    sessionStore.getToken.and.returnValue('sessao-operador-atual');
+
+    http.get('/api/terminal/fechamento-dia/?data=2026-09-17').subscribe();
+    http.post('/api/terminal/fechamento-dia/', {}).subscribe();
+
+    const previa = httpMock.expectOne('/api/terminal/fechamento-dia/?data=2026-09-17');
+    const fechamento = httpMock.expectOne('/api/terminal/fechamento-dia/');
+
+    expect(previa.request.headers.get('X-Sysvar-Operador-Session')).toBe('sessao-operador-atual');
+    expect(fechamento.request.headers.get('X-Sysvar-Operador-Session')).toBe('sessao-operador-atual');
+    previa.flush({});
+    fechamento.flush({});
+  });
+
   it('nao envia header em pareamento nem URL externa', () => {
     sessionStore.getToken.and.returnValue('sessao-operador-ficticia');
 

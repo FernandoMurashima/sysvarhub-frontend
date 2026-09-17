@@ -7,6 +7,7 @@ import { Subject, of, throwError } from 'rxjs';
 
 import { CaixaFechamentoResumoSnapshot, SessaoCaixaHubResumo } from '../../../../core/models/caixa.models';
 import { ClienteHubResumo } from '../../../../core/models/cliente.models';
+import { FechamentoDiaPrevia, FechamentoDiaRegistro } from '../../../../core/models/fechamento-dia.models';
 import { ResumoCaixa } from '../../../../core/models/resumo-caixa.models';
 import { VendedorHubResumo } from '../../../../core/models/vendedor.models';
 import { CaixaSessionService } from '../../../caixa/services/caixa-session.service';
@@ -19,6 +20,7 @@ import { VendaSessionService } from '../../../venda/services/venda-session.servi
 import { clientePreselecionadoStub, sessaoCaixaAbertaStub, vendedorStub, vendaAbertaStub } from '../../../../testing/terminal-test-data';
 import { VendedorSessionExpiredError, VendedorSessionService } from '../../../vendedor/services/vendedor-session.service';
 import { PdvCatalogoConsulta, PdvProdutoConsulta } from '../../models/pdv-produto-consulta.model';
+import { HubFechamentoDiaService } from '../../services/hub-fechamento-dia.service';
 import { PdvHubFacade } from '../../services/pdv-hub.facade';
 import { PdvPageComponent } from './pdv-page.component';
 
@@ -171,6 +173,76 @@ const fechamentoResumoSnapshotStub: CaixaFechamentoResumoSnapshot = {
   dinheiroEsperado: '399.70',
 };
 
+const previaFechamentoDiaStub: FechamentoDiaPrevia = {
+  dataOperacional: '2026-09-17',
+  fechado: false,
+  vendas: { quantidade: 5, total: '1000.00', troco: '10.00' },
+  formasPagamento: [
+    {
+      tipo: 'DINHEIRO',
+      descricao: 'Dinheiro',
+      quantidade: 2,
+      valorSistema: '150.00',
+      detalhes: [{ retaguardaFormaPagamentoId: 1, codigo: 'DIN', descricao: 'Dinheiro', tipo: 'DINHEIRO', adquirente: null, quantidade: 2, valor: '150.00' }],
+    },
+    {
+      tipo: 'PIX',
+      descricao: 'PIX',
+      quantidade: 1,
+      valorSistema: '250.00',
+      detalhes: [{ retaguardaFormaPagamentoId: 2, codigo: 'PIX', descricao: 'Pix Loja', tipo: 'PIX', adquirente: null, quantidade: 1, valor: '250.00' }],
+    },
+    {
+      tipo: 'CREDITO',
+      descricao: 'Crédito',
+      quantidade: 1,
+      valorSistema: '300.00',
+      detalhes: [{ retaguardaFormaPagamentoId: 3, codigo: 'VIS', descricao: 'Visa Crédito', tipo: 'CREDITO', adquirente: 'VISA', quantidade: 1, valor: '300.00' }],
+    },
+    {
+      tipo: 'DEBITO',
+      descricao: 'Débito',
+      quantidade: 1,
+      valorSistema: '200.00',
+      detalhes: [{ retaguardaFormaPagamentoId: 4, codigo: 'DEB', descricao: 'Débito', tipo: 'DEBITO', adquirente: 'REDE', quantidade: 1, valor: '200.00' }],
+    },
+    {
+      tipo: 'VOUCHER',
+      descricao: 'Voucher',
+      quantidade: 1,
+      valorSistema: '100.00',
+      detalhes: [{ retaguardaFormaPagamentoId: 5, codigo: 'VOU', descricao: 'Voucher Loja', tipo: 'VOUCHER', adquirente: 'VALE', quantidade: 1, valor: '100.00' }],
+    },
+  ],
+  caixas: { sessoes: 2, abertos: 0, fechados: 2, valorEsperado: '200.00', valorContado: '200.00', diferenca: '0.00' },
+  movimentacoes: { despesas: '10.00', sangrias: '20.00', suprimentos: '30.00' },
+  consistencia: { ok: true, totalVendas: '1000.00', totalFormas: '1000.00', diferenca: '0.00' },
+  podeFechar: true,
+  impedimentos: [],
+  fechamento: null,
+};
+
+const fechamentoDiaRegistroStub: FechamentoDiaRegistro = {
+  uuid: 'fechamento-dia-uuid',
+  dataOperacional: '2026-09-17',
+  quantidadeVendas: 5,
+  totalVendas: '1000.00',
+  totalSistema: '1000.00',
+  totalConferido: '1010.00',
+  diferencaTotal: '10.00',
+  situacao: 'DIVERGENTE',
+  operadorFechamento: { usuarioId: 99, codigo: 'caixa.barra', nome: 'Juliana Rocha', tipo: 'Caixa', perfil: null },
+  terminalFechamento: { uuid: 'terminal-uuid', codigo: 'PDV-01', nome: 'PDV 01' },
+  fechadoEm: '2026-09-17T20:00:00',
+  observacao: 'Conferido',
+  formasPagamento: previaFechamentoDiaStub.formasPagamento.map((forma) => ({
+    ...forma,
+    valorConferido: forma.tipo === 'DINHEIRO' ? '160.00' : forma.valorSistema,
+    diferenca: forma.tipo === 'DINHEIRO' ? '10.00' : '0.00',
+    situacao: forma.tipo === 'DINHEIRO' ? 'SOBRA' : 'OK',
+  })),
+};
+
 @Component({
   standalone: true,
   template: '',
@@ -187,6 +259,7 @@ describe('PdvPageComponent', () => {
   let tiposDespesaService: jasmine.SpyObj<HubTiposDespesaPdvService>;
   let movimentacoesCaixaService: jasmine.SpyObj<HubMovimentacoesCaixaService>;
   let resumoCaixaService: jasmine.SpyObj<HubResumoCaixaService>;
+  let fechamentoDiaService: jasmine.SpyObj<HubFechamentoDiaService>;
   let vendaSession: jasmine.SpyObj<VendaSessionService>;
   let caixaStatusSignal = signal<'inicializando' | 'fechado' | 'aberto' | 'erro'>('aberto');
   let sessaoCaixaSignal = signal<SessaoCaixaHubResumo | null>(sessaoCaixaAbertaStub);
@@ -307,6 +380,9 @@ describe('PdvPageComponent', () => {
     }));
     resumoCaixaService = jasmine.createSpyObj<HubResumoCaixaService>('HubResumoCaixaService', ['obter']);
     resumoCaixaService.obter.and.returnValue(of(resumoCaixaStub));
+    fechamentoDiaService = jasmine.createSpyObj<HubFechamentoDiaService>('HubFechamentoDiaService', ['obterPrevia', 'fechar']);
+    fechamentoDiaService.obterPrevia.and.returnValue(of(previaFechamentoDiaStub));
+    fechamentoDiaService.fechar.and.returnValue(of(fechamentoDiaRegistroStub));
     vendaSignal = signal(vendaAbertaStub.venda);
     clientePreselecionadoSignal = signal(null as typeof clientePreselecionadoStub | null);
     vendedorPreselecionadoSignal = signal(null as VendedorHubResumo | null);
@@ -345,6 +421,7 @@ describe('PdvPageComponent', () => {
         { provide: HubTiposDespesaPdvService, useValue: tiposDespesaService },
         { provide: HubMovimentacoesCaixaService, useValue: movimentacoesCaixaService },
         { provide: HubResumoCaixaService, useValue: resumoCaixaService },
+        { provide: HubFechamentoDiaService, useValue: fechamentoDiaService },
         { provide: VendaSessionService, useValue: vendaSession },
       ],
     }).compileComponents();
@@ -371,6 +448,201 @@ describe('PdvPageComponent', () => {
     expect(text).toContain('Filial 1');
     expect(text).toContain('Caixa 01');
     expect(text).toContain('PDV-01');
+  });
+
+  it('abre fechamento do dia pela acao superior e consulta data atual no Hub local', () => {
+    fixture.componentInstance.abrirFechamentoDia();
+    fixture.detectChanges();
+
+    expect(fechamentoDiaService.obterPrevia).toHaveBeenCalledWith(jasmine.stringMatching(/^\d{4}-\d{2}-\d{2}$/));
+    expect(fixture.nativeElement.textContent).toContain('FECHAMENTO DO DIA DA LOJA');
+    expect(fixture.nativeElement.textContent).toContain('Central offline não necessária');
+  });
+
+  it('altera data operacional e recarrega previa', () => {
+    const component = fixture.componentInstance;
+    component.abrirFechamentoDia();
+    component.dataOperacionalFechamentoDia = '2026-09-16';
+
+    component.aoTrocarDataFechamentoDia();
+
+    expect(fechamentoDiaService.obterPrevia).toHaveBeenCalledWith('2026-09-16');
+  });
+
+  it('mostra vendas caixas movimentacoes formas dinamicas e detalhes', () => {
+    const component = fixture.componentInstance;
+    component.abrirFechamentoDia();
+    component.alternarDetalhesFechamentoDia('CREDITO');
+    fixture.detectChanges();
+    const text = fixture.nativeElement.textContent;
+
+    expect(text).toContain('5 · R$ 1.000,00');
+    expect(text).toContain('2 sessões · 0 abertos · 2 fechados');
+    expect(text).toContain('D R$ 10,00 · S R$ 20,00 · SUP R$ 30,00');
+    expect(text).toContain('Dinheiro');
+    expect(text).toContain('PIX');
+    expect(text).toContain('Crédito');
+    expect(text).toContain('Débito');
+    expect(text).toContain('Voucher');
+    expect(text).toContain('Visa Crédito');
+    expect(text).toContain('VISA');
+  });
+
+  it('campo conferido inicia vazio e calcula diferenca visual OK SOBRA e FALTA', () => {
+    const component = fixture.componentInstance;
+    component.abrirFechamentoDia();
+    const dinheiro = previaFechamentoDiaStub.formasPagamento[0];
+
+    expect(component.valorConferidoDia('DINHEIRO')).toBe('');
+    expect(component.diferencaVisualFechamentoDia(dinheiro)).toBeNull();
+
+    component.atualizarValorConferidoDia('DINHEIRO', '150,00');
+    expect(component.diferencaVisualFechamentoDia(dinheiro)).toBe('0.00');
+    expect(component.situacaoVisualFechamentoDia(dinheiro)).toBe('OK');
+
+    component.atualizarValorConferidoDia('DINHEIRO', '160,00');
+    expect(component.diferencaVisualFechamentoDia(dinheiro)).toBe('10.00');
+    expect(component.situacaoVisualFechamentoDia(dinheiro)).toBe('SOBRA');
+
+    component.atualizarValorConferidoDia('DINHEIRO', '140,00');
+    expect(component.diferencaVisualFechamentoDia(dinheiro)).toBe('-10.00');
+    expect(component.situacaoVisualFechamentoDia(dinheiro)).toBe('FALTA');
+  });
+
+  it('impedimentos de caixa ou venda aberta bloqueiam fechamento e aparecem na tela', () => {
+    fechamentoDiaService.obterPrevia.and.returnValue(of({
+      ...previaFechamentoDiaStub,
+      podeFechar: false,
+      caixas: { ...previaFechamentoDiaStub.caixas, abertos: 1 },
+      impedimentos: ['Existe sessão de caixa aberta.', 'Existe venda em andamento.'],
+    }));
+
+    fixture.componentInstance.abrirFechamentoDia();
+    fixture.detectChanges();
+
+    expect(fixture.componentInstance.podePrepararFechamentoDia()).toBeFalse();
+    expect(fixture.nativeElement.textContent).toContain('Existe sessão de caixa aberta.');
+    expect(fixture.nativeElement.textContent).toContain('Existe venda em andamento.');
+  });
+
+  it('botao fechar dia so habilita com todos valores preenchidos e confirma antes do POST', () => {
+    const component = fixture.componentInstance;
+    component.abrirFechamentoDia();
+
+    expect(component.podePrepararFechamentoDia()).toBeFalse();
+    previaFechamentoDiaStub.formasPagamento.forEach((forma) => component.atualizarValorConferidoDia(forma.tipo, forma.valorSistema));
+    expect(component.podePrepararFechamentoDia()).toBeTrue();
+
+    component.prepararFechamentoDia(new Event('submit'));
+
+    expect(component.confirmandoFechamentoDia).toBeTrue();
+    expect(fechamentoDiaService.fechar).not.toHaveBeenCalled();
+  });
+
+  it('envia payload correto usando somente tipos retornados na previa', () => {
+    const component = fixture.componentInstance;
+    component.abrirFechamentoDia();
+    previaFechamentoDiaStub.formasPagamento.forEach((forma) => component.atualizarValorConferidoDia(forma.tipo, forma.valorSistema.replace('.', ',')));
+    component.observacaoFechamentoDia = 'Conferencia final';
+    component.prepararFechamentoDia();
+    component.confirmarFechamentoDia();
+
+    expect(fechamentoDiaService.fechar).toHaveBeenCalledWith({
+      dataOperacional: '2026-09-17',
+      observacao: 'Conferencia final',
+      formasPagamento: [
+        { tipo: 'DINHEIRO', valorConferido: '150.00' },
+        { tipo: 'PIX', valorConferido: '250.00' },
+        { tipo: 'CREDITO', valorConferido: '300.00' },
+        { tipo: 'DEBITO', valorConferido: '200.00' },
+        { tipo: 'VOUCHER', valorConferido: '100.00' },
+      ],
+    });
+  });
+
+  it('sucesso mostra resultado oficial retornado pelo Backend', () => {
+    const component = fixture.componentInstance;
+    component.abrirFechamentoDia();
+    previaFechamentoDiaStub.formasPagamento.forEach((forma) => component.atualizarValorConferidoDia(forma.tipo, forma.valorSistema));
+    component.prepararFechamentoDia();
+    component.confirmarFechamentoDia();
+    fixture.detectChanges();
+
+    expect(component.resultadoFechamentoDia?.situacao).toBe('DIVERGENTE');
+    expect(fixture.nativeElement.textContent).toContain('FECHAMENTO DO DIA CONCLUÍDO');
+    expect(fixture.nativeElement.textContent).toContain('R$ 1.010,00');
+    expect(fixture.nativeElement.textContent).toContain('SOBRA');
+  });
+
+  it('dia ja fechado vira consulta historica sem permitir novo fechamento', () => {
+    fechamentoDiaService.obterPrevia.and.returnValue(of({
+      ...previaFechamentoDiaStub,
+      fechado: true,
+      podeFechar: false,
+      fechamento: fechamentoDiaRegistroStub,
+      impedimentos: ['Dia operacional já fechado.'],
+    }));
+
+    const component = fixture.componentInstance;
+    component.abrirFechamentoDia();
+    fixture.detectChanges();
+
+    expect(component.resultadoFechamentoDia?.uuid).toBe('fechamento-dia-uuid');
+    expect(component.podePrepararFechamentoDia()).toBeFalse();
+    expect(fixture.nativeElement.textContent).toContain('Fechado em');
+    expect(fixture.nativeElement.textContent).toContain('Juliana Rocha');
+  });
+
+  it('409 com preview atualiza tela e 409 com fechamento existente mostra historico', () => {
+    const previewError = new HttpErrorResponse({
+      status: 409,
+      error: {
+        detail: 'Fechamento do dia bloqueado.',
+        preview: {
+          data_operacional: '2026-09-17',
+          fechado: false,
+          vendas: { quantidade: 0, total: '0.00', troco: '0.00' },
+          formas_pagamento: [],
+          caixas: { sessoes: 1, abertos: 1, fechados: 0, valor_esperado: '0.00', valor_contado: '0.00', diferenca: '0.00' },
+          movimentacoes: { despesas: '0.00', sangrias: '0.00', suprimentos: '0.00' },
+          consistencia: { ok: true, total_vendas: '0.00', total_formas: '0.00', diferenca: '0.00' },
+          pode_fechar: false,
+          impedimentos: ['Existe sessão de caixa aberta.'],
+        },
+      },
+    });
+    fechamentoDiaService.obterPrevia.and.returnValue(throwError(() => previewError));
+    fixture.componentInstance.abrirFechamentoDia();
+    expect(fixture.componentInstance.previaFechamentoDia?.caixas.abertos).toBe(1);
+
+    const fechamentoError = new HttpErrorResponse({
+      status: 409,
+      error: {
+        detail: 'Dia operacional já fechado.',
+        fechamento: {
+          uuid: fechamentoDiaRegistroStub.uuid,
+          data_operacional: fechamentoDiaRegistroStub.dataOperacional,
+          quantidade_vendas: fechamentoDiaRegistroStub.quantidadeVendas,
+          total_vendas: fechamentoDiaRegistroStub.totalVendas,
+          total_sistema: fechamentoDiaRegistroStub.totalSistema,
+          total_conferido: fechamentoDiaRegistroStub.totalConferido,
+          diferenca_total: fechamentoDiaRegistroStub.diferencaTotal,
+          situacao: fechamentoDiaRegistroStub.situacao,
+          operador_fechamento: { usuario_id: 99, codigo: 'caixa.barra', nome: 'Juliana Rocha', tipo: 'Caixa', perfil: null },
+          terminal_fechamento: fechamentoDiaRegistroStub.terminalFechamento,
+          fechado_em: fechamentoDiaRegistroStub.fechadoEm,
+          observacao: fechamentoDiaRegistroStub.observacao,
+          formas_pagamento: [],
+        },
+      },
+    });
+    fechamentoDiaService.obterPrevia.and.returnValue(of(previaFechamentoDiaStub));
+    fechamentoDiaService.fechar.and.returnValue(throwError(() => fechamentoError));
+    fixture.componentInstance.abrirFechamentoDia();
+    previaFechamentoDiaStub.formasPagamento.forEach((forma) => fixture.componentInstance.atualizarValorConferidoDia(forma.tipo, forma.valorSistema));
+    fixture.componentInstance.prepararFechamentoDia();
+    fixture.componentInstance.confirmarFechamentoDia();
+    expect(fixture.componentInstance.resultadoFechamentoDia?.uuid).toBe('fechamento-dia-uuid');
   });
 
   it('consulta status do caixa ao entrar e mostra caixa aberto', () => {

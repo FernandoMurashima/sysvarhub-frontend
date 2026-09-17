@@ -48,6 +48,161 @@ button {
   overflow: hidden;
 }
 
+.pdv-desktop .day-close-button {
+  min-width: 132px;
+}
+
+.pdv-desktop .day-closing-modal {
+  width: min(1120px, calc(100vw - 48px));
+}
+
+.pdv-desktop .day-closing-content {
+  display: grid;
+  gap: 14px;
+  padding: 16px 22px 20px;
+}
+
+.pdv-desktop .day-closing-content .summary-toolbar label {
+  color: #b6cee8;
+  font-weight: 900;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.pdv-desktop .day-closing-content input,
+.pdv-desktop .day-closing-content textarea {
+  border: 1px solid #315e8f;
+  border-radius: 8px;
+  background: #fff;
+  color: #071426;
+  min-width: 0;
+}
+
+.pdv-desktop .day-closing-content input {
+  height: 36px;
+  padding: 0 10px;
+}
+
+.pdv-desktop .day-closing-summary {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.pdv-desktop .day-closing-blockers {
+  border: 1px solid rgba(248, 113, 113, 0.45);
+  border-radius: 10px;
+  background: rgba(127, 29, 29, 0.28);
+  padding: 10px 12px;
+  display: grid;
+  gap: 6px;
+}
+
+.pdv-desktop .day-closing-blockers p {
+  margin: 0;
+  color: #fecaca;
+  font-weight: 800;
+}
+
+.pdv-desktop .day-closing-form {
+  display: grid;
+  gap: 14px;
+}
+
+.pdv-desktop .day-closing-table {
+  display: grid;
+  gap: 0;
+  overflow: hidden;
+  border: 1px solid rgba(79, 178, 255, 0.22);
+  border-radius: 10px;
+}
+
+.pdv-desktop .day-closing-table > div {
+  display: grid;
+  grid-template-columns: minmax(180px, 1.5fr) 130px 140px 130px 110px;
+  gap: 10px;
+  align-items: center;
+  min-height: 46px;
+  padding: 8px 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.pdv-desktop .day-closing-table .head {
+  min-height: 38px;
+  background: #071a31;
+  color: #8fc2ff;
+  font-size: 12px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.pdv-desktop .day-closing-row span strong,
+.pdv-desktop .day-closing-row span small {
+  display: block;
+}
+
+.pdv-desktop .day-closing-row span small {
+  color: #9eb5cf;
+  font-size: 11px;
+  margin-top: 2px;
+}
+
+.pdv-desktop .day-closing-table input {
+  width: 100%;
+  text-align: right;
+  font-weight: 900;
+}
+
+.pdv-desktop .link-button {
+  border: 0;
+  background: transparent;
+  color: #8fc2ff;
+  font-size: 11px;
+  font-weight: 900;
+  padding: 4px 0 0;
+}
+
+.pdv-desktop .day-closing-details {
+  grid-column: 1 / -1;
+  display: grid !important;
+  grid-template-columns: 1fr !important;
+  gap: 4px !important;
+  background: rgba(7, 26, 49, 0.72);
+}
+
+.pdv-desktop .day-closing-details p,
+.pdv-desktop .day-closing-observation {
+  display: grid;
+  grid-template-columns: 1fr 220px 120px;
+  gap: 10px;
+  margin: 0;
+  color: #dcecff;
+}
+
+.pdv-desktop .day-closing-note {
+  display: grid;
+  gap: 6px;
+  color: #b6cee8;
+  font-weight: 900;
+}
+
+.pdv-desktop .day-closing-note textarea {
+  min-height: 72px;
+  resize: vertical;
+  padding: 10px;
+}
+
+.pdv-desktop .inline-confirm {
+  min-height: 150px;
+  border: 1px solid rgba(79, 178, 255, 0.25);
+  border-radius: 12px;
+  background: #071a31;
+}
+
+.pdv-desktop .day-closing-result {
+  display: grid;
+  gap: 14px;
+}
+
 .page {
   min-height: 100vh;
   padding: 32px;

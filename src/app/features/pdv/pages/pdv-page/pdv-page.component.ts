@@ -6,6 +6,17 @@ import { Subscription } from 'rxjs';
 
 import { ClienteCadastroRequest, ClienteHubResumo, ClienteTipoPessoa, formatarDocumentoCliente } from '../../../../core/models/cliente.models';
 import { CaixaFechamentoResultado } from '../../../../core/models/caixa.models';
+import {
+  FechamentoDiaConflictApi,
+  FechamentoDiaForma,
+  FechamentoDiaFormaRegistro,
+  FechamentoDiaPrevia,
+  FechamentoDiaPreviaApi,
+  FechamentoDiaRegistro,
+  FechamentoDiaRegistroApi,
+  mapFechamentoDiaPrevia,
+  mapFechamentoDiaRegistro,
+} from '../../../../core/models/fechamento-dia.models';
 import { TipoMovimentacaoCaixa } from '../../../../core/models/movimentacao-caixa.models';
 import { FormaPagamento } from '../../../../core/models/pagamento.models';
 import { ResumoCaixa } from '../../../../core/models/resumo-caixa.models';
@@ -23,6 +34,7 @@ import { VendaSessionService } from '../../../venda/services/venda-session.servi
 import { VendedorSessionExpiredError, VendedorSessionService } from '../../../vendedor/services/vendedor-session.service';
 import { formatarMoedaString, normalizarValorPagamento, somarMoedasString } from '../../../venda/services/pagamento-valor.parser';
 import { PdvProdutoConsulta } from '../../models/pdv-produto-consulta.model';
+import { HubFechamentoDiaService } from '../../services/hub-fechamento-dia.service';
 import { PdvHubFacade } from '../../services/pdv-hub.facade';
 
 type PdvAtalho =
@@ -84,6 +96,7 @@ export class PdvPageComponent implements OnInit, OnDestroy {
   private readonly vendaSession = inject(VendaSessionService);
   private readonly clienteSession = inject(ClienteSessionService);
   private readonly vendedorSession = inject(VendedorSessionService);
+  private readonly fechamentoDiaService = inject(HubFechamentoDiaService);
   private readonly router = inject(Router);
 
   busca = '';
@@ -141,6 +154,17 @@ export class PdvPageComponent implements OnInit, OnDestroy {
   resultadoFechamentoCaixa: CaixaFechamentoResultado | null = null;
   caixaEncerradoNestaSessao = false;
   exibindoAberturaCaixa = false;
+  exibindoFechamentoDia = false;
+  dataOperacionalFechamentoDia = this.dataInputHoje();
+  previaFechamentoDia: FechamentoDiaPrevia | null = null;
+  resultadoFechamentoDia: FechamentoDiaRegistro | null = null;
+  valoresConferidosDia: Record<string, string> = {};
+  detalhesAbertosFechamentoDia: Record<string, boolean> = {};
+  observacaoFechamentoDia = '';
+  erroFechamentoDia = '';
+  carregandoFechamentoDia = false;
+  fechandoDia = false;
+  confirmandoFechamentoDia = false;
   private buscaTimer: ReturnType<typeof setTimeout> | null = null;
   private buscaClienteTimer: ReturnType<typeof setTimeout> | null = null;
   private buscaVendedorTimer: ReturnType<typeof setTimeout> | null = null;
@@ -151,6 +175,7 @@ export class PdvPageComponent implements OnInit, OnDestroy {
   private tiposDespesaSubscription: Subscription | null = null;
   private movimentacaoCaixaSubscription: Subscription | null = null;
   private resumoCaixaSubscription: Subscription | null = null;
+  private fechamentoDiaSubscription: Subscription | null = null;
 
   readonly loja = this.facade.loja;
   readonly caixa = this.facade.caixa;
@@ -194,6 +219,7 @@ export class PdvPageComponent implements OnInit, OnDestroy {
     this.tiposDespesaSubscription?.unsubscribe();
     this.movimentacaoCaixaSubscription?.unsubscribe();
     this.resumoCaixaSubscription?.unsubscribe();
+    this.fechamentoDiaSubscription?.unsubscribe();
   }
 
   @HostListener('document:keydown.f2', ['$event'])
@@ -535,11 +561,159 @@ export class PdvPageComponent implements OnInit, OnDestroy {
     if (situacao === 'OK') return 'ok';
     if (situacao === 'SOBRA') return 'sobra';
     if (situacao === 'FALTA') return 'falta';
+    if (situacao === 'DIVERGENTE') return 'falta';
     return '';
   }
 
   limiteObservacaoFechamentoRestante(): number {
     return Math.max(0, 500 - this.observacaoFechamento.length);
+  }
+
+  abrirFechamentoDia(): void {
+    this.exibindoFechamentoDia = true;
+    this.mensagem = '';
+    this.erroFechamentoDia = '';
+    this.resultadoFechamentoDia = null;
+    this.confirmandoFechamentoDia = false;
+    this.observacaoFechamentoDia = '';
+    this.dataOperacionalFechamentoDia = this.dataInputHoje();
+    this.carregarFechamentoDia();
+  }
+
+  fecharFechamentoDia(): void {
+    if (this.fechandoDia) return;
+    this.exibindoFechamentoDia = false;
+    this.confirmandoFechamentoDia = false;
+    this.previaFechamentoDia = null;
+    this.resultadoFechamentoDia = null;
+    this.valoresConferidosDia = {};
+    this.detalhesAbertosFechamentoDia = {};
+    this.erroFechamentoDia = '';
+  }
+
+  aoTrocarDataFechamentoDia(): void {
+    this.confirmandoFechamentoDia = false;
+    this.resultadoFechamentoDia = null;
+    this.carregarFechamentoDia();
+  }
+
+  carregarFechamentoDia(): void {
+    if (!this.dataOperacionalFechamentoDia) return;
+    this.carregandoFechamentoDia = true;
+    this.erroFechamentoDia = '';
+    this.confirmandoFechamentoDia = false;
+    this.fechamentoDiaSubscription?.unsubscribe();
+    this.fechamentoDiaSubscription = this.fechamentoDiaService.obterPrevia(this.dataOperacionalFechamentoDia).subscribe({
+      next: (preview) => {
+        this.carregandoFechamentoDia = false;
+        this.aplicarPreviaFechamentoDia(preview);
+      },
+      error: (error: unknown) => {
+        this.carregandoFechamentoDia = false;
+        if (this.isAuthenticationError(error)) {
+          this.operatorSession.invalidarSessao();
+          this.fecharFechamentoDia();
+          void this.router.navigateByUrl('/operador');
+          return;
+        }
+        const tratado = this.tratarErroFechamentoDia(error);
+        if (!tratado) this.erroFechamentoDia = this.detailErroHttp(error) || 'Falha de comunicação com o Hub local.';
+      },
+    });
+  }
+
+  alternarDetalhesFechamentoDia(tipo: string): void {
+    this.detalhesAbertosFechamentoDia[tipo] = !this.detalhesAbertosFechamentoDia[tipo];
+  }
+
+  detalhesFechamentoDiaAbertos(tipo: string): boolean {
+    return Boolean(this.detalhesAbertosFechamentoDia[tipo]);
+  }
+
+  valorConferidoDia(tipo: string): string {
+    return this.valoresConferidosDia[tipo] || '';
+  }
+
+  atualizarValorConferidoDia(tipo: string, valor: string): void {
+    this.valoresConferidosDia = { ...this.valoresConferidosDia, [tipo]: valor };
+    this.confirmandoFechamentoDia = false;
+  }
+
+  diferencaVisualFechamentoDia(forma: FechamentoDiaForma): string | null {
+    const conferido = this.normalizarValorConferidoDia(this.valorConferidoDia(forma.tipo));
+    if (!conferido) return null;
+    return this.subtrairMoedas(conferido, forma.valorSistema);
+  }
+
+  situacaoVisualFechamentoDia(forma: FechamentoDiaForma): string {
+    const diferenca = this.diferencaVisualFechamentoDia(forma);
+    if (diferenca === null) return '-';
+    const centavos = this.paraCentavos(diferenca);
+    if (centavos === 0n) return 'OK';
+    return centavos > 0n ? 'SOBRA' : 'FALTA';
+  }
+
+  podePrepararFechamentoDia(): boolean {
+    const preview = this.previaFechamentoDia;
+    if (!preview || preview.fechado || !preview.podeFechar || this.carregandoFechamentoDia || this.fechandoDia) return false;
+    return preview.formasPagamento.every((forma) => Boolean(this.normalizarValorConferidoDia(this.valorConferidoDia(forma.tipo))));
+  }
+
+  prepararFechamentoDia(event?: Event): void {
+    event?.preventDefault();
+    if (!this.podePrepararFechamentoDia()) return;
+    if (this.observacaoFechamentoDia.length > 500) {
+      this.erroFechamentoDia = 'Observação deve ter no máximo 500 caracteres.';
+      return;
+    }
+    this.erroFechamentoDia = '';
+    this.confirmandoFechamentoDia = true;
+  }
+
+  voltarConfirmacaoFechamentoDia(): void {
+    if (this.fechandoDia) return;
+    this.confirmandoFechamentoDia = false;
+  }
+
+  confirmarFechamentoDia(): void {
+    const preview = this.previaFechamentoDia;
+    if (!preview || this.fechandoDia || !this.confirmandoFechamentoDia) return;
+
+    const formasPagamento = preview.formasPagamento.map((forma) => ({
+      tipo: forma.tipo,
+      valorConferido: this.normalizarValorConferidoDia(this.valorConferidoDia(forma.tipo)) || '0.00',
+    }));
+    this.fechandoDia = true;
+    this.erroFechamentoDia = '';
+    this.fechamentoDiaSubscription?.unsubscribe();
+    this.fechamentoDiaSubscription = this.fechamentoDiaService.fechar({
+      dataOperacional: preview.dataOperacional,
+      formasPagamento,
+      observacao: this.observacaoFechamentoDia.trim(),
+    }).subscribe({
+      next: (fechamento) => {
+        this.fechandoDia = false;
+        this.confirmandoFechamentoDia = false;
+        this.resultadoFechamentoDia = fechamento;
+        this.mensagem = 'Fechamento do dia concluído.';
+      },
+      error: (error: unknown) => {
+        this.fechandoDia = false;
+        this.confirmandoFechamentoDia = false;
+        const tratado = this.tratarErroFechamentoDia(error);
+        if (!tratado) this.erroFechamentoDia = this.detailErroHttp(error) || 'Falha de comunicação com o Hub local.';
+      },
+    });
+  }
+
+  formatarDataOperacional(valor: string | null | undefined): string {
+    if (!valor) return '-';
+    const [ano, mes, dia] = valor.split('-');
+    return `${dia}/${mes}/${ano}`;
+  }
+
+  limitarObservacaoFechamentoDiaRestante(): number {
+    return Math.max(0, 500 - this.observacaoFechamentoDia.length);
   }
 
   private limparEstadoFechamentoCaixa(): void {
@@ -1432,6 +1606,69 @@ export class PdvPageComponent implements OnInit, OnDestroy {
 
   private apenasDigitos(valor: string): string {
     return valor.replace(/\D/g, '');
+  }
+
+  private aplicarPreviaFechamentoDia(preview: FechamentoDiaPrevia): void {
+    this.previaFechamentoDia = preview;
+    this.resultadoFechamentoDia = preview.fechamento;
+    this.dataOperacionalFechamentoDia = preview.dataOperacional;
+    this.valoresConferidosDia = {};
+    this.detalhesAbertosFechamentoDia = {};
+    this.erroFechamentoDia = '';
+    this.confirmandoFechamentoDia = false;
+  }
+
+  private tratarErroFechamentoDia(error: unknown): boolean {
+    if (!(error instanceof HttpErrorResponse)) return false;
+    const body = error.error as Partial<FechamentoDiaConflictApi> | null;
+    if (body?.preview) {
+      this.aplicarPreviaFechamentoDia(mapFechamentoDiaPrevia(body.preview as FechamentoDiaPreviaApi));
+      this.erroFechamentoDia = body.detail || 'Fechamento do dia bloqueado.';
+      return true;
+    }
+    if (body?.fechamento) {
+      this.resultadoFechamentoDia = mapFechamentoDiaRegistro(body.fechamento as FechamentoDiaRegistroApi);
+      this.previaFechamentoDia = null;
+      this.erroFechamentoDia = body.detail || 'Dia operacional já fechado.';
+      return true;
+    }
+    return false;
+  }
+
+  private normalizarValorConferidoDia(input: string | null | undefined): string | null {
+    if (input === null || input === undefined) return null;
+    const texto = input.trim();
+    if (!texto || texto.startsWith('-') || /e/i.test(texto)) return null;
+    if (!/^\d+([,.]\d{0,2})?$/.test(texto)) return null;
+    const [inteiroRaw, decimalRaw = ''] = texto.replace(',', '.').split('.');
+    const inteiro = inteiroRaw.replace(/^0+(?=\d)/, '') || '0';
+    const decimal = decimalRaw.padEnd(2, '0');
+    if (decimal.length > 2) return null;
+    if (inteiro.length > 16) return null;
+    return `${inteiro}.${decimal}`;
+  }
+
+  private subtrairMoedas(valor: string, subtrair: string): string {
+    const diferenca = this.paraCentavos(valor) - this.paraCentavos(subtrair);
+    const sinal = diferenca < 0n ? '-' : '';
+    const absoluto = diferenca < 0n ? -diferenca : diferenca;
+    return `${sinal}${absoluto / 100n}.${String(absoluto % 100n).padStart(2, '0')}`;
+  }
+
+  private paraCentavos(valor: string): bigint {
+    const [inteiroRaw, decimalRaw = '00'] = valor.replace(',', '.').split('.');
+    const sinal = inteiroRaw.startsWith('-') ? -1n : 1n;
+    const inteiro = BigInt(inteiroRaw.replace('-', '') || '0');
+    const centavos = BigInt(decimalRaw.padEnd(2, '0').slice(0, 2));
+    return sinal * (inteiro * 100n + centavos);
+  }
+
+  private dataInputHoje(): string {
+    const agora = new Date();
+    const ano = agora.getFullYear();
+    const mes = String(agora.getMonth() + 1).padStart(2, '0');
+    const dia = String(agora.getDate()).padStart(2, '0');
+    return `${ano}-${mes}-${dia}`;
   }
 
   private detailErroHttp(error: unknown): string {
