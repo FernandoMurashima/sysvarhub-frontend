@@ -23,6 +23,31 @@ button {
   cursor: pointer;
 }
 
+.pdv-desktop .shortcuts {
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  overflow: hidden;
+}
+
+.pdv-desktop .shortcuts button {
+  min-width: 0;
+  width: 100%;
+  padding: 7px 3px;
+  overflow: hidden;
+  font-size: 17px;
+  line-height: 18px;
+}
+
+.pdv-desktop .shortcuts span {
+  display: block;
+  max-width: 100%;
+  color: #fff;
+  font-size: 8px !important;
+  line-height: 10px;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
 .page {
   min-height: 100vh;
   padding: 32px;
