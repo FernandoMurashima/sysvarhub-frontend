@@ -8,12 +8,12 @@ import {
   CaixaFechamentoResultado,
   CaixaStatusResponse,
   CaixaStatusResponseApi,
+  mapCaixaFechamentoResumoSnapshot,
   mapCaixaStatus,
   mapSessaoCaixa,
   SessaoCaixaHubResumo,
   SessaoCaixaHubResumoApi,
 } from '../../../core/models/caixa.models';
-import { mapResumoCaixa } from '../../../core/models/resumo-caixa.models';
 
 @Injectable({ providedIn: 'root' })
 export class HubCaixaService {
@@ -48,7 +48,7 @@ export class HubCaixaService {
             valorContado: response.fechamento.valor_contado,
             diferenca: response.fechamento.diferenca,
             situacao: response.fechamento.situacao,
-            resumo: mapResumoCaixa(response.fechamento.resumo),
+            resumo: mapCaixaFechamentoResumoSnapshot(response.fechamento.resumo),
           },
         })),
       );

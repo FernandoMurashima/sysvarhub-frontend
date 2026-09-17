@@ -3,6 +3,7 @@ import { TestBed } from '@angular/core/testing';
 import { Router } from '@angular/router';
 import { of, throwError } from 'rxjs';
 
+import { CaixaFechamentoResumoSnapshot } from '../../../core/models/caixa.models';
 import { caixaStatusAbertoStub, caixaStatusFechadoStub, sessaoCaixaAbertaStub } from '../../../testing/terminal-test-data';
 import { OperatorSessionService } from '../../operador/services/operator-session.service';
 import { HubCaixaService } from './hub-caixa.service';
@@ -13,6 +14,24 @@ describe('CaixaSessionService', () => {
   let hubCaixaService: jasmine.SpyObj<HubCaixaService>;
   let operatorSession: jasmine.SpyObj<OperatorSessionService>;
   let router: jasmine.SpyObj<Router>;
+
+  const fechamentoResumoSnapshotStub: CaixaFechamentoResumoSnapshot = {
+    valorAbertura: '100.00',
+    quantidadeVendas: 1,
+    totalVendas: '199.90',
+    valorRecebido: '210.00',
+    troco: '10.10',
+    formasPagamento: [
+      { id: 1, codigo: 'DIN', descricao: 'Dinheiro', tipo: 'DINHEIRO', quantidade: 1, valor: '160.00' },
+      { id: 2, codigo: 'PIX', descricao: 'PIX', tipo: 'PIX', quantidade: 1, valor: '50.00' },
+    ],
+    dinheiroBruto: '160.00',
+    dinheiroLiquido: '149.90',
+    despesas: '10.00',
+    sangrias: '20.00',
+    suprimentos: '30.00',
+    dinheiroEsperado: '249.90',
+  };
 
   beforeEach(() => {
     hubCaixaService = jasmine.createSpyObj<HubCaixaService>('HubCaixaService', ['status', 'abrir', 'fechar']);
@@ -75,13 +94,7 @@ describe('CaixaSessionService', () => {
     hubCaixaService.fechar.and.returnValue(of({
       status: 'ok',
       sessao: { ...sessaoCaixaAbertaStub, status: 'FECHADO', valorEsperadoFechamento: '249.90', valorContadoFechamento: '249.90', diferencaFechamento: '0.00', situacaoFechamento: 'OK' },
-      fechamento: { valorEsperado: '249.90', valorContado: '249.90', diferenca: '0.00', situacao: 'OK', resumo: {
-        sessao: sessaoCaixaAbertaStub,
-        vendas: { quantidade: 0, total: '0.00', valorRecebido: '0.00', troco: '0.00' },
-        pagamentos: { formas: [], dinheiroBruto: '0.00', troco: '0.00', dinheiroLiquido: '0.00' },
-        movimentacoes: { despesas: { quantidade: 0, total: '0.00' }, sangrias: { quantidade: 0, total: '0.00' }, suprimentos: { quantidade: 0, total: '0.00' }, itens: [] },
-        dinheiro: { valorAbertura: '100.00', vendasDinheiroBruto: '0.00', troco: '0.00', vendasDinheiroLiquido: '0.00', suprimentos: '0.00', sangrias: '0.00', despesas: '0.00', esperado: '100.00' },
-      } },
+      fechamento: { valorEsperado: '249.90', valorContado: '249.90', diferenca: '0.00', situacao: 'OK', resumo: fechamentoResumoSnapshotStub },
     }));
 
     service.fechar('249.90', '').subscribe((resultado) => {
@@ -97,13 +110,7 @@ describe('CaixaSessionService', () => {
     hubCaixaService.fechar.and.returnValue(of({
       status: 'ok',
       sessao: { ...sessaoCaixaAbertaStub, status: 'FECHADO' },
-      fechamento: { valorEsperado: '100.00', valorContado: '110.00', diferenca: '10.00', situacao: 'SOBRA', resumo: {
-        sessao: sessaoCaixaAbertaStub,
-        vendas: { quantidade: 0, total: '0.00', valorRecebido: '0.00', troco: '0.00' },
-        pagamentos: { formas: [], dinheiroBruto: '0.00', troco: '0.00', dinheiroLiquido: '0.00' },
-        movimentacoes: { despesas: { quantidade: 0, total: '0.00' }, sangrias: { quantidade: 0, total: '0.00' }, suprimentos: { quantidade: 0, total: '0.00' }, itens: [] },
-        dinheiro: { valorAbertura: '100.00', vendasDinheiroBruto: '0.00', troco: '0.00', vendasDinheiroLiquido: '0.00', suprimentos: '0.00', sangrias: '0.00', despesas: '0.00', esperado: '100.00' },
-      } },
+      fechamento: { valorEsperado: '100.00', valorContado: '110.00', diferenca: '10.00', situacao: 'SOBRA', resumo: fechamentoResumoSnapshotStub },
     }));
 
     service.fechar('110.00', 'Sobra conferida').subscribe(() => {

@@ -3,7 +3,6 @@ import {
   OperadorHubPublico,
   OperadorHubPublicoApi,
 } from './operador.models';
-import type { ResumoCaixa, ResumoCaixaApi } from './resumo-caixa.models';
 
 export type CaixaSessionStatus = 'inicializando' | 'fechado' | 'aberto' | 'erro';
 export type CaixaFechamentoSituacao = 'OK' | 'SOBRA' | 'FALTA';
@@ -54,7 +53,29 @@ export interface CaixaFechamentoRequest {
   observacao: string;
 }
 
-export type CaixaFechamentoResumoSnapshot = ResumoCaixa;
+export interface CaixaFechamentoFormaPagamento {
+  id: number;
+  codigo: string;
+  descricao: string;
+  tipo: string;
+  quantidade: number;
+  valor: string;
+}
+
+export interface CaixaFechamentoResumoSnapshot {
+  valorAbertura: string;
+  quantidadeVendas: number;
+  totalVendas: string;
+  valorRecebido: string;
+  troco: string;
+  formasPagamento: CaixaFechamentoFormaPagamento[];
+  dinheiroBruto: string;
+  dinheiroLiquido: string;
+  despesas: string;
+  sangrias: string;
+  suprimentos: string;
+  dinheiroEsperado: string;
+}
 
 export interface CaixaFechamentoResultado {
   valorEsperado: string;
@@ -107,7 +128,31 @@ export interface CaixaFechamentoResultadoApi {
   valor_contado: string;
   diferenca: string;
   situacao: CaixaFechamentoSituacao;
-  resumo: ResumoCaixaApi;
+  resumo: CaixaFechamentoResumoSnapshotApi;
+}
+
+export interface CaixaFechamentoFormaPagamentoApi {
+  id: number;
+  codigo: string;
+  descricao: string;
+  tipo: string;
+  quantidade: number;
+  valor: string;
+}
+
+export interface CaixaFechamentoResumoSnapshotApi {
+  valor_abertura: string;
+  quantidade_vendas: number;
+  total_vendas: string;
+  valor_recebido: string;
+  troco: string;
+  formas_pagamento: CaixaFechamentoFormaPagamentoApi[];
+  dinheiro_bruto: string;
+  dinheiro_liquido: string;
+  despesas: string;
+  sangrias: string;
+  suprimentos: string;
+  dinheiro_esperado: string;
 }
 
 export interface CaixaFechamentoResponseApi {
@@ -159,6 +204,22 @@ export function mapSessaoCaixa(api: SessaoCaixaHubResumoApi): SessaoCaixaHubResu
   };
 }
 
+export function mapCaixaFechamentoResumoSnapshot(api: CaixaFechamentoResumoSnapshotApi): CaixaFechamentoResumoSnapshot {
+  return {
+    valorAbertura: api.valor_abertura,
+    quantidadeVendas: api.quantidade_vendas,
+    totalVendas: api.total_vendas,
+    valorRecebido: api.valor_recebido,
+    troco: api.troco,
+    formasPagamento: api.formas_pagamento.map((forma) => ({ ...forma })),
+    dinheiroBruto: api.dinheiro_bruto,
+    dinheiroLiquido: api.dinheiro_liquido,
+    despesas: api.despesas,
+    sangrias: api.sangrias,
+    suprimentos: api.suprimentos,
+    dinheiroEsperado: api.dinheiro_esperado,
+  };
+}
 
 export function mapCaixaStatus(api: CaixaStatusResponseApi): CaixaStatusResponse {
   return {

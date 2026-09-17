@@ -60,7 +60,12 @@ describe('HubCaixaService', () => {
       expect(response.fechamento.valorContado).toBe('249.90');
       expect(response.fechamento.diferenca).toBe('0.00');
       expect(response.fechamento.situacao).toBe('OK');
-      expect(response.fechamento.resumo.dinheiro.esperado).toBe('249.90');
+      expect(response.fechamento.resumo.valorAbertura).toBe('100.00');
+      expect(response.fechamento.resumo.quantidadeVendas).toBe(1);
+      expect(response.fechamento.resumo.totalVendas).toBe('199.90');
+      expect(response.fechamento.resumo.dinheiroBruto).toBe('160.00');
+      expect(response.fechamento.resumo.dinheiroLiquido).toBe('149.90');
+      expect(response.fechamento.resumo.dinheiroEsperado).toBe('249.90');
       done();
     });
 
@@ -92,22 +97,67 @@ describe('HubCaixaService', () => {
         diferenca: '0.00',
         situacao: 'OK',
         resumo: {
-          sessao: {
-            uuid: 'sessao',
-            status: 'ABERTO',
-            valor_abertura: '100.00',
-            aberto_em: '2026-09-13T12:00:00',
-            fechado_em: null,
-            caixa: { id: 29, codigo: 'CX-BARRA', descricao: 'Caixa Loja Barra', ativo: true },
-            terminal_abertura: { uuid: 'terminal', codigo: 'PDV-01', nome: 'PDV 01' },
-            operador_abertura: { usuario_id: 90, codigo: 'caixa.barra', nome: 'Juliana Rocha', tipo: 'Caixa', perfil: null },
-            terminal_fechamento: null,
-            operador_fechamento: null,
-          },
-          vendas: { quantidade: 1, total: '249.90', valor_recebido: '249.90', troco: '0.00' },
-          pagamentos: { formas: [], dinheiro_bruto: '249.90', troco: '0.00', dinheiro_liquido: '249.90' },
-          movimentacoes: { despesas: { quantidade: 0, total: '0.00' }, sangrias: { quantidade: 0, total: '0.00' }, suprimentos: { quantidade: 0, total: '0.00' }, itens: [] },
-          dinheiro: { valor_abertura: '0.00', vendas_dinheiro_bruto: '249.90', troco: '0.00', vendas_dinheiro_liquido: '249.90', suprimentos: '0.00', sangrias: '0.00', despesas: '0.00', esperado: '249.90' },
+          valor_abertura: '100.00',
+          quantidade_vendas: 1,
+          total_vendas: '199.90',
+          valor_recebido: '210.00',
+          troco: '10.10',
+          formas_pagamento: [
+            { id: 1, codigo: 'DIN', descricao: 'Dinheiro', tipo: 'DINHEIRO', quantidade: 1, valor: '160.00' },
+            { id: 2, codigo: 'PIX', descricao: 'PIX', tipo: 'PIX', quantidade: 1, valor: '50.00' },
+          ],
+          dinheiro_bruto: '160.00',
+          dinheiro_liquido: '149.90',
+          despesas: '10.00',
+          sangrias: '20.00',
+          suprimentos: '30.00',
+          dinheiro_esperado: '249.90',
+        },
+      },
+    });
+  });
+
+  it('mapeia snapshot real do fechamento sem exception', (done) => {
+    service.fechar('249.90', '').subscribe((response) => {
+      expect(response.fechamento.resumo.formasPagamento.length).toBe(1);
+      expect(response.fechamento.resumo.formasPagamento[0].codigo).toBe('DIN');
+      expect(response.fechamento.resumo.dinheiroEsperado).toBe('249.90');
+      done();
+    });
+
+    const request = httpMock.expectOne('/api/terminal/caixa/fechar/');
+    request.flush({
+      status: 'ok',
+      sessao: {
+        uuid: 'sessao',
+        status: 'FECHADO',
+        valor_abertura: '100.00',
+        aberto_em: '2026-09-13T12:00:00',
+        fechado_em: '2026-09-13T13:00:00',
+        caixa: { id: 29, codigo: 'CX-BARRA', descricao: 'Caixa Loja Barra', ativo: true },
+        terminal_abertura: { uuid: 'terminal', codigo: 'PDV-01', nome: 'PDV 01' },
+        operador_abertura: { usuario_id: 90, codigo: 'caixa.barra', nome: 'Juliana Rocha', tipo: 'Caixa', perfil: null },
+        terminal_fechamento: null,
+        operador_fechamento: null,
+      },
+      fechamento: {
+        valor_esperado: '249.90',
+        valor_contado: '249.90',
+        diferenca: '0.00',
+        situacao: 'OK',
+        resumo: {
+          valor_abertura: '100.00',
+          quantidade_vendas: 1,
+          total_vendas: '199.90',
+          valor_recebido: '210.00',
+          troco: '10.10',
+          formas_pagamento: [{ id: 1, codigo: 'DIN', descricao: 'Dinheiro', tipo: 'DINHEIRO', quantidade: 1, valor: '160.00' }],
+          dinheiro_bruto: '160.00',
+          dinheiro_liquido: '149.90',
+          despesas: '10.00',
+          sangrias: '20.00',
+          suprimentos: '30.00',
+          dinheiro_esperado: '249.90',
         },
       },
     });

@@ -5,7 +5,7 @@ import { Router } from '@angular/router';
 import { RouterTestingModule } from '@angular/router/testing';
 import { Subject, of, throwError } from 'rxjs';
 
-import { SessaoCaixaHubResumo } from '../../../../core/models/caixa.models';
+import { CaixaFechamentoResumoSnapshot, SessaoCaixaHubResumo } from '../../../../core/models/caixa.models';
 import { ClienteHubResumo } from '../../../../core/models/cliente.models';
 import { ResumoCaixa } from '../../../../core/models/resumo-caixa.models';
 import { VendedorHubResumo } from '../../../../core/models/vendedor.models';
@@ -153,6 +153,24 @@ const resumoCaixaStub: ResumoCaixa = {
   },
 };
 
+const fechamentoResumoSnapshotStub: CaixaFechamentoResumoSnapshot = {
+  valorAbertura: '100.00',
+  quantidadeVendas: 3,
+  totalVendas: '599.70',
+  valorRecebido: '600.00',
+  troco: '0.30',
+  formasPagamento: [
+    { id: 1, codigo: 'DIN', descricao: 'Dinheiro', tipo: 'DINHEIRO', quantidade: 2, valor: '300.00' },
+    { id: 2, codigo: 'PIX', descricao: 'Pix', tipo: 'PIX', quantidade: 1, valor: '199.90' },
+  ],
+  dinheiroBruto: '300.00',
+  dinheiroLiquido: '299.70',
+  despesas: '10.00',
+  sangrias: '20.00',
+  suprimentos: '30.00',
+  dinheiroEsperado: '399.70',
+};
+
 @Component({
   standalone: true,
   template: '',
@@ -244,7 +262,7 @@ describe('PdvPageComponent', () => {
     caixaSession.fechar.and.returnValue(of({
       ok: true,
       sessao: { ...sessaoCaixaAbertaStub, status: 'FECHADO', valorEsperadoFechamento: '399.70', valorContadoFechamento: '399.70', diferencaFechamento: '0.00', situacaoFechamento: 'OK' },
-      fechamento: { valorEsperado: '399.70', valorContado: '399.70', diferenca: '0.00', situacao: 'OK', resumo: resumoCaixaStub },
+      fechamento: { valorEsperado: '399.70', valorContado: '399.70', diferenca: '0.00', situacao: 'OK', resumo: fechamentoResumoSnapshotStub },
     }));
     tiposDespesaService = jasmine.createSpyObj<HubTiposDespesaPdvService>('HubTiposDespesaPdvService', ['listar']);
     tiposDespesaService.listar.and.returnValue(of({
@@ -570,7 +588,7 @@ describe('PdvPageComponent', () => {
     caixaSession.fechar.and.returnValue(of({
       ok: true,
       sessao: { ...sessaoCaixaAbertaStub, status: 'FECHADO' },
-      fechamento: { valorEsperado: '399.70', valorContado: '409.70', diferenca: '10.00', situacao: 'SOBRA', resumo: resumoCaixaStub },
+      fechamento: { valorEsperado: '399.70', valorContado: '409.70', diferenca: '10.00', situacao: 'SOBRA', resumo: fechamentoResumoSnapshotStub },
     }));
 
     component.prepararFechamentoCaixa(new Event('submit'));
@@ -592,7 +610,7 @@ describe('PdvPageComponent', () => {
     caixaSession.fechar.and.returnValue(of({
       ok: true,
       sessao: { ...sessaoCaixaAbertaStub, status: 'FECHADO' },
-      fechamento: { valorEsperado: '399.70', valorContado: '389.70', diferenca: '-10.00', situacao: 'FALTA', resumo: resumoCaixaStub },
+      fechamento: { valorEsperado: '399.70', valorContado: '389.70', diferenca: '-10.00', situacao: 'FALTA', resumo: fechamentoResumoSnapshotStub },
     }));
 
     component.valorContadoFechamento = '389,70';
