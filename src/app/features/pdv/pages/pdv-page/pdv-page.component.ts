@@ -136,6 +136,7 @@ export class PdvPageComponent implements OnInit, OnDestroy {
   confirmandoFechamentoCaixa = false;
   fechandoCaixa = false;
   resultadoFechamentoCaixa: CaixaFechamentoResultado | null = null;
+  caixaEncerradoNestaSessao = false;
   private buscaTimer: ReturnType<typeof setTimeout> | null = null;
   private buscaClienteTimer: ReturnType<typeof setTimeout> | null = null;
   private buscaVendedorTimer: ReturnType<typeof setTimeout> | null = null;
@@ -392,6 +393,10 @@ export class PdvPageComponent implements OnInit, OnDestroy {
     this.carregarResumoCaixa();
   }
 
+  deveExibirAberturaCaixa(): boolean {
+    return this.caixaStatus() === 'fechado' && !this.caixaEncerradoNestaSessao && !this.fechandoCaixa && !this.resultadoFechamentoCaixa;
+  }
+
   abrirFechamentoCaixa(): void {
     this.modalAtalho = 'fechamento';
     this.mensagem = '';
@@ -444,6 +449,7 @@ export class PdvPageComponent implements OnInit, OnDestroy {
       }
 
       this.resultadoFechamentoCaixa = resultado.fechamento;
+      this.caixaEncerradoNestaSessao = true;
       this.confirmandoFechamentoCaixa = false;
       this.vendaSession.limparEstado();
       this.itemSelecionadoUuid = null;
@@ -487,6 +493,10 @@ export class PdvPageComponent implements OnInit, OnDestroy {
   }
 
   abrirMovimentacaoCaixa(): void {
+    if (this.caixaStatus() !== 'aberto') {
+      this.mensagem = 'Abra o caixa antes de registrar movimentação.';
+      return;
+    }
     this.modalAtalho = 'despesa';
     this.mensagem = '';
     this.erroMovimentacaoCaixa = '';
