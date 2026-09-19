@@ -722,6 +722,59 @@ describe('PdvPageComponent', () => {
     expect(component.venda()?.itens.length).toBe(1);
   });
 
+  it('usa imagemUrl do produto selecionado no painel direito', () => {
+    const component = fixture.componentInstance;
+    const produtoComImagem = { ...produtoVendavel, imagemUrl: '/api/terminal/catalogo/imagens/2050/v1/' };
+
+    component.selecionarProduto(produtoComImagem);
+    fixture.detectChanges();
+
+    const imagem = fixture.nativeElement.querySelector('.selected-product-photo img') as HTMLImageElement;
+    expect(imagem.getAttribute('src')).toBe('/api/terminal/catalogo/imagens/2050/v1/');
+  });
+
+  it('troca imagem quebrada pelo logo Sysvar', () => {
+    const component = fixture.componentInstance;
+    const produtoComImagem = { ...produtoVendavel, imagemUrl: '/api/terminal/catalogo/imagens/2050/v1/' };
+
+    component.selecionarProduto(produtoComImagem);
+    fixture.detectChanges();
+    const imagem = fixture.nativeElement.querySelector('.selected-product-photo img') as HTMLImageElement;
+
+    imagem.dispatchEvent(new Event('error'));
+    fixture.detectChanges();
+
+    expect(component.produtoImagemComErro).toBeTrue();
+    expect(imagem.getAttribute('src')).toBe('assets/logosysvar.png');
+  });
+
+  it('reseta fallback de imagem ao selecionar outro produto', () => {
+    const component = fixture.componentInstance;
+    const produtoComImagem = { ...produtoVendavel, imagemUrl: '/api/terminal/catalogo/imagens/2050/v1/' };
+    const outroProduto = {
+      ...produtoVendavel,
+      produtoId: 2051,
+      skuId: 10828,
+      codigo: '7892701000020',
+      ean13: '7892701000020',
+      descricao: 'Camisa Linho Solar',
+      descricaoReduzida: 'Camisa Linho Solar',
+      imagemUrl: '/api/terminal/catalogo/imagens/2051/v2/',
+    };
+
+    component.selecionarProduto(produtoComImagem);
+    fixture.detectChanges();
+    const imagem = fixture.nativeElement.querySelector('.selected-product-photo img') as HTMLImageElement;
+    imagem.dispatchEvent(new Event('error'));
+    fixture.detectChanges();
+
+    component.selecionarProduto(outroProduto);
+    fixture.detectChanges();
+
+    expect(component.produtoImagemComErro).toBeFalse();
+    expect(imagem.getAttribute('src')).toBe('/api/terminal/catalogo/imagens/2051/v2/');
+  });
+
   it('troca operador limpa sessao operacional sem mexer no carrinho', () => {
     const component = fixture.componentInstance;
 
