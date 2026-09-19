@@ -249,19 +249,19 @@
             [alt]="produtoSelecionado?.descricao || 'Sysvar'"
             (error)="produtoImagemComErro = true"
           />
+          @if (produtoSelecionado && !produtoSelecionado.vendavel) {
+            <span class="product-blocked-badge">Bloqueado</span>
+          }
         </div>
-        <strong>{{ produtoSelecionado?.descricao || 'Nenhum produto selecionado' }}</strong>
-        <span>{{ produtoSelecionado?.codigo || 'Aguardando bipagem' }}</span>
+        <div class="selected-product-summary">
+          <strong>{{ produtoSelecionado?.descricao || 'Nenhum produto selecionado' }}</strong>
+          @if (produtoSelecionado) {
+            <span>TAM. {{ produtoSelecionado.tamanho || '-' }} · ESTOQUE {{ formatarQuantidade(produtoSelecionado.estoqueDisponivel) }}</span>
+          }
+        </div>
         @if (produtoSelecionado) {
-          <small>{{ produtoSelecionado.vendavel ? '✓ Vendável' : 'Bloqueado' }}</small>
-          <em>
-            Ref. {{ produtoSelecionado.referencia }} · EAN {{ produtoSelecionado.ean13 || '-' }} ·
-            {{ produtoSelecionado.cor }} / {{ produtoSelecionado.tamanho }}
-          </em>
-          <em>Preço: {{ formatarPreco(produtoSelecionado.precoVenda) }}</em>
-          <em>Estoque catálogo: {{ formatarQuantidade(produtoSelecionado.estoqueDisponivel) }}</em>
           @if (!produtoSelecionado.vendavel) {
-            <em>{{ motivos(produtoSelecionado) }}</em>
+            <em class="product-blocked-reason">{{ motivos(produtoSelecionado) }}</em>
           }
         }
       </div>

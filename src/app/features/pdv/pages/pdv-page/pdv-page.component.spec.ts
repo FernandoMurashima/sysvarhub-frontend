@@ -287,6 +287,10 @@ describe('PdvPageComponent', () => {
     return fixture.nativeElement.querySelector('.current-client')?.textContent || '';
   }
 
+  function textoPainelProdutoSelecionado(): string {
+    return fixture.nativeElement.querySelector('.selected-product-photo')?.textContent || '';
+  }
+
   function simularElementoTelaCheia(elemento: Element | null): void {
     Object.defineProperty(document, 'fullscreenElement', {
       configurable: true,
@@ -722,11 +726,11 @@ describe('PdvPageComponent', () => {
     component.selecionarProduto(produtoVendavel);
     fixture.detectChanges();
 
-    const text = fixture.nativeElement.textContent;
+    const text = textoPainelProdutoSelecionado();
     expect(text).toContain('Calça Jeans Reta Aurora');
-    expect(text).toContain('7892701000013');
-    expect(text).toContain('199,90');
-    expect(text).toContain('Produto selecionado. Pressione ENTER no código exato ou use Adicionar.');
+    expect(text).toContain('TAM. 34');
+    expect(text).toContain('ESTOQUE 4');
+    expect(fixture.nativeElement.textContent).toContain('Produto selecionado. Pressione ENTER no código exato ou use Adicionar.');
     expect(component.venda()?.itens.length).toBe(1);
   });
 
@@ -739,6 +743,16 @@ describe('PdvPageComponent', () => {
 
     const imagem = fixture.nativeElement.querySelector('.selected-product-photo img') as HTMLImageElement;
     expect(imagem.getAttribute('src')).toBe('/api/terminal/catalogo/imagens/2050/v1/');
+  });
+
+  it('usa logo Sysvar quando produto selecionado nao tem imagem', () => {
+    const component = fixture.componentInstance;
+
+    component.selecionarProduto({ ...produtoVendavel, imagemUrl: null });
+    fixture.detectChanges();
+
+    const imagem = fixture.nativeElement.querySelector('.selected-product-photo img') as HTMLImageElement;
+    expect(imagem.getAttribute('src')).toBe('assets/logosysvar.png');
   });
 
   it('troca imagem quebrada pelo logo Sysvar', () => {
@@ -781,6 +795,39 @@ describe('PdvPageComponent', () => {
 
     expect(component.produtoImagemComErro).toBeFalse();
     expect(imagem.getAttribute('src')).toBe('/api/terminal/catalogo/imagens/2051/v2/');
+  });
+
+  it('painel do produto selecionado mostra resumo compacto sem dados tecnicos', () => {
+    const component = fixture.componentInstance;
+
+    component.selecionarProduto(produtoVendavel);
+    fixture.detectChanges();
+
+    const painel = textoPainelProdutoSelecionado();
+    expect(painel).toContain('Calça Jeans Reta Aurora');
+    expect(painel).toContain('TAM. 34');
+    expect(painel).toContain('ESTOQUE 4');
+    expect(painel).not.toContain('7892701000013');
+    expect(painel).not.toContain('27-01-01001');
+    expect(painel).not.toContain('EAN');
+    expect(painel).not.toContain('Vendável');
+    expect(painel).not.toContain('Preço');
+  });
+
+  it('limpar produto selecionado mantem fallback visual sem dados de bipagem', () => {
+    const component = fixture.componentInstance;
+    component.selecionarProduto(produtoVendavel);
+    fixture.detectChanges();
+
+    component.limpar();
+    fixture.detectChanges();
+
+    const painel = textoPainelProdutoSelecionado();
+    const imagem = fixture.nativeElement.querySelector('.selected-product-photo img') as HTMLImageElement;
+    expect(component.produtoSelecionado).toBeNull();
+    expect(painel).toContain('Nenhum produto selecionado');
+    expect(painel).not.toContain('Aguardando bipagem');
+    expect(imagem.getAttribute('src')).toBe('assets/logosysvar.png');
   });
 
   it('troca operador limpa sessao operacional sem mexer no carrinho', () => {
