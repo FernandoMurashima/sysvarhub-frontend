@@ -54,6 +54,7 @@ export class PdvHubFacade {
       estoqueDisponivel: item.estoque_disponivel,
       vendavel: item.vendavel,
       motivosBloqueio: item.motivos_bloqueio,
+      imagemUrl: item.imagem_url ?? null,
     };
   }
 }

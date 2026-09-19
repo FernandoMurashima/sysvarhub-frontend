@@ -104,6 +104,7 @@ export class PdvPageComponent implements OnInit, OnDestroy {
   produtos: PdvProdutoConsulta[] = [];
   produtosPreco: PdvProdutoConsulta[] = [];
   produtoSelecionado: PdvProdutoConsulta | null = null;
+  produtoImagemComErro = false;
   carrinho: PdvProdutoConsulta[] = [];
   itemSelecionadoUuid: string | null = null;
   itemOperandoUuid: string | null = null;
@@ -330,6 +331,7 @@ export class PdvPageComponent implements OnInit, OnDestroy {
 
   selecionarProduto(produto: PdvProdutoConsulta): void {
     this.produtoSelecionado = produto;
+    this.produtoImagemComErro = false;
     this.mensagem = produto.vendavel
       ? this.mensagemVendaPendente()
       : `Produto bloqueado: ${this.motivos(produto)}`;
@@ -342,6 +344,7 @@ export class PdvPageComponent implements OnInit, OnDestroy {
 
   limpar(): void {
     this.produtoSelecionado = null;
+    this.produtoImagemComErro = false;
     this.produtos = [];
     this.busca = '';
     this.mensagem = '';
@@ -1337,6 +1340,7 @@ export class PdvPageComponent implements OnInit, OnDestroy {
 
   private adicionarProduto(produto: PdvProdutoConsulta): void {
     this.produtoSelecionado = produto;
+    this.produtoImagemComErro = false;
     if (this.caixaStatus() !== 'aberto') {
       this.mensagem = 'Operação de venda será habilitada após abertura do caixa.';
       return;

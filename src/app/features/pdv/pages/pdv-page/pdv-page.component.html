@@ -234,7 +234,11 @@
 
       <div class="selected-product-photo">
         <div class="photo-frame">
-          <img src="assets/logosysvar.png" alt="Sysvar" />
+          <img
+            [src]="produtoSelecionado?.imagemUrl && !produtoImagemComErro ? produtoSelecionado?.imagemUrl : 'assets/logosysvar.png'"
+            [alt]="produtoSelecionado?.descricao || 'Sysvar'"
+            (error)="produtoImagemComErro = true"
+          />
         </div>
         <strong>{{ produtoSelecionado?.descricao || 'Nenhum produto selecionado' }}</strong>
         <span>{{ produtoSelecionado?.codigo || 'Aguardando bipagem' }}</span>

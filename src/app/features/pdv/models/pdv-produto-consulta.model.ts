@@ -21,6 +21,7 @@ export interface PdvProdutoConsulta {
   estoqueDisponivel: DecimalString;
   vendavel: boolean;
   motivosBloqueio: string[];
+  imagemUrl?: string | null;
 }
 
 export interface PdvCatalogoConsulta {

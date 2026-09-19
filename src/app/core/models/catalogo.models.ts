@@ -42,6 +42,7 @@ export interface CatalogoItem {
   vendavel: boolean;
   motivos_bloqueio: string[];
   fiscal: unknown;
+  imagem_url?: string | null;
 }
 
 export interface CatalogoResponse {
