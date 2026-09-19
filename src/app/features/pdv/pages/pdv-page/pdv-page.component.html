@@ -20,7 +20,7 @@
       @if (busca.trim().length >= 2 && produtos.length) {
         <div class="search-suggestions">
           @for (produto of produtos.slice(0, 8); track produto.skuId) {
-            <button type="button" (click)="tentarAdicionarProduto(produto)">
+            <button type="button" [disabled]="vendaLoading()" (click)="tentarAdicionarProduto(produto)">
               <strong>{{ produto.descricao }}</strong>
               <span>
                 Ref. {{ produto.referencia }} · {{ produto.cor }} / {{ produto.tamanho }} · Estoque:

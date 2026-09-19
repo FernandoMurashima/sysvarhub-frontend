@@ -369,7 +369,7 @@ export class PdvPageComponent implements OnInit, OnDestroy {
   }
 
   tentarAdicionarProduto(produto: PdvProdutoConsulta | null): void {
-    if (!produto || this.temPagamentoAtivo()) return;
+    if (!produto || this.temPagamentoAtivo() || this.vendaLoading()) return;
     this.adicionarProduto(produto);
   }
 

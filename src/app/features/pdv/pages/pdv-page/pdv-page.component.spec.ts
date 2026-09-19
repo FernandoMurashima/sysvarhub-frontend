@@ -1281,9 +1281,14 @@ describe('PdvPageComponent', () => {
     expect(component.produtos).toEqual([]);
   }));
 
-  it('duplo clique em sugestao nao duplica inclusao', fakeAsync(() => {
+  it('dois cliques rapidos em sugestao nao duplicam inclusao enquanto operacao esta pendente', fakeAsync(() => {
     const component = fixture.componentInstance;
+    const inclusaoPendente = new Subject<{ ok: boolean; detail?: string }>();
     facade.buscarCatalogo.and.returnValue(of(catalogo([produtoVendavel])));
+    vendaSession.adicionarItem.and.callFake(() => {
+      vendaLoadingSignal.set(true);
+      return inclusaoPendente.asObservable();
+    });
 
     component.busca = 'calca';
     component.aoDigitarBusca();
@@ -1292,10 +1297,19 @@ describe('PdvPageComponent', () => {
 
     const sugestao = fixture.nativeElement.querySelector('.search-suggestions button') as HTMLButtonElement;
     sugestao.dispatchEvent(new MouseEvent('click'));
-    sugestao.dispatchEvent(new MouseEvent('dblclick'));
+    sugestao.dispatchEvent(new MouseEvent('click'));
     fixture.detectChanges();
 
     expect(vendaSession.adicionarItem).toHaveBeenCalledOnceWith(10825, 1);
+    expect(component.produtoSelecionado).toBe(produtoVendavel);
+
+    vendaLoadingSignal.set(false);
+    inclusaoPendente.next({ ok: true });
+    inclusaoPendente.complete();
+    fixture.detectChanges();
+
+    expect(component.busca).toBe('');
+    expect(component.produtos).toEqual([]);
     expect(component.produtoSelecionado).toBe(produtoVendavel);
   }));
 
