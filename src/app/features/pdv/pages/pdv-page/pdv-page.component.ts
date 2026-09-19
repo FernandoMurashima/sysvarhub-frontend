@@ -166,6 +166,7 @@ export class PdvPageComponent implements OnInit, OnDestroy {
   carregandoFechamentoDia = false;
   fechandoDia = false;
   confirmandoFechamentoDia = false;
+  telaCheiaAtiva = false;
   private buscaTimer: ReturnType<typeof setTimeout> | null = null;
   private buscaClienteTimer: ReturnType<typeof setTimeout> | null = null;
   private buscaVendedorTimer: ReturnType<typeof setTimeout> | null = null;
@@ -192,6 +193,7 @@ export class PdvPageComponent implements OnInit, OnDestroy {
   readonly vendaLoading = this.vendaSession.loadingOperacao;
 
   ngOnInit(): void {
+    this.atualizarEstadoTelaCheia();
     this.caixaSession.bootstrap().subscribe((aberto) => {
       if (aberto) {
         this.vendaSession.bootstrap().subscribe();
@@ -307,6 +309,35 @@ export class PdvPageComponent implements OnInit, OnDestroy {
       return;
     }
     this.confirmarVendedorSelecionado();
+  }
+
+  @HostListener('document:fullscreenchange')
+  aoAlterarTelaCheia(): void {
+    this.atualizarEstadoTelaCheia();
+  }
+
+  alternarTelaCheia(): void {
+    const fullscreenElement = document.fullscreenElement;
+
+    if (fullscreenElement) {
+      if (typeof document.exitFullscreen !== 'function') {
+        this.atualizarEstadoTelaCheia();
+        return;
+      }
+      void document.exitFullscreen().catch(() => this.atualizarEstadoTelaCheia());
+      return;
+    }
+
+    const root = document.documentElement;
+    if (typeof root.requestFullscreen !== 'function') {
+      this.atualizarEstadoTelaCheia();
+      return;
+    }
+    void root.requestFullscreen().catch(() => this.atualizarEstadoTelaCheia());
+  }
+
+  private atualizarEstadoTelaCheia(): void {
+    this.telaCheiaAtiva = !!document.fullscreenElement;
   }
 
   aoDigitarBusca(): void {

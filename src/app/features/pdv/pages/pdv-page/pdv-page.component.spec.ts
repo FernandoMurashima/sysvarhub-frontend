@@ -287,6 +287,13 @@ describe('PdvPageComponent', () => {
     return fixture.nativeElement.querySelector('.current-client')?.textContent || '';
   }
 
+  function simularElementoTelaCheia(elemento: Element | null): void {
+    Object.defineProperty(document, 'fullscreenElement', {
+      configurable: true,
+      get: () => elemento,
+    });
+  }
+
   beforeEach(async () => {
     facade = jasmine.createSpyObj<PdvHubFacade>('PdvHubFacade', ['buscarCatalogo'], {
       loja: signal('Filial 1').asReadonly(),
@@ -428,6 +435,7 @@ describe('PdvPageComponent', () => {
 
     router = TestBed.inject(Router);
     spyOn(router, 'navigateByUrl').and.resolveTo(true);
+    simularElementoTelaCheia(null);
     fixture = TestBed.createComponent(PdvPageComponent);
     fixture.detectChanges();
   });
@@ -1981,6 +1989,94 @@ describe('PdvPageComponent', () => {
     expect(suporte?.textContent).toContain('Suporte');
     expect(suporte?.tagName.toLowerCase()).toBe('a');
     expect(topActions?.textContent).toContain('Suporte');
+  });
+
+  it('renderiza botao de tela cheia no header', () => {
+    const botao: HTMLButtonElement | null = fixture.nativeElement.querySelector('.top-actions .fullscreen-button');
+
+    expect(botao).not.toBeNull();
+    expect(botao?.title).toBe('Tela cheia');
+    expect(botao?.getAttribute('aria-label')).toBe('Tela cheia');
+  });
+
+  it('clique chama requestFullscreen quando esta fora de tela cheia', () => {
+    simularElementoTelaCheia(null);
+    const requestFullscreen = jasmine.createSpy('requestFullscreen').and.resolveTo();
+    Object.defineProperty(document.documentElement, 'requestFullscreen', { configurable: true, value: requestFullscreen });
+
+    fixture.nativeElement.querySelector('.fullscreen-button').click();
+
+    expect(requestFullscreen).toHaveBeenCalled();
+  });
+
+  it('clique chama exitFullscreen quando esta em tela cheia', () => {
+    simularElementoTelaCheia(document.documentElement);
+    const exitFullscreen = jasmine.createSpy('exitFullscreen').and.resolveTo();
+    Object.defineProperty(document, 'exitFullscreen', { configurable: true, value: exitFullscreen });
+
+    fixture.nativeElement.querySelector('.fullscreen-button').click();
+
+    expect(exitFullscreen).toHaveBeenCalled();
+  });
+
+  it('fullscreenchange atualiza o estado para tela cheia', () => {
+    const component = fixture.componentInstance;
+
+    simularElementoTelaCheia(document.documentElement);
+    document.dispatchEvent(new Event('fullscreenchange'));
+    fixture.detectChanges();
+
+    const botao: HTMLButtonElement = fixture.nativeElement.querySelector('.fullscreen-button');
+    expect(component.telaCheiaAtiva).toBeTrue();
+    expect(botao.title).toBe('Sair da tela cheia');
+    expect(botao.classList).toContain('active');
+  });
+
+  it('saida por ESC/fullscreenchange volta o botao ao estado normal', () => {
+    const component = fixture.componentInstance;
+
+    simularElementoTelaCheia(document.documentElement);
+    document.dispatchEvent(new Event('fullscreenchange'));
+    fixture.detectChanges();
+    simularElementoTelaCheia(null);
+    document.dispatchEvent(new Event('fullscreenchange'));
+    fixture.detectChanges();
+
+    const botao: HTMLButtonElement = fixture.nativeElement.querySelector('.fullscreen-button');
+    expect(component.telaCheiaAtiva).toBeFalse();
+    expect(botao.title).toBe('Tela cheia');
+    expect(botao.classList).not.toContain('active');
+  });
+
+  it('indisponibilidade da Fullscreen API nao quebra o componente', () => {
+    simularElementoTelaCheia(null);
+    Object.defineProperty(document.documentElement, 'requestFullscreen', { configurable: true, value: undefined });
+
+    expect(() => fixture.componentInstance.alternarTelaCheia()).not.toThrow();
+    expect(fixture.componentInstance.telaCheiaAtiva).toBeFalse();
+  });
+
+  it('alternar tela cheia nao afeta produto selecionado venda ou estado operacional', () => {
+    const component = fixture.componentInstance;
+    const vendaAtual = vendaAbertaStub.venda;
+    component.produtoSelecionado = produtoVendavel;
+    component.itemSelecionadoUuid = 'item-uuid';
+    component.modalAtalho = 'pagamentos';
+    vendaSignal.set(vendaAtual);
+    simularElementoTelaCheia(null);
+    Object.defineProperty(document.documentElement, 'requestFullscreen', { configurable: true, value: jasmine.createSpy('requestFullscreen').and.resolveTo() });
+
+    component.alternarTelaCheia();
+
+    expect(component.produtoSelecionado).toBe(produtoVendavel);
+    expect(component.itemSelecionadoUuid).toBe('item-uuid');
+    expect(component.modalAtalho).toBe('pagamentos');
+    expect(component.venda()).toBe(vendaAtual);
+    expect(vendaSession.iniciarVenda).not.toHaveBeenCalled();
+    expect(vendaSession.cancelarVenda).not.toHaveBeenCalled();
+    expect(vendaSession.limparEstado).not.toHaveBeenCalled();
+    expect(caixaSession.abrir).not.toHaveBeenCalled();
+    expect(caixaSession.fechar).not.toHaveBeenCalled();
   });
 
   it('F3 abre modal e consulta vendedores sem autoselecionar operador', fakeAsync(() => {

@@ -53,6 +53,16 @@
       <button class="switch-operator" type="button" (click)="trocarOperador()">Trocar operador</button>
       <button class="switch-operator day-close-button" type="button" (click)="abrirFechamentoDia()">Fechamento do Dia</button>
       <a routerLink="/suporte" class="home-button">Suporte</a>
+      <button
+        class="home-button fullscreen-button"
+        type="button"
+        [attr.aria-label]="telaCheiaAtiva ? 'Sair da tela cheia' : 'Tela cheia'"
+        [title]="telaCheiaAtiva ? 'Sair da tela cheia' : 'Tela cheia'"
+        [class.active]="telaCheiaAtiva"
+        (click)="alternarTelaCheia()"
+      >
+        {{ telaCheiaAtiva ? '⇲' : '⛶' }}
+      </button>
       <div class="clock">
         <strong>{{ hora }}</strong>
         <small>{{ data }}</small>
