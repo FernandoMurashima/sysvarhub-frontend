@@ -1259,6 +1259,84 @@ describe('PdvPageComponent', () => {
     expect(component.mensagem).toBe('Inicie a venda antes de incluir produtos.');
   });
 
+  it('clique simples em sugestao vendavel seleciona e inclui o SKU uma unica vez', fakeAsync(() => {
+    const component = fixture.componentInstance;
+    const skuClicado = { ...produtoVendavel, skuId: 10826, codigo: '7892701000020', ean13: '7892701000020', cor: 'Preto', tamanho: '38' };
+    facade.buscarCatalogo.and.returnValue(of(catalogo([produtoVendavel, skuClicado])));
+
+    component.busca = 'calca';
+    component.aoDigitarBusca();
+    tick(250);
+    fixture.detectChanges();
+
+    const sugestoes = fixture.nativeElement.querySelectorAll('.search-suggestions button') as NodeListOf<HTMLButtonElement>;
+    sugestoes[1].click();
+    fixture.detectChanges();
+
+    expect(vendaSession.adicionarItem).toHaveBeenCalledOnceWith(10826, 1);
+    expect(component.produtoSelecionado).toBe(skuClicado);
+    expect(component.produtoSelecionado?.cor).toBe('Preto');
+    expect(component.produtoSelecionado?.tamanho).toBe('38');
+    expect(component.busca).toBe('');
+    expect(component.produtos).toEqual([]);
+  }));
+
+  it('duplo clique em sugestao nao duplica inclusao', fakeAsync(() => {
+    const component = fixture.componentInstance;
+    facade.buscarCatalogo.and.returnValue(of(catalogo([produtoVendavel])));
+
+    component.busca = 'calca';
+    component.aoDigitarBusca();
+    tick(250);
+    fixture.detectChanges();
+
+    const sugestao = fixture.nativeElement.querySelector('.search-suggestions button') as HTMLButtonElement;
+    sugestao.dispatchEvent(new MouseEvent('click'));
+    sugestao.dispatchEvent(new MouseEvent('dblclick'));
+    fixture.detectChanges();
+
+    expect(vendaSession.adicionarItem).toHaveBeenCalledOnceWith(10825, 1);
+    expect(component.produtoSelecionado).toBe(produtoVendavel);
+  }));
+
+  it('clique em sugestao sem venda seleciona mas nao inclui item', fakeAsync(() => {
+    const component = fixture.componentInstance;
+    vendaSignal.set(null);
+    vendaStatusSignal.set('sem-venda');
+    facade.buscarCatalogo.and.returnValue(of(catalogo([produtoVendavel])));
+
+    component.busca = 'calca';
+    component.aoDigitarBusca();
+    tick(250);
+    fixture.detectChanges();
+
+    const sugestao = fixture.nativeElement.querySelector('.search-suggestions button') as HTMLButtonElement;
+    sugestao.click();
+
+    expect(vendaSession.adicionarItem).not.toHaveBeenCalled();
+    expect(component.produtoSelecionado).toBe(produtoVendavel);
+    expect(component.mensagem).toBe('Inicie a venda antes de incluir produtos.');
+  }));
+
+  it('clique em sugestao com pagamento ativo mantem bloqueio de alteracao', fakeAsync(() => {
+    const component = fixture.componentInstance;
+    vendaSignal.set({ ...vendaAbertaStub.venda!, pagamentos: [{ uuid: 'pag', formaPagamentoId: 1, formaRetaguardaId: 10, codigo: 'DIN', descricao: 'Dinheiro', tipo: 'DINHEIRO', numParcelas: 1, valor: '199.90', autorizacao: '', origemCaptura: 'MANUAL', criadoEm: '2026-09-14' }] });
+    facade.buscarCatalogo.and.returnValue(of(catalogo([produtoVendavel])));
+
+    component.busca = 'calca';
+    component.aoDigitarBusca();
+    tick(250);
+    fixture.detectChanges();
+
+    const sugestao = fixture.nativeElement.querySelector('.search-suggestions button') as HTMLButtonElement;
+    sugestao.click();
+
+    expect(vendaSession.adicionarItem).not.toHaveBeenCalled();
+    expect(component.produtoSelecionado).toBeNull();
+    expect(component.busca).toBe('calca');
+    expect(component.produtos).toEqual([produtoVendavel]);
+  }));
+
   it('sem venda ENTER com produto exato consulta mas nao inclui item', () => {
     const component = fixture.componentInstance;
     vendaSignal.set(null);
