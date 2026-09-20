@@ -20,6 +20,15 @@ export interface VendaItemHubResumo {
   precoUnitario: string;
   desconto: string;
   totalItem: string;
+  promocao: VendaItemPromocaoResumo | null;
+}
+
+export interface VendaItemPromocaoResumo {
+  id: number;
+  nome: string;
+  tipo: string;
+  valor: string;
+  acumulaCashback: boolean;
 }
 
 export interface VendaHubResumo {
@@ -72,6 +81,7 @@ export interface VendaPagamentoHubResumo {
   numParcelas: number;
   valor: string;
   autorizacao: string;
+  valeTrocaDocumento: string;
   origemCaptura: string;
   criadoEm: string;
 }
@@ -107,6 +117,15 @@ export interface VendaItemHubResumoApi {
   preco_unitario: string;
   desconto: string;
   total_item: string;
+  promocao?: VendaItemPromocaoResumoApi | null;
+}
+
+export interface VendaItemPromocaoResumoApi {
+  id: number;
+  nome: string;
+  tipo: string;
+  valor: string;
+  acumula_cashback: boolean;
 }
 
 export interface VendaHubResumoApi {
@@ -159,6 +178,7 @@ export interface VendaPagamentoHubResumoApi {
   num_parcelas: number;
   valor: string;
   autorizacao: string;
+  vale_troca_documento?: string;
   origem_captura: string;
   criado_em: string;
 }
@@ -241,6 +261,13 @@ export function mapVendaItem(item: VendaItemHubResumoApi): VendaItemHubResumo {
     precoUnitario: item.preco_unitario,
     desconto: item.desconto,
     totalItem: item.total_item,
+    promocao: item.promocao ? {
+      id: item.promocao.id,
+      nome: item.promocao.nome,
+      tipo: item.promocao.tipo,
+      valor: item.promocao.valor,
+      acumulaCashback: item.promocao.acumula_cashback,
+    } : null,
   };
 }
 
@@ -255,6 +282,7 @@ export function mapVendaPagamento(pagamento: VendaPagamentoHubResumoApi): VendaP
     numParcelas: pagamento.num_parcelas,
     valor: pagamento.valor,
     autorizacao: pagamento.autorizacao,
+    valeTrocaDocumento: pagamento.vale_troca_documento ?? '',
     origemCaptura: pagamento.origem_captura,
     criadoEm: pagamento.criado_em,
   };

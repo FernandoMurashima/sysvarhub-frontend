@@ -91,4 +91,16 @@ export class HubVendaService {
   obterDanfeNfce(vendaUuid: string, via: DanfeVia): Observable<DanfeNfce> {
     return this.http.get<DanfeNfceApi>(`${this.baseUrl}/${vendaUuid}/danfe-nfce/?via=${via}`).pipe(map(mapDanfeNfce));
   }
+
+  consultarDevolucao(vendaUuid: string): Observable<unknown> {
+    return this.http.get(`${this.terminalUrl}/devolucoes/venda/${vendaUuid}/`);
+  }
+
+  finalizarDevolucao(vendaUuid: string, itens: { item_uuid: string; quantidade: number }[], motivo: string): Observable<unknown> {
+    return this.http.post(`${this.terminalUrl}/devolucoes/finalizar/`, {
+      venda_uuid: vendaUuid,
+      itens,
+      motivo,
+    });
+  }
 }

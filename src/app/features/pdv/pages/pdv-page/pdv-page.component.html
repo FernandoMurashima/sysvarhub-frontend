@@ -193,7 +193,10 @@
             >
               <span class="line-number">{{ indice + 1 }}</span>
               <span class="code-cell"><strong>{{ codigoItemVenda(item) }}</strong><small>{{ item.codigoItemRef || item.referencia }}</small></span>
-              <span class="product-cell"><strong>{{ item.descricao }}</strong><small>{{ item.referencia }}</small></span>
+              <span class="product-cell">
+                <strong>{{ item.descricao }}</strong>
+                <small>{{ item.promocao?.nome || item.referencia }}</small>
+              </span>
               <span class="variant-cell"><strong>{{ item.cor || '-' }}</strong><small>{{ item.tamanho || '-' }}</small></span>
               <span class="quantity-stepper">
                 <button type="button" [disabled]="itemOperandoUuid === item.uuid || temPagamentoAtivo()" (click)="diminuirItem(item); $event.stopPropagation()">-</button>
