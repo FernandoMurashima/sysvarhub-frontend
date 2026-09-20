@@ -124,8 +124,9 @@ export const vendaAbertaStub: VendaAtualResponse = {
       numero: null,
       serie: null,
       chaveAcesso: null,
-      protocoloAutorizacao: null,
-      motivo: '',
+      tipoEmissao: '',
+      contingencia: false,
+      mensagem: '',
     },
     itens: [
       {

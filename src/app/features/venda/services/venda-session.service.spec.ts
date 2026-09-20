@@ -135,8 +135,9 @@ describe('VendaSessionService', () => {
         numero: 123,
         serie: 1,
         chaveAcesso: '35260900000000000123650010000001231000001234',
-        protocoloAutorizacao: '135260000000001',
-        motivo: 'Autorizado o uso da NF-e',
+        tipoEmissao: '1',
+        contingencia: false,
+        mensagem: 'Autorizado o uso da NF-e',
       },
     };
     hubVendaService.adicionarItem.and.returnValue(of(vendaAbertaStub));
@@ -146,6 +147,8 @@ describe('VendaSessionService', () => {
       service.finalizarVenda('venda-hub-uuid').subscribe((resultado) => {
         expect(resultado.ok).toBeTrue();
         expect(resultado.vendaFinalizada?.fiscal.nfceUuid).toBe('nfce-uuid');
+        expect(resultado.vendaFinalizada?.fiscal.tipoEmissao).toBe('1');
+        expect(resultado.vendaFinalizada?.fiscal.mensagem).toBe('Autorizado o uso da NF-e');
         expect(service.venda()).toBeNull();
         expect(service.status()).toBe('sem-venda');
         done();

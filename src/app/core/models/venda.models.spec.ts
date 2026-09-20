@@ -69,8 +69,9 @@ describe('venda models', () => {
           numero: 123,
           serie: 1,
           chave_acesso: '35260900000000000123650010000001231000001234',
-          protocolo_autorizacao: '135260000000001',
-          motivo: 'Autorizado o uso da NF-e',
+          tipo_emissao: '1',
+          contingencia: false,
+          mensagem: 'Autorizado o uso da NF-e',
         },
       },
     };
@@ -96,6 +97,9 @@ describe('venda models', () => {
     expect(venda?.fiscal.nfceUuid).toBe('nfce-uuid');
     expect(venda?.fiscal.status).toBe('AUTORIZADA');
     expect(venda?.fiscal.chaveAcesso).toBe('35260900000000000123650010000001231000001234');
+    expect(venda?.fiscal.tipoEmissao).toBe('1');
+    expect(venda?.fiscal.contingencia).toBeFalse();
+    expect(venda?.fiscal.mensagem).toBe('Autorizado o uso da NF-e');
   });
 
   it('mapeia venda com cliente null', () => {

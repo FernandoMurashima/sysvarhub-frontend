@@ -1375,11 +1375,11 @@ export class PdvPageComponent implements OnInit, OnDestroy {
   }
 
   fiscalExigeAlerta(): boolean {
-    return ['CONTINGENCIA', 'REJEITADA', 'ERRO_GERACAO', 'PENDENTE_TRANSMISSAO'].includes(this.fiscalFinalizacao?.status || '');
+    return Boolean(this.fiscalFinalizacao?.contingencia || ['CONTINGENCIA', 'REJEITADA', 'ERRO_GERACAO', 'PENDENTE_TRANSMISSAO'].includes(this.fiscalFinalizacao?.status || ''));
   }
 
   podeImprimirViaEstabelecimento(): boolean {
-    return Boolean(this.danfeNfce?.imprimivel && this.fiscalFinalizacao?.status === 'CONTINGENCIA');
+    return Boolean(this.danfeNfce?.imprimivel && (this.fiscalFinalizacao?.contingencia || this.fiscalFinalizacao?.status === 'CONTINGENCIA'));
   }
 
   private exibirVendaFinalizada(venda: VendaHubResumo): void {

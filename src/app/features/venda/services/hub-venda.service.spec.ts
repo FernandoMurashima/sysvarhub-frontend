@@ -188,24 +188,49 @@ describe('HubVendaService', () => {
     service.obterDanfeNfce('venda-uuid', 'CONSUMIDOR').subscribe((danfe) => {
       expect(danfe.via).toBe('CONSUMIDOR');
       expect(danfe.emitente.razaoSocial).toBe('Empresa Teste Ltda');
-      expect(danfe.qrCodeDataUri).toBe('data:image/png;base64,AAAA');
+      expect(danfe.emitente.inscricaoEstadual).toBe('123456789');
+      expect(danfe.documento.numero).toBe(10);
+      expect(danfe.itens[0].valorLiquido).toBe('189.90');
+      expect(danfe.totais.valorTotal).toBe('189.90');
+      expect(danfe.protocolo?.numero).toBe('135260000000001');
+      expect(danfe.qrCodeDataUri).toBe('data:image/svg+xml;base64,AAAA');
     });
 
     const request = httpMock.expectOne('/api/terminal/venda/venda-uuid/danfe-nfce/?via=CONSUMIDOR');
     expect(request.request.method).toBe('GET');
     request.flush({
+      nfce_uuid: 'nfce-uuid',
+      venda_uuid: 'venda-uuid',
+      status: 'AUTORIZADA',
       via: 'CONSUMIDOR',
+      via_texto: 'Via Consumidor',
       imprimivel: true,
-      emitente: { razao_social: 'Empresa Teste Ltda', cnpj: '00000000000123' },
-      nfce: { numero: 123, serie: 1, status: 'AUTORIZADA' },
-      itens: [{ codigo: '001', descricao: 'Produto', quantidade: '1.000', unidade: 'UN', valor_unitario: '10.00', valor_total: '10.00' }],
-      totais: { subtotal: '10.00', total: '10.00' },
-      pagamentos: [{ descricao: 'Dinheiro', valor: '10.00' }],
+      motivo_nao_imprimivel: '',
+      ambiente: 'HOMOLOGACAO',
+      homologacao: true,
+      contingencia: false,
+      emitente: { razao_social: 'Empresa Teste Ltda', nome_fantasia: 'Sysvar', cnpj: '00000000000123', ie: '123456789', endereco: 'Rua Teste, 1' },
+      documento: {
+        modelo: '65',
+        serie: 7,
+        numero: 10,
+        emitida_em: '20/09/2026 10:00:00',
+        emitida_em_iso: '2026-09-20T10:00:00-03:00',
+        ambiente: '2',
+        tipo_emissao: '1',
+        chave_acesso: '35260900000000000123650070000000101000000010',
+        chave_acesso_formatada: '3526 0900 0000 0000 1236 5007 0000 0001 0100 0000 010',
+        url_consulta: 'https://sefaz.example.test',
+      },
+      consumidor: { identificado: false, tipo_documento: '', documento: '', nome: '' },
+      itens: [{ numero: 1, codigo: '001', descricao: 'Produto', quantidade: '1.000', unidade: 'UN', valor_unitario: '199.90', valor_bruto: '199.90', desconto: '10.00', valor_liquido: '189.90' }],
+      totais: { quantidade_itens: 1, vProd: '199.90', vDesc: '10.00', vNF: '189.90', vPIS: '0.00', vCOFINS: '0.00', vICMS: '0.00' },
+      pagamentos: [{ tPag: '01', descricao: 'Dinheiro', valor: '189.90' }],
       troco: '0.00',
       mensagens: [],
-      qr_code_data_uri: 'data:image/png;base64,AAAA',
-      chave_acesso: '35260900000000000123650010000001231000001234',
-      url_consulta: 'https://sefaz.example.test',
+      protocolo: { numero: '135260000000001', autorizada_em: '20/09/2026 10:00:05', codigo_retorno: '100', mensagem_retorno: 'Autorizado o uso da NF-e' },
+      qr_code_payload: 'https://sefaz.example.test/qrcode',
+      qr_code_data_uri: 'data:image/svg+xml;base64,AAAA',
     });
   });
 });

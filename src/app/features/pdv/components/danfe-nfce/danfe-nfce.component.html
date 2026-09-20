@@ -12,8 +12,8 @@
     <strong>DANFE NFC-e</strong>
     <span>Documento Auxiliar da Nota Fiscal de Consumidor Eletronica</span>
     <span>{{ textoNfce() }}</span>
-    <span>{{ danfe.nfce.emitidaEm || '-' }} · {{ danfe.nfce.ambiente }}</span>
-    <span>{{ danfe.via }}</span>
+    <span>{{ danfe.documento.emitidaEm || '-' }} · {{ danfe.ambiente }}</span>
+    <span>{{ danfe.viaTexto }}</span>
   </section>
 
   <section class="danfe-section">
@@ -25,15 +25,18 @@
       <div class="danfe-item">
         <strong>{{ item.codigo }} {{ item.descricao }}</strong>
         <span>{{ item.quantidade }} {{ item.unidade }} x {{ item.valorUnitario }}</span>
-        <b>{{ item.valorTotal }}</b>
+        @if (item.desconto !== '0.00') {
+          <span>Desconto {{ item.desconto }}</span>
+        }
+        <b>{{ item.valorLiquido }}</b>
       </div>
     }
   </section>
 
   <section class="danfe-section">
-    <div class="danfe-row"><span>Subtotal</span><strong>{{ danfe.totais.subtotal }}</strong></div>
+    <div class="danfe-row"><span>Produtos</span><strong>{{ danfe.totais.valorProdutos }}</strong></div>
     <div class="danfe-row"><span>Desconto</span><strong>{{ danfe.totais.desconto }}</strong></div>
-    <div class="danfe-row total"><span>Total</span><strong>{{ danfe.totais.total }}</strong></div>
+    <div class="danfe-row total"><span>Total</span><strong>{{ danfe.totais.valorTotal }}</strong></div>
   </section>
 
   <section class="danfe-section">
@@ -45,8 +48,8 @@
 
   <section class="danfe-section">
     <strong>Consumidor</strong>
-    @if (danfe.consumidor) {
-      <span>{{ danfe.consumidor.nome || 'Consumidor nao identificado' }}</span>
+    @if (danfe.consumidor.identificado) {
+      <span>{{ danfe.consumidor.nome }}</span>
       <span>{{ danfe.consumidor.documento }}</span>
     } @else {
       <span>Consumidor nao identificado</span>
@@ -65,10 +68,10 @@
     @if (danfe.qrCodeDataUri) {
       <img [src]="danfe.qrCodeDataUri" alt="QR Code da NFC-e" />
     }
-    <span class="danfe-key">{{ danfe.chaveAcesso }}</span>
-    <span>{{ danfe.urlConsulta }}</span>
-    @if (danfe.protocoloAutorizacao) {
-      <span>Protocolo {{ danfe.protocoloAutorizacao }}</span>
+    <span class="danfe-key">{{ danfe.documento.chaveAcessoFormatada }}</span>
+    <span>{{ danfe.documento.urlConsulta }}</span>
+    @if (danfe.protocolo) {
+      <span>Protocolo {{ danfe.protocolo.numero }}</span>
     }
   </footer>
 </article>

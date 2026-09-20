@@ -48,8 +48,9 @@ export interface VendaFiscalResumo {
   numero: number | null;
   serie: number | null;
   chaveAcesso: string | null;
-  protocoloAutorizacao: string | null;
-  motivo: string;
+  tipoEmissao: string;
+  contingencia: boolean;
+  mensagem: string;
 }
 
 export interface VendaClienteResumo {
@@ -134,8 +135,9 @@ export interface VendaFiscalResumoApi {
   numero?: number | null;
   serie?: number | null;
   chave_acesso?: string | null;
-  protocolo_autorizacao?: string | null;
-  motivo?: string | null;
+  tipo_emissao?: string | null;
+  contingencia?: boolean;
+  mensagem?: string | null;
 }
 
 export interface VendaClienteResumoApi {
@@ -205,8 +207,9 @@ export function mapVendaFiscal(fiscal: VendaFiscalResumoApi | null | undefined):
     numero: fiscal?.numero ?? null,
     serie: fiscal?.serie ?? null,
     chaveAcesso: fiscal?.chave_acesso ?? null,
-    protocoloAutorizacao: fiscal?.protocolo_autorizacao ?? null,
-    motivo: fiscal?.motivo ?? '',
+    tipoEmissao: fiscal?.tipo_emissao ?? '',
+    contingencia: Boolean(fiscal?.contingencia),
+    mensagem: fiscal?.mensagem ?? '',
   };
 }
 

@@ -1157,8 +1157,11 @@
               @if (fiscalFinalizacao?.numero || fiscalFinalizacao?.serie) {
                 <span>NFC-e {{ fiscalFinalizacao?.numero || '-' }} · Série {{ fiscalFinalizacao?.serie || '-' }}</span>
               }
-              @if (fiscalFinalizacao?.motivo) {
-                <span>{{ fiscalFinalizacao?.motivo }}</span>
+              @if (fiscalFinalizacao?.tipoEmissao) {
+                <span>Tipo de emissão {{ fiscalFinalizacao?.tipoEmissao }}</span>
+              }
+              @if (fiscalFinalizacao?.mensagem) {
+                <span>{{ fiscalFinalizacao?.mensagem }}</span>
               }
             </section>
 
