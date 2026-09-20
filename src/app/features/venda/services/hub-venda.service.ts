@@ -12,8 +12,11 @@ import {
 import { DanfeNfce, DanfeNfceApi, DanfeVia, mapDanfeNfce } from '../../../core/models/danfe-nfce.models';
 import {
   mapVendaAtual,
+  BeneficiosClienteResponse,
   VendaAtualResponse,
   VendaApiResponse,
+  VendaDevolucaoConsultaResponse,
+  VendaDevolucaoResultadoResponse,
   VendaItemAdicionarRequest,
   VendaQuantidadeRequest,
 } from '../../../core/models/venda.models';
@@ -92,12 +95,16 @@ export class HubVendaService {
     return this.http.get<DanfeNfceApi>(`${this.baseUrl}/${vendaUuid}/danfe-nfce/?via=${via}`).pipe(map(mapDanfeNfce));
   }
 
-  consultarDevolucao(vendaUuid: string): Observable<unknown> {
-    return this.http.get(`${this.terminalUrl}/devolucoes/venda/${vendaUuid}/`);
+  consultarBeneficiosCliente(clienteUuid: string): Observable<BeneficiosClienteResponse> {
+    return this.http.get<BeneficiosClienteResponse>(`${this.terminalUrl}/clientes/${clienteUuid}/beneficios/`);
   }
 
-  finalizarDevolucao(vendaUuid: string, itens: { item_uuid: string; quantidade: number }[], motivo: string): Observable<unknown> {
-    return this.http.post(`${this.terminalUrl}/devolucoes/finalizar/`, {
+  consultarDevolucao(vendaUuid: string): Observable<VendaDevolucaoConsultaResponse> {
+    return this.http.get<VendaDevolucaoConsultaResponse>(`${this.terminalUrl}/devolucoes/venda/${vendaUuid}/`);
+  }
+
+  finalizarDevolucao(vendaUuid: string, itens: { item_uuid: string; quantidade: number }[], motivo: string): Observable<VendaDevolucaoResultadoResponse> {
+    return this.http.post<VendaDevolucaoResultadoResponse>(`${this.terminalUrl}/devolucoes/finalizar/`, {
       venda_uuid: vendaUuid,
       itens,
       motivo,

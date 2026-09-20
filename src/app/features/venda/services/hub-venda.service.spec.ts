@@ -233,4 +233,54 @@ describe('HubVendaService', () => {
       qr_code_data_uri: 'data:image/svg+xml;base64,AAAA',
     });
   });
+
+  it('consulta beneficios de cliente para cashback e vale-troca', () => {
+    service.consultarBeneficiosCliente('cliente-uuid').subscribe((response) => {
+      expect(response.cashback.saldo).toBe('30.00');
+      expect(response.vales_troca[0].documento).toBe('VT-1');
+    });
+
+    const request = httpMock.expectOne('/api/terminal/clientes/cliente-uuid/beneficios/');
+    expect(request.request.method).toBe('GET');
+    request.flush({
+      cashback: { saldo: '30.00', limite_uso_percentual: '50.0000', valor_minimo_uso: '1.00' },
+      vales_troca: [{ documento: 'VT-1', saldo: '40.00', validade: null }],
+    });
+  });
+
+  it('consulta e finaliza devolucao tipada', () => {
+    service.consultarDevolucao('venda-uuid').subscribe((response) => {
+      expect(response.venda.itens[0].quantidade_disponivel).toBe(1);
+    });
+    const consulta = httpMock.expectOne('/api/terminal/devolucoes/venda/venda-uuid/');
+    expect(consulta.request.method).toBe('GET');
+    consulta.flush({
+      venda: {
+        uuid: 'venda-uuid',
+        cliente: { id: 10, uuid: 'cliente-uuid', nome: 'Cliente' },
+        total: '199.90',
+        itens: [{ item_uuid: 'item-uuid', sku_id: 1, descricao: 'Produto', quantidade: 1, quantidade_devolvida: 0, quantidade_disponivel: 1, preco_unitario: '199.9000', total_item: '199.90' }],
+      },
+    });
+
+    service.finalizarDevolucao('venda-uuid', [{ item_uuid: 'item-uuid', quantidade: 1 }], 'Troca').subscribe((response) => {
+      expect(response.devolucao.vale_troca?.documento).toBe('VT-HUB');
+    });
+    const finalizar = httpMock.expectOne('/api/terminal/devolucoes/finalizar/');
+    expect(finalizar.request.method).toBe('POST');
+    expect(finalizar.request.body).toEqual({
+      venda_uuid: 'venda-uuid',
+      itens: [{ item_uuid: 'item-uuid', quantidade: 1 }],
+      motivo: 'Troca',
+    });
+    finalizar.flush({
+      devolucao: {
+        uuid: 'dev-uuid',
+        venda_uuid: 'venda-uuid',
+        valor_total: '199.90',
+        finalizada_em: '2026-09-20T10:00:00',
+        vale_troca: { documento: 'VT-HUB', saldo: '199.90' },
+      },
+    });
+  });
 });

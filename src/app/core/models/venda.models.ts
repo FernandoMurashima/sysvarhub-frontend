@@ -20,7 +20,7 @@ export interface VendaItemHubResumo {
   precoUnitario: string;
   desconto: string;
   totalItem: string;
-  promocao: VendaItemPromocaoResumo | null;
+  promocao?: VendaItemPromocaoResumo | null;
 }
 
 export interface VendaItemPromocaoResumo {
@@ -81,7 +81,7 @@ export interface VendaPagamentoHubResumo {
   numParcelas: number;
   valor: string;
   autorizacao: string;
-  valeTrocaDocumento: string;
+  valeTrocaDocumento?: string;
   origemCaptura: string;
   criadoEm: string;
 }
@@ -187,6 +187,55 @@ export interface VendaApiResponse {
   venda: VendaHubResumoApi | null;
   cliente_preselecionado?: VendaClienteResumoApi | null;
   vendedor_preselecionado?: VendedorHubResumoApi | null;
+}
+
+export interface BeneficiosClienteResponse {
+  cashback: {
+    saldo: string;
+    limite_uso_percentual: string;
+    valor_minimo_uso: string;
+  };
+  vales_troca: ValeTrocaDisponivel[];
+}
+
+export interface ValeTrocaDisponivel {
+  documento: string;
+  saldo: string;
+  validade: string | null;
+}
+
+export interface VendaDevolucaoConsultaResponse {
+  venda: VendaDevolucaoConsulta;
+}
+
+export interface VendaDevolucaoConsulta {
+  uuid: string;
+  cliente: { id: number | null; uuid: string | null; nome: string };
+  total: string;
+  itens: VendaDevolucaoItem[];
+}
+
+export interface VendaDevolucaoItem {
+  item_uuid: string;
+  sku_id: number;
+  descricao: string;
+  quantidade: number;
+  quantidade_devolvida?: number;
+  quantidade_disponivel?: number;
+  preco_unitario: string;
+  total_item: string;
+}
+
+export interface VendaDevolucaoResultadoResponse {
+  devolucao: VendaDevolucaoResultado;
+}
+
+export interface VendaDevolucaoResultado {
+  uuid: string;
+  venda_uuid: string;
+  valor_total: string;
+  finalizada_em: string;
+  vale_troca: { documento: string; saldo: string } | null;
 }
 
 export function mapVendaAtual(response: VendaApiResponse): VendaAtualResponse {

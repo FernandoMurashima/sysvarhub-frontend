@@ -22,7 +22,7 @@ import { FormaPagamento } from '../../../../core/models/pagamento.models';
 import { ResumoCaixa } from '../../../../core/models/resumo-caixa.models';
 import { TipoDespesaPdv } from '../../../../core/models/tipo-despesa-pdv.models';
 import { DanfeNfce, DanfeVia } from '../../../../core/models/danfe-nfce.models';
-import { VendaClienteResumo, VendaFiscalResumo, VendaHubResumo, VendaItemHubResumo, VendaFiscalStatus } from '../../../../core/models/venda.models';
+import { BeneficiosClienteResponse, VendaClienteResumo, VendaDevolucaoConsulta, VendaFiscalResumo, VendaHubResumo, VendaItemHubResumo, VendaFiscalStatus } from '../../../../core/models/venda.models';
 import { VendedorHubResumo } from '../../../../core/models/vendedor.models';
 import { CaixaSessionService } from '../../../caixa/services/caixa-session.service';
 import { HubMovimentacoesCaixaService } from '../../../caixa/services/hub-movimentacoes-caixa.service';
@@ -52,6 +52,7 @@ type PdvAtalho =
   | 'fechamento'
   | 'abertura-caixa'
   | 'consulta-vendas'
+  | 'devolucao'
   | 'fechar-pdv';
 
 type ClienteModalModo = 'busca' | 'cadastro';
@@ -118,6 +119,13 @@ export class PdvPageComponent implements OnInit, OnDestroy {
   formasPagamento: FormaPagamento[] = [];
   formaPagamentoSelecionada: FormaPagamento | null = null;
   filtroPagamento: 'TODAS' | 'DINHEIRO' | 'CARTAO' | 'PIX' | 'OUTRAS' = 'TODAS';
+  beneficiosCliente: BeneficiosClienteResponse | null = null;
+  devolucaoVendaUuid = '';
+  devolucaoMotivo = '';
+  devolucaoConsulta: VendaDevolucaoConsulta | null = null;
+  devolucaoQuantidades: Record<string, number> = {};
+  devolucaoCarregando = false;
+  devolucaoResultado: { valorTotal: string; valeDocumento: string; valeSaldo: string } | null = null;
   valorPagamento = '';
   autorizacaoPagamento = '';
   carregandoFormasPagamento = false;
@@ -1246,6 +1254,7 @@ export class PdvPageComponent implements OnInit, OnDestroy {
     this.modalAtalho = 'pagamentos';
     this.filtroPagamento = filtro;
     this.carregarFormasPagamento(filtro);
+    this.carregarBeneficiosCliente();
   }
 
   formasPagamentoFiltradas(): FormaPagamento[] {
@@ -1261,6 +1270,88 @@ export class PdvPageComponent implements OnInit, OnDestroy {
   selecionarFormaPagamento(forma: FormaPagamento): void {
     this.formaPagamentoSelecionada = forma;
     this.valorPagamento = this.venda()?.pendente || '';
+    if (forma.tipo === 'CASHBACK' && this.beneficiosCliente) {
+      const pendente = Number(this.venda()?.pendente || 0);
+      const saldo = Number(this.beneficiosCliente.cashback.saldo || 0);
+      const limitePercentual = Number(this.beneficiosCliente.cashback.limite_uso_percentual || 0);
+      const limiteVenda = Number(this.venda()?.total || 0) * limitePercentual / 100;
+      this.valorPagamento = Math.max(0, Math.min(pendente, saldo, limiteVenda)).toFixed(2);
+    }
+  }
+
+  selecionarValeTroca(documento: string, saldo: string): void {
+    const troca = this.formasPagamento.find((forma) => ['TROCA', 'VALE_TROCA'].includes(forma.tipo));
+    if (troca) this.formaPagamentoSelecionada = troca;
+    this.autorizacaoPagamento = documento;
+    const pendente = Number(this.venda()?.pendente || 0);
+    this.valorPagamento = Math.max(0, Math.min(pendente, Number(saldo || 0))).toFixed(2);
+  }
+
+  carregarBeneficiosCliente(): void {
+    const clienteUuid = this.venda()?.cliente?.clienteUuid;
+    this.beneficiosCliente = null;
+    if (!clienteUuid) return;
+    this.hubVendaService.consultarBeneficiosCliente(clienteUuid).subscribe({
+      next: (beneficios) => this.beneficiosCliente = beneficios,
+      error: () => this.beneficiosCliente = null,
+    });
+  }
+
+  abrirDevolucao(event?: Event): void {
+    event?.preventDefault();
+    this.modalAtalho = 'devolucao';
+    this.devolucaoVendaUuid = '';
+    this.devolucaoMotivo = '';
+    this.devolucaoConsulta = null;
+    this.devolucaoQuantidades = {};
+    this.devolucaoResultado = null;
+  }
+
+  consultarVendaDevolucao(): void {
+    if (!this.devolucaoVendaUuid.trim()) {
+      this.mensagem = 'Informe a venda local para devolução.';
+      return;
+    }
+    this.devolucaoCarregando = true;
+    this.hubVendaService.consultarDevolucao(this.devolucaoVendaUuid.trim()).subscribe({
+      next: (resposta) => {
+        this.devolucaoConsulta = resposta.venda;
+        this.devolucaoQuantidades = {};
+        this.devolucaoResultado = null;
+        this.devolucaoCarregando = false;
+      },
+      error: (erro: HttpErrorResponse) => {
+        this.mensagem = erro.error?.detail || 'Venda não encontrada para devolução.';
+        this.devolucaoCarregando = false;
+      },
+    });
+  }
+
+  confirmarDevolucao(): void {
+    const venda = this.devolucaoConsulta;
+    if (!venda) return;
+    const itens = venda.itens
+      .map((item) => ({ item_uuid: item.item_uuid, quantidade: Number(this.devolucaoQuantidades[item.item_uuid] || 0) }))
+      .filter((item) => item.quantidade > 0);
+    if (!itens.length) {
+      this.mensagem = 'Informe ao menos um item para devolução.';
+      return;
+    }
+    this.devolucaoCarregando = true;
+    this.hubVendaService.finalizarDevolucao(venda.uuid, itens, this.devolucaoMotivo).subscribe({
+      next: (resposta) => {
+        this.devolucaoResultado = {
+          valorTotal: resposta.devolucao.valor_total,
+          valeDocumento: resposta.devolucao.vale_troca?.documento || '',
+          valeSaldo: resposta.devolucao.vale_troca?.saldo || '0.00',
+        };
+        this.devolucaoCarregando = false;
+      },
+      error: (erro: HttpErrorResponse) => {
+        this.mensagem = erro.error?.detail || 'Falha ao finalizar devolução.';
+        this.devolucaoCarregando = false;
+      },
+    });
   }
 
   adicionarPagamento(): void {

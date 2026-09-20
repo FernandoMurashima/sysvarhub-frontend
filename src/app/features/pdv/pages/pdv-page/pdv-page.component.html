@@ -160,6 +160,7 @@
         <button type="button" (click)="abrirAtalho($event, 'fechamento')">F10<br /><span>Fechar Caixa</span></button>
         <button type="button" (click)="abrirAtalho($event, 'abertura-caixa')">F11<br /><span>Abrir Caixa</span></button>
         <button type="button" (click)="abrirAtalho($event, 'consulta-vendas')">F12<br /><span>Consulta de Vendas</span></button>
+        <button type="button" (click)="abrirDevolucao($event)">DEV<br /><span>Devolução</span></button>
         <button type="button" (click)="abrirAtalho($event, 'fechar-pdv')">F13<br /><span>Fechar PDV</span></button>
       </div>
     </aside>
@@ -1113,6 +1114,21 @@
               </div>
 
               <form class="payment-form" (submit)="$event.preventDefault(); adicionarPagamento()">
+                @if (beneficiosCliente) {
+                  <div class="benefits-box">
+                    <strong>Cashback {{ formatarMoeda(beneficiosCliente.cashback.saldo) }}</strong>
+                    <small>Limite {{ beneficiosCliente.cashback.limite_uso_percentual }}%</small>
+                    @if (beneficiosCliente.vales_troca.length) {
+                      <div class="vale-list">
+                        @for (vale of beneficiosCliente.vales_troca; track vale.documento) {
+                          <button type="button" class="vale-picker-button" (click)="selecionarValeTroca(vale.documento, vale.saldo)">
+                            {{ vale.documento }} · {{ formatarMoeda(vale.saldo) }}
+                          </button>
+                        }
+                      </div>
+                    }
+                  </div>
+                }
                 <label>Valor<input name="valorPagamento" [(ngModel)]="valorPagamento" inputmode="decimal" autocomplete="off" /></label>
                 <label>Autorização<input name="autorizacaoPagamento" [(ngModel)]="autorizacaoPagamento" maxlength="120" autocomplete="off" /></label>
                 @if (formaPagamentoSelecionada?.tefHabilitado) {
@@ -1121,6 +1137,37 @@
                 <button type="submit" [disabled]="!formaPagamentoSelecionada || formaPagamentoSelecionada.tefHabilitado || vendaLoading()">Adicionar</button>
               </form>
             </div>
+          </div>
+        } @else if (modalAtalho === 'devolucao') {
+          <div class="payment-modal">
+            <section class="payment-summary">
+              <article><span>Valor</span><strong>{{ devolucaoResultado ? formatarMoeda(devolucaoResultado.valorTotal) : '-' }}</strong></article>
+              <article><span>Vale-Troca</span><strong>{{ devolucaoResultado?.valeDocumento || '-' }}</strong></article>
+            </section>
+            <form class="payment-form" (submit)="$event.preventDefault(); consultarVendaDevolucao()">
+              <label>Venda local<input name="devolucaoVendaUuid" [(ngModel)]="devolucaoVendaUuid" autocomplete="off" /></label>
+              <label>Motivo<input name="devolucaoMotivo" [(ngModel)]="devolucaoMotivo" maxlength="255" autocomplete="off" /></label>
+              <button type="submit" [disabled]="devolucaoCarregando">Localizar</button>
+            </form>
+            @if (devolucaoConsulta) {
+              <div class="vale-list">
+                <div class="vale-row head"><span>Item</span><span>Vendido</span><span>Disponível</span><span>Devolver</span></div>
+                @for (item of devolucaoConsulta.itens; track item.item_uuid) {
+                  <div class="vale-row">
+                    <span><strong>{{ item.descricao }}</strong><small>{{ formatarMoeda(item.total_item) }}</small></span>
+                    <span>{{ item.quantidade }}</span>
+                    <span>{{ item.quantidade_disponivel || item.quantidade }}</span>
+                    <input type="number" min="0" [max]="item.quantidade_disponivel || item.quantidade" name="dev{{ item.item_uuid }}" [(ngModel)]="devolucaoQuantidades[item.item_uuid]" />
+                  </div>
+                }
+              </div>
+              <div class="modal-actions">
+                <button type="button" class="primary" [disabled]="devolucaoCarregando" (click)="confirmarDevolucao()">Confirmar devolução</button>
+              </div>
+            }
+            @if (devolucaoResultado) {
+              <p class="summary-empty">Vale {{ devolucaoResultado.valeDocumento }} gerado com saldo {{ formatarMoeda(devolucaoResultado.valeSaldo) }}.</p>
+            }
           </div>
         } @else {
           <div class="modal-confirm">
