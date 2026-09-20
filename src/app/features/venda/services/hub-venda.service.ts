@@ -99,8 +99,8 @@ export class HubVendaService {
     return this.http.get<BeneficiosClienteResponse>(`${this.terminalUrl}/clientes/${clienteUuid}/beneficios/`);
   }
 
-  consultarDevolucao(vendaUuid: string): Observable<VendaDevolucaoConsultaResponse> {
-    return this.http.get<VendaDevolucaoConsultaResponse>(`${this.terminalUrl}/devolucoes/venda/${vendaUuid}/`);
+  consultarDevolucao(documento: string): Observable<VendaDevolucaoConsultaResponse> {
+    return this.http.get<VendaDevolucaoConsultaResponse>(`${this.terminalUrl}/devolucoes/vendas/?documento=${encodeURIComponent(documento)}`);
   }
 
   finalizarDevolucao(vendaUuid: string, itens: { item_uuid: string; quantidade: number }[], motivo: string): Observable<VendaDevolucaoResultadoResponse> {

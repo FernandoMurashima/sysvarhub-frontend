@@ -192,6 +192,8 @@ export interface VendaApiResponse {
 export interface BeneficiosClienteResponse {
   cashback: {
     saldo: string;
+    saldo_retaguarda: string;
+    saldo_offline_utilizavel: string;
     limite_uso_percentual: string;
     valor_minimo_uso: string;
   };
@@ -202,6 +204,7 @@ export interface ValeTrocaDisponivel {
   documento: string;
   saldo: string;
   validade: string | null;
+  utilizavel_offline: boolean;
 }
 
 export interface VendaDevolucaoConsultaResponse {

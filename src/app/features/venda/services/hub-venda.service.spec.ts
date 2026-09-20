@@ -243,8 +243,14 @@ describe('HubVendaService', () => {
     const request = httpMock.expectOne('/api/terminal/clientes/cliente-uuid/beneficios/');
     expect(request.request.method).toBe('GET');
     request.flush({
-      cashback: { saldo: '30.00', limite_uso_percentual: '50.0000', valor_minimo_uso: '1.00' },
-      vales_troca: [{ documento: 'VT-1', saldo: '40.00', validade: null }],
+      cashback: {
+        saldo: '30.00',
+        saldo_retaguarda: '80.00',
+        saldo_offline_utilizavel: '30.00',
+        limite_uso_percentual: '50.0000',
+        valor_minimo_uso: '1.00',
+      },
+      vales_troca: [{ documento: 'VT-1', saldo: '40.00', validade: null, utilizavel_offline: true }],
     });
   });
 
@@ -252,7 +258,7 @@ describe('HubVendaService', () => {
     service.consultarDevolucao('venda-uuid').subscribe((response) => {
       expect(response.venda.itens[0].quantidade_disponivel).toBe(1);
     });
-    const consulta = httpMock.expectOne('/api/terminal/devolucoes/venda/venda-uuid/');
+    const consulta = httpMock.expectOne('/api/terminal/devolucoes/vendas/?documento=venda-uuid');
     expect(consulta.request.method).toBe('GET');
     consulta.flush({
       venda: {

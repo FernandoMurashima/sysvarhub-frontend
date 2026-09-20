@@ -1116,13 +1116,13 @@
               <form class="payment-form" (submit)="$event.preventDefault(); adicionarPagamento()">
                 @if (beneficiosCliente) {
                   <div class="benefits-box">
-                    <strong>Cashback {{ formatarMoeda(beneficiosCliente.cashback.saldo) }}</strong>
-                    <small>Limite {{ beneficiosCliente.cashback.limite_uso_percentual }}%</small>
+                    <strong>Cashback offline {{ formatarMoeda(beneficiosCliente.cashback.saldo_offline_utilizavel || beneficiosCliente.cashback.saldo) }}</strong>
+                    <small>Retaguarda {{ formatarMoeda(beneficiosCliente.cashback.saldo_retaguarda) }} · Limite {{ beneficiosCliente.cashback.limite_uso_percentual }}%</small>
                     @if (beneficiosCliente.vales_troca.length) {
                       <div class="vale-list">
                         @for (vale of beneficiosCliente.vales_troca; track vale.documento) {
-                          <button type="button" class="vale-picker-button" (click)="selecionarValeTroca(vale.documento, vale.saldo)">
-                            {{ vale.documento }} · {{ formatarMoeda(vale.saldo) }}
+                          <button type="button" class="vale-picker-button" [disabled]="!vale.utilizavel_offline" (click)="selecionarValeTroca(vale.documento, vale.saldo, vale.utilizavel_offline)">
+                            {{ vale.documento }} · {{ formatarMoeda(vale.saldo) }}{{ vale.utilizavel_offline ? '' : ' · retaguarda' }}
                           </button>
                         }
                       </div>
@@ -1145,7 +1145,7 @@
               <article><span>Vale-Troca</span><strong>{{ devolucaoResultado?.valeDocumento || '-' }}</strong></article>
             </section>
             <form class="payment-form" (submit)="$event.preventDefault(); consultarVendaDevolucao()">
-              <label>Venda local<input name="devolucaoVendaUuid" [(ngModel)]="devolucaoVendaUuid" autocomplete="off" /></label>
+              <label>Venda / Cupom<input name="devolucaoDocumento" [(ngModel)]="devolucaoDocumento" autocomplete="off" /></label>
               <label>Motivo<input name="devolucaoMotivo" [(ngModel)]="devolucaoMotivo" maxlength="255" autocomplete="off" /></label>
               <button type="submit" [disabled]="devolucaoCarregando">Localizar</button>
             </form>

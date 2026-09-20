@@ -120,7 +120,7 @@ export class PdvPageComponent implements OnInit, OnDestroy {
   formaPagamentoSelecionada: FormaPagamento | null = null;
   filtroPagamento: 'TODAS' | 'DINHEIRO' | 'CARTAO' | 'PIX' | 'OUTRAS' = 'TODAS';
   beneficiosCliente: BeneficiosClienteResponse | null = null;
-  devolucaoVendaUuid = '';
+  devolucaoDocumento = '';
   devolucaoMotivo = '';
   devolucaoConsulta: VendaDevolucaoConsulta | null = null;
   devolucaoQuantidades: Record<string, number> = {};
@@ -1272,14 +1272,18 @@ export class PdvPageComponent implements OnInit, OnDestroy {
     this.valorPagamento = this.venda()?.pendente || '';
     if (forma.tipo === 'CASHBACK' && this.beneficiosCliente) {
       const pendente = Number(this.venda()?.pendente || 0);
-      const saldo = Number(this.beneficiosCliente.cashback.saldo || 0);
+      const saldo = Number(this.beneficiosCliente.cashback.saldo_offline_utilizavel || this.beneficiosCliente.cashback.saldo || 0);
       const limitePercentual = Number(this.beneficiosCliente.cashback.limite_uso_percentual || 0);
       const limiteVenda = Number(this.venda()?.total || 0) * limitePercentual / 100;
       this.valorPagamento = Math.max(0, Math.min(pendente, saldo, limiteVenda)).toFixed(2);
     }
   }
 
-  selecionarValeTroca(documento: string, saldo: string): void {
+  selecionarValeTroca(documento: string, saldo: string, utilizavelOffline = true): void {
+    if (!utilizavelOffline) {
+      this.mensagem = 'Vale-troca da retaguarda não pode ser usado offline.';
+      return;
+    }
     const troca = this.formasPagamento.find((forma) => ['TROCA', 'VALE_TROCA'].includes(forma.tipo));
     if (troca) this.formaPagamentoSelecionada = troca;
     this.autorizacaoPagamento = documento;
@@ -1300,7 +1304,7 @@ export class PdvPageComponent implements OnInit, OnDestroy {
   abrirDevolucao(event?: Event): void {
     event?.preventDefault();
     this.modalAtalho = 'devolucao';
-    this.devolucaoVendaUuid = '';
+    this.devolucaoDocumento = '';
     this.devolucaoMotivo = '';
     this.devolucaoConsulta = null;
     this.devolucaoQuantidades = {};
@@ -1308,12 +1312,12 @@ export class PdvPageComponent implements OnInit, OnDestroy {
   }
 
   consultarVendaDevolucao(): void {
-    if (!this.devolucaoVendaUuid.trim()) {
-      this.mensagem = 'Informe a venda local para devolução.';
+    if (!this.devolucaoDocumento.trim()) {
+      this.mensagem = 'Informe a venda ou cupom para devolução.';
       return;
     }
     this.devolucaoCarregando = true;
-    this.hubVendaService.consultarDevolucao(this.devolucaoVendaUuid.trim()).subscribe({
+    this.hubVendaService.consultarDevolucao(this.devolucaoDocumento.trim()).subscribe({
       next: (resposta) => {
         this.devolucaoConsulta = resposta.venda;
         this.devolucaoQuantidades = {};
