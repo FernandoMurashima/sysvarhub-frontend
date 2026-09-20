@@ -29,6 +29,7 @@ describe('VendaSessionService', () => {
       'removerCliente',
       'selecionarVendedor',
       'removerVendedor',
+      'finalizarVenda',
     ]);
     operatorSession = jasmine.createSpyObj<OperatorSessionService>('OperatorSessionService', ['invalidarSessao']);
     router = jasmine.createSpyObj<Router>('Router', ['navigateByUrl']);
@@ -118,6 +119,37 @@ describe('VendaSessionService', () => {
       expect(service.status()).toBe('sem-venda');
       expect(service.venda()).toBeNull();
       done();
+    });
+  });
+
+  it('finalizar venda retorna venda finalizada com fiscal e limpa estado atual', (done) => {
+    const vendaFinalizada = {
+      ...vendaAbertaStub.venda!,
+      status: 'FINALIZADA' as const,
+      totalPago: '199.90',
+      pendente: '0.00',
+      fiscal: {
+        emiteNfce: true,
+        nfceUuid: 'nfce-uuid',
+        status: 'AUTORIZADA' as const,
+        numero: 123,
+        serie: 1,
+        chaveAcesso: '35260900000000000123650010000001231000001234',
+        protocoloAutorizacao: '135260000000001',
+        motivo: 'Autorizado o uso da NF-e',
+      },
+    };
+    hubVendaService.adicionarItem.and.returnValue(of(vendaAbertaStub));
+    hubVendaService.finalizarVenda.and.returnValue(of({ venda: vendaFinalizada, clientePreselecionado: null, vendedorPreselecionado: null }));
+
+    service.adicionarItem(10825).subscribe(() => {
+      service.finalizarVenda('venda-hub-uuid').subscribe((resultado) => {
+        expect(resultado.ok).toBeTrue();
+        expect(resultado.vendaFinalizada?.fiscal.nfceUuid).toBe('nfce-uuid');
+        expect(service.venda()).toBeNull();
+        expect(service.status()).toBe('sem-venda');
+        done();
+      });
     });
   });
 

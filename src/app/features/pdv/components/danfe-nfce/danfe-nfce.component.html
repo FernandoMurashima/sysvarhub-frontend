@@ -1,0 +1,74 @@
+<article class="danfe-nfce">
+  <header class="danfe-center danfe-section">
+    <strong>{{ danfe.emitente.razaoSocial }}</strong>
+    @if (danfe.emitente.nomeFantasia) {
+      <span>{{ danfe.emitente.nomeFantasia }}</span>
+    }
+    <span>CNPJ {{ danfe.emitente.cnpj }} IE {{ danfe.emitente.inscricaoEstadual || '-' }}</span>
+    <span>{{ danfe.emitente.endereco }}</span>
+  </header>
+
+  <section class="danfe-center danfe-section">
+    <strong>DANFE NFC-e</strong>
+    <span>Documento Auxiliar da Nota Fiscal de Consumidor Eletronica</span>
+    <span>{{ textoNfce() }}</span>
+    <span>{{ danfe.nfce.emitidaEm || '-' }} · {{ danfe.nfce.ambiente }}</span>
+    <span>{{ danfe.via }}</span>
+  </section>
+
+  <section class="danfe-section">
+    <div class="danfe-row danfe-head">
+      <span>Item</span>
+      <span>Total</span>
+    </div>
+    @for (item of danfe.itens; track item.codigo + item.descricao) {
+      <div class="danfe-item">
+        <strong>{{ item.codigo }} {{ item.descricao }}</strong>
+        <span>{{ item.quantidade }} {{ item.unidade }} x {{ item.valorUnitario }}</span>
+        <b>{{ item.valorTotal }}</b>
+      </div>
+    }
+  </section>
+
+  <section class="danfe-section">
+    <div class="danfe-row"><span>Subtotal</span><strong>{{ danfe.totais.subtotal }}</strong></div>
+    <div class="danfe-row"><span>Desconto</span><strong>{{ danfe.totais.desconto }}</strong></div>
+    <div class="danfe-row total"><span>Total</span><strong>{{ danfe.totais.total }}</strong></div>
+  </section>
+
+  <section class="danfe-section">
+    @for (pagamento of danfe.pagamentos; track pagamento.descricao + pagamento.valor) {
+      <div class="danfe-row"><span>{{ pagamento.descricao }}</span><strong>{{ pagamento.valor }}</strong></div>
+    }
+    <div class="danfe-row"><span>Troco</span><strong>{{ danfe.troco }}</strong></div>
+  </section>
+
+  <section class="danfe-section">
+    <strong>Consumidor</strong>
+    @if (danfe.consumidor) {
+      <span>{{ danfe.consumidor.nome || 'Consumidor nao identificado' }}</span>
+      <span>{{ danfe.consumidor.documento }}</span>
+    } @else {
+      <span>Consumidor nao identificado</span>
+    }
+  </section>
+
+  @if (danfe.mensagens.length) {
+    <section class="danfe-section">
+      @for (mensagem of danfe.mensagens; track mensagem) {
+        <p>{{ mensagem }}</p>
+      }
+    </section>
+  }
+
+  <footer class="danfe-center danfe-section">
+    @if (danfe.qrCodeDataUri) {
+      <img [src]="danfe.qrCodeDataUri" alt="QR Code da NFC-e" />
+    }
+    <span class="danfe-key">{{ danfe.chaveAcesso }}</span>
+    <span>{{ danfe.urlConsulta }}</span>
+    @if (danfe.protocoloAutorizacao) {
+      <span>Protocolo {{ danfe.protocoloAutorizacao }}</span>
+    }
+  </footer>
+</article>

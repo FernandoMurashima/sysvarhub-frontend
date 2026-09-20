@@ -16,6 +16,7 @@ import { HubResumoCaixaService } from '../../../caixa/services/hub-resumo-caixa.
 import { HubTiposDespesaPdvService } from '../../../caixa/services/hub-tipos-despesa-pdv.service';
 import { ClienteSessionExpiredError, ClienteSessionService } from '../../../cliente/services/cliente-session.service';
 import { OperatorSessionService } from '../../../operador/services/operator-session.service';
+import { HubVendaService } from '../../../venda/services/hub-venda.service';
 import { VendaSessionService } from '../../../venda/services/venda-session.service';
 import { clientePreselecionadoStub, sessaoCaixaAbertaStub, vendedorStub, vendaAbertaStub } from '../../../../testing/terminal-test-data';
 import { VendedorSessionExpiredError, VendedorSessionService } from '../../../vendedor/services/vendedor-session.service';
@@ -261,6 +262,7 @@ describe('PdvPageComponent', () => {
   let resumoCaixaService: jasmine.SpyObj<HubResumoCaixaService>;
   let fechamentoDiaService: jasmine.SpyObj<HubFechamentoDiaService>;
   let vendaSession: jasmine.SpyObj<VendaSessionService>;
+  let hubVendaService: jasmine.SpyObj<HubVendaService>;
   let caixaStatusSignal = signal<'inicializando' | 'fechado' | 'aberto' | 'erro'>('aberto');
   let sessaoCaixaSignal = signal<SessaoCaixaHubResumo | null>(sessaoCaixaAbertaStub);
   let vendaSignal = signal(vendaAbertaStub.venda);
@@ -420,6 +422,25 @@ describe('PdvPageComponent', () => {
     vendaSession.removerCliente.and.returnValue(of({ ok: true }));
     vendaSession.selecionarVendedor.and.returnValue(of({ ok: true }));
     vendaSession.removerVendedor.and.returnValue(of({ ok: true }));
+    hubVendaService = jasmine.createSpyObj<HubVendaService>('HubVendaService', ['obterDanfeNfce']);
+    hubVendaService.obterDanfeNfce.and.returnValue(of({
+      via: 'CONSUMIDOR',
+      imprimivel: true,
+      motivoNaoImprimivel: '',
+      contingencia: false,
+      emitente: { razaoSocial: 'Empresa Teste Ltda', nomeFantasia: 'Sysvar', cnpj: '00000000000123', inscricaoEstadual: '123', endereco: 'Rua Teste, 1' },
+      nfce: { numero: 123, serie: 1, emitidaEm: '2026-09-20T10:00:00', ambiente: 'HOMOLOGACAO', status: 'AUTORIZADA' },
+      itens: [{ codigo: '001', descricao: 'Calça Jeans', quantidade: '1.000', unidade: 'UN', valorUnitario: '199.90', valorTotal: '199.90' }],
+      totais: { subtotal: '199.90', desconto: '0.00', total: '199.90' },
+      pagamentos: [{ descricao: 'Dinheiro', valor: '199.90' }],
+      troco: '0.00',
+      consumidor: null,
+      mensagens: ['Consulte pela chave de acesso'],
+      qrCodeDataUri: 'data:image/png;base64,AAAA',
+      chaveAcesso: '35260900000000000123650010000001231000001234',
+      urlConsulta: 'https://sefaz.example.test',
+      protocoloAutorizacao: '135260000000001',
+    }));
 
     await TestBed.configureTestingModule({
       imports: [PdvPageComponent, RouterTestingModule.withRoutes([{ path: 'operador', component: EmptyRouteComponent }])],
@@ -434,6 +455,7 @@ describe('PdvPageComponent', () => {
         { provide: HubResumoCaixaService, useValue: resumoCaixaService },
         { provide: HubFechamentoDiaService, useValue: fechamentoDiaService },
         { provide: VendaSessionService, useValue: vendaSession },
+        { provide: HubVendaService, useValue: hubVendaService },
       ],
     }).compileComponents();
 
@@ -2336,4 +2358,169 @@ describe('PdvPageComponent', () => {
     expect(component.modalAtalho).toBe('pagamentos');
     expect(vendaSession.listarFormasPagamento).toHaveBeenCalled();
   });
+
+  it('finalizacao sem NFC-e mostra conclusao sem consultar DANFE', () => {
+    const component = fixture.componentInstance;
+    const finalizada = { ...vendaAbertaStub.venda!, status: 'FINALIZADA' as const, vendedor: vendedorStub, totalPago: '199.90', pendente: '0.00' };
+    vendaSession.finalizarVenda.and.returnValue(of({ ok: true, vendaFinalizada: finalizada }));
+
+    component.finalizarVendaConfirmada();
+    fixture.detectChanges();
+
+    expect(component.exibindoVendaFinalizada).toBeTrue();
+    expect(hubVendaService.obterDanfeNfce).not.toHaveBeenCalled();
+    expect(fixture.nativeElement.textContent).toContain('Venda concluída sem emissão de NFC-e.');
+  });
+
+  it('finalizacao com NFC-e carrega DANFE consumidor e mostra numero serie status', () => {
+    const component = fixture.componentInstance;
+    const finalizada = {
+      ...vendaAbertaStub.venda!,
+      status: 'FINALIZADA' as const,
+      vendedor: vendedorStub,
+      totalPago: '199.90',
+      pendente: '0.00',
+      fiscal: { emiteNfce: true, nfceUuid: 'nfce-uuid', status: 'AUTORIZADA' as const, numero: 123, serie: 1, chaveAcesso: 'chave', protocoloAutorizacao: 'protocolo', motivo: '' },
+    };
+    vendaSession.finalizarVenda.and.returnValue(of({ ok: true, vendaFinalizada: finalizada }));
+
+    component.finalizarVendaConfirmada();
+    fixture.detectChanges();
+
+    expect(hubVendaService.obterDanfeNfce).toHaveBeenCalledWith('venda-hub-uuid', 'CONSUMIDOR');
+    expect(fixture.nativeElement.textContent).toContain('NFC-e autorizada');
+    expect(fixture.nativeElement.textContent).toContain('NFC-e 123');
+    expect(fixture.nativeElement.textContent).toContain('serie 1');
+  });
+
+  it('contingencia mostra alerta e imprime via estabelecimento refazendo consulta', () => {
+    const component = fixture.componentInstance;
+    const finalizada = {
+      ...vendaAbertaStub.venda!,
+      status: 'FINALIZADA' as const,
+      vendedor: vendedorStub,
+      totalPago: '199.90',
+      pendente: '0.00',
+      fiscal: { emiteNfce: true, nfceUuid: 'nfce-uuid', status: 'CONTINGENCIA' as const, numero: 124, serie: 1, chaveAcesso: 'chave', protocoloAutorizacao: null, motivo: 'Emitida offline' },
+    };
+    vendaSession.finalizarVenda.and.returnValue(of({ ok: true, vendaFinalizada: finalizada }));
+    spyOn(window, 'print');
+
+    component.finalizarVendaConfirmada();
+    fixture.detectChanges();
+    component.imprimirViaEstabelecimento();
+
+    expect(fixture.nativeElement.textContent).toContain('NFC-e emitida em contingência');
+    expect(hubVendaService.obterDanfeNfce).toHaveBeenCalledWith('venda-hub-uuid', 'ESTABELECIMENTO');
+    expect(window.print).toHaveBeenCalled();
+  });
+
+  it('rejeitada alerta e nao mostra botao de impressao quando DANFE nao imprimivel', () => {
+    const component = fixture.componentInstance;
+    hubVendaService.obterDanfeNfce.and.returnValue(of({
+      via: 'CONSUMIDOR',
+      imprimivel: false,
+      motivoNaoImprimivel: 'NFC-e rejeitada não possui DANFE imprimível.',
+      contingencia: false,
+      emitente: { razaoSocial: 'Empresa Teste Ltda', nomeFantasia: '', cnpj: '00000000000123', inscricaoEstadual: '', endereco: '' },
+      nfce: { numero: 125, serie: 1, emitidaEm: null, ambiente: 'HOMOLOGACAO', status: 'REJEITADA' },
+      itens: [],
+      totais: { subtotal: '0.00', desconto: '0.00', total: '0.00' },
+      pagamentos: [],
+      troco: '0.00',
+      consumidor: null,
+      mensagens: [],
+      qrCodeDataUri: null,
+      chaveAcesso: 'chave',
+      urlConsulta: '',
+      protocoloAutorizacao: null,
+    }));
+    vendaSession.finalizarVenda.and.returnValue(of({
+      ok: true,
+      vendaFinalizada: {
+        ...vendaAbertaStub.venda!,
+        status: 'FINALIZADA' as const,
+        fiscal: { emiteNfce: true, nfceUuid: 'nfce-uuid', status: 'REJEITADA' as const, numero: 125, serie: 1, chaveAcesso: 'chave', protocoloAutorizacao: null, motivo: 'Rejeição fiscal' },
+      },
+    }));
+
+    component.finalizarVendaConfirmada();
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.textContent).toContain('NFC-e rejeitada');
+    expect(fixture.nativeElement.textContent).toContain('NFC-e rejeitada não possui DANFE imprimível.');
+    expect(fixture.nativeElement.textContent).not.toContain('IMPRIMIR DANFE');
+  });
+
+  it('falha ao carregar DANFE permite retry sem restaurar carrinho', () => {
+    const component = fixture.componentInstance;
+    const danfeOk = {
+      via: 'CONSUMIDOR' as const,
+      imprimivel: true,
+      motivoNaoImprimivel: '',
+      contingencia: false,
+      emitente: { razaoSocial: 'Empresa Teste Ltda', nomeFantasia: '', cnpj: '00000000000123', inscricaoEstadual: '', endereco: '' },
+      nfce: { numero: 126, serie: 1, emitidaEm: null, ambiente: 'HOMOLOGACAO', status: 'AUTORIZADA' },
+      itens: [],
+      totais: { subtotal: '0.00', desconto: '0.00', total: '0.00' },
+      pagamentos: [],
+      troco: '0.00',
+      consumidor: null,
+      mensagens: [],
+      qrCodeDataUri: null,
+      chaveAcesso: 'chave',
+      urlConsulta: '',
+      protocoloAutorizacao: null,
+    };
+    hubVendaService.obterDanfeNfce.and.returnValues(throwError(() => new Error('rede')), of(danfeOk));
+    vendaSession.finalizarVenda.and.returnValue(of({
+      ok: true,
+      vendaFinalizada: {
+        ...vendaAbertaStub.venda!,
+        status: 'FINALIZADA' as const,
+        fiscal: { emiteNfce: true, nfceUuid: 'nfce-uuid', status: 'AUTORIZADA' as const, numero: 126, serie: 1, chaveAcesso: 'chave', protocoloAutorizacao: null, motivo: '' },
+      },
+    }));
+
+    component.finalizarVendaConfirmada();
+    fixture.detectChanges();
+    expect(component.venda()).toBe(vendaAbertaStub.venda);
+    expect(fixture.nativeElement.textContent).toContain('Venda finalizada. Não foi possível carregar o DANFE.');
+
+    component.tentarCarregarDanfe();
+    fixture.detectChanges();
+
+    expect(hubVendaService.obterDanfeNfce).toHaveBeenCalledTimes(2);
+    expect(component.danfeNfce?.nfce.numero).toBe(126);
+  });
+
+  it('impressao aplica e remove classe do body chamando window.print', fakeAsync(() => {
+    const component = fixture.componentInstance;
+    spyOn(window, 'print');
+    component.danfeNfce = {
+      via: 'CONSUMIDOR',
+      imprimivel: true,
+      motivoNaoImprimivel: '',
+      contingencia: false,
+      emitente: { razaoSocial: 'Empresa Teste Ltda', nomeFantasia: '', cnpj: '00000000000123', inscricaoEstadual: '', endereco: '' },
+      nfce: { numero: 123, serie: 1, emitidaEm: null, ambiente: 'HOMOLOGACAO', status: 'AUTORIZADA' },
+      itens: [],
+      totais: { subtotal: '0.00', desconto: '0.00', total: '0.00' },
+      pagamentos: [],
+      troco: '0.00',
+      consumidor: null,
+      mensagens: [],
+      qrCodeDataUri: null,
+      chaveAcesso: 'chave',
+      urlConsulta: '',
+      protocoloAutorizacao: null,
+    };
+
+    component.imprimirDanfeConsumidor();
+
+    expect(document.body.classList).toContain('danfe-print-mode');
+    expect(window.print).toHaveBeenCalled();
+    tick(500);
+    expect(document.body.classList).not.toContain('danfe-print-mode');
+  }));
 });

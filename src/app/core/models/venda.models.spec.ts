@@ -62,6 +62,16 @@ describe('venda models', () => {
           origem_captura: 'MANUAL',
           criado_em: '2026-09-13T12:01:00',
         }],
+        fiscal: {
+          emite_nfce: true,
+          nfce_uuid: 'nfce-uuid',
+          status: 'AUTORIZADA',
+          numero: 123,
+          serie: 1,
+          chave_acesso: '35260900000000000123650010000001231000001234',
+          protocolo_autorizacao: '135260000000001',
+          motivo: 'Autorizado o uso da NF-e',
+        },
       },
     };
 
@@ -82,6 +92,10 @@ describe('venda models', () => {
     expect(venda?.vendedor?.id).toBe(501);
     expect(venda?.vendedor?.comissaoPercentual).toBe('3.00');
     expect(venda?.pagamentos[0].formaPagamentoId).toBe(1);
+    expect(venda?.fiscal.emiteNfce).toBeTrue();
+    expect(venda?.fiscal.nfceUuid).toBe('nfce-uuid');
+    expect(venda?.fiscal.status).toBe('AUTORIZADA');
+    expect(venda?.fiscal.chaveAcesso).toBe('35260900000000000123650010000001231000001234');
   });
 
   it('mapeia venda com cliente null', () => {
@@ -103,6 +117,7 @@ describe('venda models', () => {
 
     expect(venda?.cliente).toBeNull();
     expect(venda?.vendedor).toBeNull();
+    expect(venda?.fiscal.emiteNfce).toBeFalse();
   });
 
   it('mapeia venda null com cliente_preselecionado e vendedor_preselecionado', () => {

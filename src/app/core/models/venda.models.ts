@@ -2,6 +2,7 @@ import { mapOperador, OperadorHubPublico, OperadorHubPublicoApi } from './operad
 import { mapVendedor, VendedorHubResumo, VendedorHubResumoApi } from './vendedor.models';
 
 export type VendaSessionStatus = 'inicializando' | 'sem-venda' | 'aberta' | 'erro';
+export type VendaFiscalStatus = 'GERADA' | 'CONTINGENCIA' | 'AUTORIZADA' | 'REJEITADA' | 'ERRO_GERACAO' | 'PENDENTE_TRANSMISSAO';
 
 export interface VendaItemHubResumo {
   uuid: string;
@@ -37,6 +38,18 @@ export interface VendaHubResumo {
   operadorCriacao: OperadorHubPublico;
   itens: VendaItemHubResumo[];
   pagamentos: VendaPagamentoHubResumo[];
+  fiscal: VendaFiscalResumo;
+}
+
+export interface VendaFiscalResumo {
+  emiteNfce: boolean;
+  nfceUuid: string | null;
+  status: VendaFiscalStatus | null;
+  numero: number | null;
+  serie: number | null;
+  chaveAcesso: string | null;
+  protocoloAutorizacao: string | null;
+  motivo: string;
 }
 
 export interface VendaClienteResumo {
@@ -111,6 +124,18 @@ export interface VendaHubResumoApi {
   operador_criacao: OperadorHubPublicoApi;
   itens: VendaItemHubResumoApi[];
   pagamentos?: VendaPagamentoHubResumoApi[];
+  fiscal?: VendaFiscalResumoApi | null;
+}
+
+export interface VendaFiscalResumoApi {
+  emite_nfce: boolean;
+  nfce_uuid?: string | null;
+  status?: VendaFiscalStatus | null;
+  numero?: number | null;
+  serie?: number | null;
+  chave_acesso?: string | null;
+  protocolo_autorizacao?: string | null;
+  motivo?: string | null;
 }
 
 export interface VendaClienteResumoApi {
@@ -168,6 +193,20 @@ export function mapVenda(venda: VendaHubResumoApi): VendaHubResumo {
     operadorCriacao: mapOperador(venda.operador_criacao),
     itens: venda.itens.map(mapVendaItem),
     pagamentos: (venda.pagamentos ?? []).map(mapVendaPagamento),
+    fiscal: mapVendaFiscal(venda.fiscal),
+  };
+}
+
+export function mapVendaFiscal(fiscal: VendaFiscalResumoApi | null | undefined): VendaFiscalResumo {
+  return {
+    emiteNfce: Boolean(fiscal?.emite_nfce),
+    nfceUuid: fiscal?.nfce_uuid ?? null,
+    status: fiscal?.status ?? null,
+    numero: fiscal?.numero ?? null,
+    serie: fiscal?.serie ?? null,
+    chaveAcesso: fiscal?.chave_acesso ?? null,
+    protocoloAutorizacao: fiscal?.protocolo_autorizacao ?? null,
+    motivo: fiscal?.motivo ?? '',
   };
 }
 

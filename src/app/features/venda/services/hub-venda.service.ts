@@ -9,6 +9,7 @@ import {
   FormasPagamentoResponse,
   mapFormasPagamento,
 } from '../../../core/models/pagamento.models';
+import { DanfeNfce, DanfeNfceApi, DanfeVia, mapDanfeNfce } from '../../../core/models/danfe-nfce.models';
 import {
   mapVendaAtual,
   VendaAtualResponse,
@@ -85,5 +86,9 @@ export class HubVendaService {
 
   finalizarVenda(vendaUuid: string): Observable<VendaAtualResponse> {
     return this.http.post<VendaApiResponse>(`${this.baseUrl}/finalizar/`, { venda_uuid: vendaUuid }).pipe(map(mapVendaAtual));
+  }
+
+  obterDanfeNfce(vendaUuid: string, via: DanfeVia): Observable<DanfeNfce> {
+    return this.http.get<DanfeNfceApi>(`${this.baseUrl}/${vendaUuid}/danfe-nfce/?via=${via}`).pipe(map(mapDanfeNfce));
   }
 }

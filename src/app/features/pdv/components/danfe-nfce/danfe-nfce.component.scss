@@ -1,0 +1,68 @@
+.danfe-nfce {
+  width: min(100%, 320px);
+  margin: 0 auto;
+  padding: 10px;
+  background: #fff;
+  color: #000;
+  font-family: "Courier New", monospace;
+  font-size: 11px;
+  line-height: 1.28;
+}
+
+.danfe-section {
+  display: grid;
+  gap: 4px;
+  padding: 7px 0;
+  border-bottom: 1px dashed #000;
+}
+
+.danfe-center {
+  text-align: center;
+}
+
+.danfe-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  align-items: start;
+}
+
+.danfe-head {
+  font-weight: 700;
+}
+
+.danfe-item {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 2px 8px;
+}
+
+.danfe-item strong,
+.danfe-item span {
+  grid-column: 1 / -1;
+}
+
+.danfe-item b {
+  justify-self: end;
+}
+
+.total {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+p {
+  margin: 0;
+}
+
+img {
+  width: 30mm;
+  min-width: 25mm;
+  height: auto;
+  justify-self: center;
+  image-rendering: pixelated;
+}
+
+.danfe-key {
+  overflow-wrap: anywhere;
+}

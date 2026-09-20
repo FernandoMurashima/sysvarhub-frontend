@@ -13,6 +13,7 @@ export interface VendaOperacaoResultado {
   ok: boolean;
   detail?: string;
   estoqueDisponivel?: string;
+  vendaFinalizada?: VendaHubResumo;
 }
 
 export interface PagamentoIntencao {
@@ -151,7 +152,9 @@ export class VendaSessionService {
         }
         this.definirEstado(response);
       }),
-      map(() => ({ ok: true })),
+      map((response) => response.venda?.status === 'FINALIZADA'
+        ? { ok: true, vendaFinalizada: response.venda }
+        : { ok: false, detail: 'Não foi possível confirmar a finalização da venda.' }),
       catchError((error: unknown) => this.tratarErroFinalizacao(error)),
       tap(() => this.loadingOperacaoSignal.set(false)),
     );

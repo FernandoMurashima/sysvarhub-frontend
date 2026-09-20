@@ -1132,6 +1132,72 @@
     </div>
   }
 
+  @if (exibindoVendaFinalizada && vendaFinalizada) {
+    <div class="pdv-modal-backdrop">
+      <section class="pdv-modal sale-finished-modal">
+        <header>
+          <div>
+            <strong>Venda finalizada</strong>
+            <span>Venda {{ vendaFinalizada.uuid.slice(0, 8) }}</span>
+          </div>
+        </header>
+
+        <div class="sale-finished-content">
+          <section class="sale-finished-summary">
+            <article><span>Total</span><strong>{{ formatarMoeda(vendaFinalizada.total) }}</strong></article>
+            <article><span>Recebido</span><strong>{{ formatarMoeda(vendaFinalizada.totalPago) }}</strong></article>
+            <article><span>Troco</span><strong>{{ formatarMoeda(vendaFinalizada.troco) }}</strong></article>
+            <article><span>Vendedor</span><strong>{{ vendaFinalizada.vendedor?.nome || vendedorOperacional()?.nome || '-' }}</strong></article>
+            <article><span>Cliente</span><strong>{{ vendaFinalizada.cliente?.nomeCliente || 'Consumidor não identificado' }}</strong></article>
+          </section>
+
+          @if (fiscalFinalizacao?.emiteNfce) {
+            <section class="sale-fiscal-status" [class.alert]="fiscalExigeAlerta()">
+              <strong>{{ descricaoStatusFiscal(fiscalFinalizacao?.status) }}</strong>
+              @if (fiscalFinalizacao?.numero || fiscalFinalizacao?.serie) {
+                <span>NFC-e {{ fiscalFinalizacao?.numero || '-' }} · Série {{ fiscalFinalizacao?.serie || '-' }}</span>
+              }
+              @if (fiscalFinalizacao?.motivo) {
+                <span>{{ fiscalFinalizacao?.motivo }}</span>
+              }
+            </section>
+
+            @if (carregandoDanfe) {
+              <p class="danfe-state">Carregando DANFE...</p>
+            }
+            @if (erroDanfe) {
+              <div class="danfe-error">
+                <span>{{ erroDanfe }}</span>
+                <button type="button" (click)="tentarCarregarDanfe()">Tentar novamente</button>
+              </div>
+            }
+            @if (danfeNfce) {
+              @if (!danfeNfce.imprimivel) {
+                <p class="danfe-error">{{ danfeNfce.motivoNaoImprimivel || 'DANFE não disponível para impressão.' }}</p>
+              }
+              <div class="danfe-preview">
+                <app-danfe-nfce [danfe]="danfeNfce"></app-danfe-nfce>
+              </div>
+            }
+          } @else {
+            <p class="sale-without-nfce">Venda concluída sem emissão de NFC-e.</p>
+          }
+        </div>
+
+        <div class="modal-actions danfe-print-actions">
+          <button type="button" (click)="fecharVendaFinalizada()">Nova Venda</button>
+          @if (danfeNfce?.imprimivel) {
+            <button type="button" class="primary" (click)="imprimirDanfeConsumidor()">IMPRIMIR DANFE</button>
+          }
+          @if (podeImprimirViaEstabelecimento()) {
+            <button type="button" class="secondary" (click)="imprimirViaEstabelecimento()">IMPRIMIR VIA ESTABELECIMENTO</button>
+          }
+          <button type="button" (click)="fecharVendaFinalizada()">Fechar</button>
+        </div>
+      </section>
+    </div>
+  }
+
   @if (confirmandoFinalizacao && venda()) {
     <div class="pdv-modal-backdrop">
       <section class="pdv-modal">

@@ -117,6 +117,16 @@ export const vendaAbertaStub: VendaAtualResponse = {
     cliente: null,
     vendedor: null,
     operadorCriacao: operadorLoginResponseStub.operador,
+    fiscal: {
+      emiteNfce: false,
+      nfceUuid: null,
+      status: null,
+      numero: null,
+      serie: null,
+      chaveAcesso: null,
+      protocoloAutorizacao: null,
+      motivo: '',
+    },
     itens: [
       {
         uuid: 'item-venda-uuid',

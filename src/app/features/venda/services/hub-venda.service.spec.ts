@@ -183,4 +183,29 @@ describe('HubVendaService', () => {
     expect(request.request.body).toEqual({ venda_uuid: 'venda' });
     request.flush({ venda: null });
   });
+
+  it('consulta DANFE NFC-e por venda e via', () => {
+    service.obterDanfeNfce('venda-uuid', 'CONSUMIDOR').subscribe((danfe) => {
+      expect(danfe.via).toBe('CONSUMIDOR');
+      expect(danfe.emitente.razaoSocial).toBe('Empresa Teste Ltda');
+      expect(danfe.qrCodeDataUri).toBe('data:image/png;base64,AAAA');
+    });
+
+    const request = httpMock.expectOne('/api/terminal/venda/venda-uuid/danfe-nfce/?via=CONSUMIDOR');
+    expect(request.request.method).toBe('GET');
+    request.flush({
+      via: 'CONSUMIDOR',
+      imprimivel: true,
+      emitente: { razao_social: 'Empresa Teste Ltda', cnpj: '00000000000123' },
+      nfce: { numero: 123, serie: 1, status: 'AUTORIZADA' },
+      itens: [{ codigo: '001', descricao: 'Produto', quantidade: '1.000', unidade: 'UN', valor_unitario: '10.00', valor_total: '10.00' }],
+      totais: { subtotal: '10.00', total: '10.00' },
+      pagamentos: [{ descricao: 'Dinheiro', valor: '10.00' }],
+      troco: '0.00',
+      mensagens: [],
+      qr_code_data_uri: 'data:image/png;base64,AAAA',
+      chave_acesso: '35260900000000000123650010000001231000001234',
+      url_consulta: 'https://sefaz.example.test',
+    });
+  });
 });

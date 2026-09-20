@@ -280,8 +280,186 @@ button {
   color: #b42318;
 }
 
+.pdv-desktop .sale-finished-modal {
+  width: min(1120px, calc(100vw - 56px));
+}
+
+.pdv-desktop .sale-finished-content {
+  display: grid;
+  gap: 14px;
+  padding: 18px 22px;
+}
+
+.pdv-desktop .sale-finished-summary {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.pdv-desktop .sale-finished-summary article,
+.pdv-desktop .sale-fiscal-status,
+.pdv-desktop .sale-without-nfce,
+.pdv-desktop .danfe-error,
+.pdv-desktop .danfe-state {
+  border: 1px solid rgba(79, 178, 255, 0.25);
+  border-radius: 8px;
+  background: #071a31;
+  padding: 10px 12px;
+}
+
+.pdv-desktop .sale-finished-summary span {
+  display: block;
+  color: #9eb5cf;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.pdv-desktop .sale-finished-summary strong {
+  display: block;
+  color: #fff;
+  font-size: 16px;
+  margin-top: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pdv-desktop .sale-fiscal-status {
+  display: grid;
+  gap: 4px;
+}
+
+.pdv-desktop .sale-fiscal-status strong {
+  color: #8fc2ff;
+}
+
+.pdv-desktop .sale-fiscal-status span {
+  color: #dcecff;
+}
+
+.pdv-desktop .sale-fiscal-status.alert {
+  border-color: rgba(251, 191, 36, 0.48);
+  background: rgba(120, 53, 15, 0.24);
+}
+
+.pdv-desktop .sale-fiscal-status.alert strong {
+  color: #fde68a;
+}
+
+.pdv-desktop .sale-without-nfce,
+.pdv-desktop .danfe-state {
+  margin: 0;
+  color: #b6cee8;
+  font-weight: 900;
+  text-align: center;
+}
+
+.pdv-desktop .danfe-error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0;
+  color: #fecaca;
+  border-color: rgba(248, 113, 113, 0.42);
+  background: rgba(127, 29, 29, 0.3);
+  font-weight: 900;
+}
+
+.pdv-desktop .danfe-error button,
+.pdv-desktop .modal-actions button {
+  height: 36px;
+  border: 1px solid #315e8f;
+  border-radius: 8px;
+  background: #071a31;
+  color: #fff;
+  font-weight: 900;
+  padding: 0 14px;
+}
+
+.pdv-desktop .danfe-preview {
+  max-height: 46vh;
+  overflow: auto;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 8px;
+  background: #fff;
+  padding: 12px;
+}
+
+.pdv-desktop .modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 16px 22px;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.pdv-desktop .modal-actions button.primary {
+  background: #1688ff;
+  border-color: #1688ff;
+}
+
+.pdv-desktop .modal-actions button.secondary {
+  background: #0f766e;
+  border-color: #0f766e;
+}
+
 @media (max-width: 720px) {
   .page {
     padding: 18px;
+  }
+}
+
+@media (max-width: 900px) {
+  .pdv-desktop .sale-finished-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .pdv-desktop .modal-actions {
+    justify-content: stretch;
+    flex-direction: column;
+  }
+
+  .pdv-desktop .modal-actions button {
+    width: 100%;
+  }
+}
+
+@media print {
+  @page {
+    size: 58mm auto;
+    margin: 2mm;
+  }
+
+  body.danfe-print-mode {
+    background: #fff !important;
+    color: #000 !important;
+  }
+
+  body.danfe-print-mode * {
+    visibility: hidden !important;
+  }
+
+  body.danfe-print-mode app-danfe-nfce,
+  body.danfe-print-mode app-danfe-nfce * {
+    visibility: visible !important;
+  }
+
+  body.danfe-print-mode app-danfe-nfce {
+    position: absolute !important;
+    inset: 0 auto auto 0 !important;
+    width: 54mm !important;
+    display: block !important;
+    background: #fff !important;
+    color: #000 !important;
+  }
+
+  body.danfe-print-mode .danfe-print-actions,
+  body.danfe-print-mode button {
+    display: none !important;
+  }
+
+  body.danfe-print-mode img {
+    min-width: 25mm !important;
   }
 }

@@ -21,7 +21,8 @@ import { TipoMovimentacaoCaixa } from '../../../../core/models/movimentacao-caix
 import { FormaPagamento } from '../../../../core/models/pagamento.models';
 import { ResumoCaixa } from '../../../../core/models/resumo-caixa.models';
 import { TipoDespesaPdv } from '../../../../core/models/tipo-despesa-pdv.models';
-import { VendaClienteResumo, VendaItemHubResumo } from '../../../../core/models/venda.models';
+import { DanfeNfce, DanfeVia } from '../../../../core/models/danfe-nfce.models';
+import { VendaClienteResumo, VendaFiscalResumo, VendaHubResumo, VendaItemHubResumo, VendaFiscalStatus } from '../../../../core/models/venda.models';
 import { VendedorHubResumo } from '../../../../core/models/vendedor.models';
 import { CaixaSessionService } from '../../../caixa/services/caixa-session.service';
 import { HubMovimentacoesCaixaService } from '../../../caixa/services/hub-movimentacoes-caixa.service';
@@ -31,11 +32,13 @@ import { ClienteCadastroComunicacaoIncertError, ClienteSessionExpiredError, Clie
 import { normalizarValorAbertura } from '../../../caixa/services/caixa-valor.parser';
 import { OperatorSessionService } from '../../../operador/services/operator-session.service';
 import { VendaSessionService } from '../../../venda/services/venda-session.service';
+import { HubVendaService } from '../../../venda/services/hub-venda.service';
 import { VendedorSessionExpiredError, VendedorSessionService } from '../../../vendedor/services/vendedor-session.service';
 import { formatarMoedaString, normalizarValorPagamento, somarMoedasString } from '../../../venda/services/pagamento-valor.parser';
 import { PdvProdutoConsulta } from '../../models/pdv-produto-consulta.model';
 import { HubFechamentoDiaService } from '../../services/hub-fechamento-dia.service';
 import { PdvHubFacade } from '../../services/pdv-hub.facade';
+import { DanfeNfceComponent } from '../../components/danfe-nfce/danfe-nfce.component';
 
 type PdvAtalho =
   | 'cliente'
@@ -82,7 +85,7 @@ interface MovimentacaoCaixaForm {
 @Component({
   selector: 'app-pdv-page',
   standalone: true,
-  imports: [FormsModule, RouterLink],
+  imports: [FormsModule, RouterLink, DanfeNfceComponent],
   templateUrl: './pdv-page.component.html',
   styleUrl: './pdv-page.component.scss',
 })
@@ -94,6 +97,7 @@ export class PdvPageComponent implements OnInit, OnDestroy {
   private readonly movimentacoesCaixaService = inject(HubMovimentacoesCaixaService);
   private readonly resumoCaixaService = inject(HubResumoCaixaService);
   private readonly vendaSession = inject(VendaSessionService);
+  private readonly hubVendaService = inject(HubVendaService);
   private readonly clienteSession = inject(ClienteSessionService);
   private readonly vendedorSession = inject(VendedorSessionService);
   private readonly fechamentoDiaService = inject(HubFechamentoDiaService);
@@ -118,6 +122,12 @@ export class PdvPageComponent implements OnInit, OnDestroy {
   autorizacaoPagamento = '';
   carregandoFormasPagamento = false;
   confirmandoFinalizacao = false;
+  vendaFinalizada: VendaHubResumo | null = null;
+  fiscalFinalizacao: VendaFiscalResumo | null = null;
+  danfeNfce: DanfeNfce | null = null;
+  carregandoDanfe = false;
+  erroDanfe = '';
+  exibindoVendaFinalizada = false;
   carregandoBusca = false;
   buscaCliente = '';
   clientesEncontrados: ClienteHubResumo[] = [];
@@ -178,6 +188,8 @@ export class PdvPageComponent implements OnInit, OnDestroy {
   private movimentacaoCaixaSubscription: Subscription | null = null;
   private resumoCaixaSubscription: Subscription | null = null;
   private fechamentoDiaSubscription: Subscription | null = null;
+  private danfeSubscription: Subscription | null = null;
+  private danfeConsumidor: DanfeNfce | null = null;
 
   readonly loja = this.facade.loja;
   readonly caixa = this.facade.caixa;
@@ -223,6 +235,8 @@ export class PdvPageComponent implements OnInit, OnDestroy {
     this.movimentacaoCaixaSubscription?.unsubscribe();
     this.resumoCaixaSubscription?.unsubscribe();
     this.fechamentoDiaSubscription?.unsubscribe();
+    this.danfeSubscription?.unsubscribe();
+    document.body.classList.remove('danfe-print-mode');
   }
 
   @HostListener('document:keydown.f2', ['$event'])
@@ -1301,14 +1315,120 @@ export class PdvPageComponent implements OnInit, OnDestroy {
         this.mensagem = resultado.detail || 'Falha ao finalizar venda.';
         return;
       }
-      const troco = venda.troco !== '0.00' ? ` Troco: ${this.formatarMoeda(venda.troco)}.` : '';
+      const vendaFinalizada = resultado.vendaFinalizada;
+      if (!vendaFinalizada) {
+        this.mensagem = 'Venda finalizada, mas não foi possível recuperar o resumo fiscal.';
+        return;
+      }
       this.fecharAtalho();
       this.itemSelecionadoUuid = null;
       this.busca = '';
       this.produtos = [];
       this.produtoSelecionado = null;
-      this.mensagem = `Venda finalizada com sucesso.${troco}`;
+      this.mensagem = '';
+      this.exibirVendaFinalizada(vendaFinalizada);
     });
+  }
+
+  tentarCarregarDanfe(): void {
+    this.carregarDanfeNfce('CONSUMIDOR');
+  }
+
+  imprimirDanfeConsumidor(): void {
+    if (!this.danfeNfce?.imprimivel) return;
+    this.imprimirDanfe();
+  }
+
+  imprimirViaEstabelecimento(): void {
+    const consumidorAtual = this.danfeConsumidor;
+    this.carregarDanfeNfce('ESTABELECIMENTO', () => {
+      this.imprimirDanfe(() => {
+        if (consumidorAtual) {
+          this.danfeNfce = consumidorAtual;
+        }
+      });
+    });
+  }
+
+  fecharVendaFinalizada(): void {
+    this.danfeSubscription?.unsubscribe();
+    this.vendaFinalizada = null;
+    this.fiscalFinalizacao = null;
+    this.danfeNfce = null;
+    this.danfeConsumidor = null;
+    this.carregandoDanfe = false;
+    this.erroDanfe = '';
+    this.exibindoVendaFinalizada = false;
+    this.mensagem = '';
+  }
+
+  descricaoStatusFiscal(status: VendaFiscalStatus | null | undefined): string {
+    const descricoes: Record<VendaFiscalStatus, string> = {
+      GERADA: 'NFC-e gerada',
+      CONTINGENCIA: 'NFC-e emitida em contingência',
+      AUTORIZADA: 'NFC-e autorizada',
+      REJEITADA: 'NFC-e rejeitada',
+      ERRO_GERACAO: 'Erro na geração da NFC-e',
+      PENDENTE_TRANSMISSAO: 'NFC-e pendente de transmissão',
+    };
+    return status ? descricoes[status] : 'NFC-e sem status';
+  }
+
+  fiscalExigeAlerta(): boolean {
+    return ['CONTINGENCIA', 'REJEITADA', 'ERRO_GERACAO', 'PENDENTE_TRANSMISSAO'].includes(this.fiscalFinalizacao?.status || '');
+  }
+
+  podeImprimirViaEstabelecimento(): boolean {
+    return Boolean(this.danfeNfce?.imprimivel && this.fiscalFinalizacao?.status === 'CONTINGENCIA');
+  }
+
+  private exibirVendaFinalizada(venda: VendaHubResumo): void {
+    this.vendaFinalizada = venda;
+    this.fiscalFinalizacao = venda.fiscal;
+    this.danfeNfce = null;
+    this.danfeConsumidor = null;
+    this.erroDanfe = '';
+    this.exibindoVendaFinalizada = true;
+    if (venda.fiscal.emiteNfce) {
+      this.carregarDanfeNfce('CONSUMIDOR');
+    }
+  }
+
+  private carregarDanfeNfce(via: DanfeVia, aoCarregar?: () => void): void {
+    const venda = this.vendaFinalizada;
+    if (!venda) return;
+    this.danfeSubscription?.unsubscribe();
+    this.carregandoDanfe = true;
+    this.erroDanfe = '';
+    this.danfeSubscription = this.hubVendaService.obterDanfeNfce(venda.uuid, via).subscribe({
+      next: (danfe) => {
+        this.carregandoDanfe = false;
+        this.danfeNfce = danfe;
+        if (via === 'CONSUMIDOR') {
+          this.danfeConsumidor = danfe;
+        }
+        aoCarregar?.();
+      },
+      error: () => {
+        this.carregandoDanfe = false;
+        this.erroDanfe = 'Venda finalizada. Não foi possível carregar o DANFE.';
+      },
+    });
+  }
+
+  private imprimirDanfe(aoFinalizar?: () => void): void {
+    document.body.classList.add('danfe-print-mode');
+    let finalizado = false;
+    const limpar = (): void => {
+      if (finalizado) return;
+      finalizado = true;
+      document.body.classList.remove('danfe-print-mode');
+      window.removeEventListener('afterprint', limpar);
+      aoFinalizar?.();
+    };
+    window.addEventListener('afterprint', limpar, { once: true });
+    window.print();
+    setTimeout(limpar, 500);
   }
 
   temPagamentoAtivo(): boolean {
