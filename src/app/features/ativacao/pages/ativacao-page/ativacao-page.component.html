@@ -1,0 +1,88 @@
+<main class="page activation-page">
+  <section class="activation-card card">
+    <div class="header">
+      <p class="eyebrow">Sysvar Hub</p>
+      <h1>Ativação do Sysvar Hub</h1>
+      @if (status()?.ativado) {
+        <p class="muted">Hub conectado à Central.</p>
+      } @else {
+        <p class="muted">Vincule este Hub a uma loja usando o código temporário gerado na Central.</p>
+      }
+    </div>
+
+    @if (loading()) {
+      <p class="muted">Carregando status...</p>
+    }
+
+    @if (status(); as atual) {
+      <section class="status-panel" [class.connected]="atual.ativado">
+        <div>
+          <span>Status</span>
+          <strong>{{ atual.ativado ? 'Conectado/Ativado' : 'Não ativado' }}</strong>
+        </div>
+        <div>
+          <span>Empresa</span>
+          <strong>{{ atual.empresa_nome || atual.empresa_id || '-' }}</strong>
+        </div>
+        <div>
+          <span>Loja</span>
+          <strong>{{ atual.loja_nome || atual.loja_id || '-' }}</strong>
+        </div>
+        <div>
+          <span>Hub UUID</span>
+          <strong>{{ atual.hub_uuid || '-' }}</strong>
+        </div>
+        <div>
+          <span>URL da Central</span>
+          <strong>{{ atual.retaguarda_url || '-' }}</strong>
+        </div>
+        <div>
+          <span>Ativado em</span>
+          <strong>{{ atual.ativado_em || '-' }}</strong>
+        </div>
+      </section>
+    }
+
+    @if (errorMessage()) {
+      <p class="error" role="alert">{{ errorMessage() }}</p>
+    }
+
+    @if (successMessage()) {
+      <p class="success" role="status">{{ successMessage() }}</p>
+    }
+
+    @if (status()?.ativado && !editando()) {
+      <div class="actions split">
+        <button class="secondary-button" type="button" (click)="reativar()">Reativar / alterar vínculo</button>
+        <button class="primary-button" type="button" (click)="continuar()">Continuar para o Sysvar Hub</button>
+      </div>
+    }
+
+    @if (mostrarFormulario()) {
+      <form [formGroup]="form" (ngSubmit)="ativar()" class="form">
+        <div class="field">
+          <label for="retaguarda_url">URL da Central</label>
+          <input id="retaguarda_url" type="url" formControlName="retaguarda_url" autocomplete="url" />
+        </div>
+
+        <div class="field">
+          <label for="codigo">Código de ativação</label>
+          <input
+            id="codigo"
+            type="text"
+            formControlName="codigo"
+            autocomplete="off"
+            autocapitalize="characters"
+            (input)="codigoInput($event)"
+          />
+        </div>
+
+        <div class="actions">
+          <button class="primary-button" type="submit" [disabled]="saving()">
+            {{ saving() ? 'Ativando...' : 'Ativar Sysvar Hub' }}
+          </button>
+        </div>
+      </form>
+    }
+  </section>
+</main>

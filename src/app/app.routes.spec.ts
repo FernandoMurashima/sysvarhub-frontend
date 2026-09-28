@@ -23,6 +23,13 @@ describe('routes', () => {
     expect(suporteRoute?.canActivate).not.toContain(operatorSessionGuard);
   });
 
+  it('existe rota publica de ativacao sem guards', () => {
+    const ativacaoRoute = routes.find((route) => route.path === 'ativacao');
+
+    expect(ativacaoRoute).toBeTruthy();
+    expect(ativacaoRoute?.canActivate).toBeUndefined();
+  });
+
   it('nao combina redirectTo com canActivate em nenhuma rota', () => {
     const invalidRoute = routes.find((route) => route.redirectTo && route.canActivate);
 

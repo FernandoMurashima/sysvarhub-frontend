@@ -2,6 +2,7 @@ import { Routes } from '@angular/router';
 
 import { operatorSessionGuard } from './core/guards/operator-session.guard';
 import { terminalSessionGuard } from './core/guards/terminal-session.guard';
+import { AtivacaoPageComponent } from './features/ativacao/pages/ativacao-page/ativacao-page.component';
 import { OperadorLoginPageComponent } from './features/operador/pages/operador-login-page/operador-login-page.component';
 import { PareamentoPageComponent } from './features/terminal/pages/pareamento-page/pareamento-page.component';
 import { PdvPageComponent } from './features/pdv/pages/pdv-page/pdv-page.component';
@@ -16,6 +17,10 @@ export const routes: Routes = [
   {
     path: 'pareamento',
     component: PareamentoPageComponent,
+  },
+  {
+    path: 'ativacao',
+    component: AtivacaoPageComponent,
   },
   {
     path: 'pdv',
