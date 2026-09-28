@@ -1,6 +1,6 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { computed, inject, Injectable, signal } from '@angular/core';
-import { catchError, finalize, map, Observable, of, tap } from 'rxjs';
+import { catchError, EMPTY, finalize, map, Observable, of, Subscription, tap, timer } from 'rxjs';
 
 import { TERMINAL_CREDENTIAL_STORE } from '../../../core/auth/terminal-credential-store';
 import { TerminalContexto, TerminalSessionStatus } from '../../../core/models/terminal.models';
@@ -14,6 +14,7 @@ export class TerminalSessionService {
   private readonly statusSignal = signal<TerminalSessionStatus>('inicializando');
   private readonly contextoSignal = signal<TerminalContexto | null>(null);
   private bootstrapRequest$: Observable<boolean> | null = null;
+  private heartbeatSubscription: Subscription | null = null;
 
   readonly status = this.statusSignal.asReadonly();
   readonly contexto = this.contextoSignal.asReadonly();
@@ -35,6 +36,7 @@ export class TerminalSessionService {
         tap((contexto) => {
           this.contextoSignal.set(contexto);
           this.statusSignal.set('contexto-carregado');
+          this.startHeartbeat();
         }),
         map(() => true),
         catchError((error: unknown) => {
@@ -62,6 +64,7 @@ export class TerminalSessionService {
       tap((contexto) => {
         this.contextoSignal.set(contexto);
         this.statusSignal.set('contexto-carregado');
+        this.startHeartbeat();
       }),
     );
   }
@@ -75,9 +78,40 @@ export class TerminalSessionService {
   }
 
   private clearSession(status: TerminalSessionStatus): void {
+    this.stopHeartbeat();
     this.credentialStore.clearToken();
     this.contextoSignal.set(null);
     this.statusSignal.set(status);
+  }
+
+  private startHeartbeat(): void {
+    if (this.heartbeatSubscription || !this.credentialStore.hasToken()) {
+      return;
+    }
+
+    this.heartbeatSubscription = timer(0, 15_000)
+      .pipe(
+        tap(() => {
+          this.executarHeartbeat().subscribe();
+        }),
+      )
+      .subscribe();
+  }
+
+  private stopHeartbeat(): void {
+    this.heartbeatSubscription?.unsubscribe();
+    this.heartbeatSubscription = null;
+  }
+
+  private executarHeartbeat(): Observable<unknown> {
+    return this.hubTerminalService.heartbeat().pipe(
+      catchError((error: unknown) => {
+        if (this.isAuthenticationError(error)) {
+          this.clearSession('nao-pareado');
+        }
+        return EMPTY;
+      }),
+    );
   }
 
   private isAuthenticationError(error: unknown): boolean {

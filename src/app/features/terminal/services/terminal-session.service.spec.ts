@@ -1,5 +1,5 @@
 import { HttpErrorResponse } from '@angular/common/http';
-import { TestBed } from '@angular/core/testing';
+import { discardPeriodicTasks, fakeAsync, TestBed, tick } from '@angular/core/testing';
 import { of, throwError } from 'rxjs';
 
 import { TERMINAL_CREDENTIAL_STORE, TerminalCredentialStore } from '../../../core/auth/terminal-credential-store';
@@ -34,6 +34,15 @@ describe('TerminalSessionService', () => {
     });
 
     service = TestBed.inject(TerminalSessionService);
+    hubTerminalService.heartbeat.and.returnValue(of({
+      status: 'ok',
+      terminal_uuid: terminalContextoStub.terminal.uuid,
+      servidor_em: '2026-09-28T10:00:00Z',
+    }));
+  });
+
+  afterEach(() => {
+    service.invalidarSessao();
   });
 
   it('sem token fica nao pareado', (done) => {
@@ -136,4 +145,69 @@ describe('TerminalSessionService', () => {
       done();
     });
   });
+
+  it('mantem heartbeat ativo a cada 15 segundos apos contexto valido', fakeAsync(() => {
+    credentialStore.hasToken.and.returnValue(true);
+    hubTerminalService.contexto.and.returnValue(of(terminalContextoStub));
+    hubTerminalService.heartbeat.and.returnValue(of({
+      status: 'ok',
+      terminal_uuid: terminalContextoStub.terminal.uuid,
+      servidor_em: '2026-09-28T10:00:00Z',
+    }));
+
+    let valid = false;
+    service.bootstrap().subscribe((resultado) => {
+      valid = resultado;
+    });
+    tick();
+
+    expect(valid).toBeTrue();
+    expect(hubTerminalService.heartbeat).toHaveBeenCalledTimes(1);
+
+    tick(15_000);
+    expect(hubTerminalService.heartbeat).toHaveBeenCalledTimes(2);
+
+    tick(15_000);
+    expect(hubTerminalService.heartbeat).toHaveBeenCalledTimes(3);
+
+    discardPeriodicTasks();
+  }));
+
+  it('nao duplica heartbeat quando bootstrap roda novamente com contexto carregado', fakeAsync(() => {
+    credentialStore.hasToken.and.returnValue(true);
+    hubTerminalService.contexto.and.returnValue(of(terminalContextoStub));
+    hubTerminalService.heartbeat.and.returnValue(of({
+      status: 'ok',
+      terminal_uuid: terminalContextoStub.terminal.uuid,
+      servidor_em: '2026-09-28T10:00:00Z',
+    }));
+
+    service.bootstrap().subscribe();
+    tick();
+    service.bootstrap().subscribe();
+    tick(15_000);
+
+    expect(hubTerminalService.contexto).toHaveBeenCalledTimes(1);
+    expect(hubTerminalService.heartbeat).toHaveBeenCalledTimes(2);
+
+    discardPeriodicTasks();
+  }));
+
+  it('heartbeat com autenticacao invalida limpa sessao e encerra ciclo', fakeAsync(() => {
+    credentialStore.hasToken.and.returnValue(true);
+    hubTerminalService.contexto.and.returnValue(of(terminalContextoStub));
+    hubTerminalService.heartbeat.and.returnValue(
+      throwError(() => new HttpErrorResponse({ status: 403 })),
+    );
+
+    service.bootstrap().subscribe();
+    tick();
+
+    expect(credentialStore.clearToken).toHaveBeenCalled();
+    expect(service.status()).toBe('nao-pareado');
+
+    hubTerminalService.heartbeat.calls.reset();
+    tick(15_000);
+    expect(hubTerminalService.heartbeat).not.toHaveBeenCalled();
+  }));
 });
