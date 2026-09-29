@@ -8,6 +8,7 @@ import {
   HeartbeatResponse,
   PareamentoRequest,
   PareamentoResponse,
+  RecuperacaoTerminalLocalResponse,
   TerminalContexto,
 } from '../../../core/models/terminal.models';
 import { TERMINAL_CREDENTIAL_STORE } from '../../../core/auth/terminal-credential-store';
@@ -19,6 +20,14 @@ export class HubTerminalService {
 
   parear(payload: PareamentoRequest): Observable<PareamentoResponse> {
     return this.http.post<PareamentoResponse>(`${HUB_TERMINAL_API_PATH}/parear/`, payload).pipe(
+      tap((response) => {
+        this.credentialStore.setToken(response.token);
+      }),
+    );
+  }
+
+  recuperarLocal(payload: HeartbeatRequest = {}): Observable<RecuperacaoTerminalLocalResponse> {
+    return this.http.post<RecuperacaoTerminalLocalResponse>(`${HUB_TERMINAL_API_PATH}/recuperar-local/`, payload).pipe(
       tap((response) => {
         this.credentialStore.setToken(response.token);
       }),

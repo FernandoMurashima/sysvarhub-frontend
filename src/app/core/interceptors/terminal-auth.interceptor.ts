@@ -7,6 +7,7 @@ import { TERMINAL_CREDENTIAL_STORE } from '../auth/terminal-credential-store';
 
 const AUTHENTICATED_TERMINAL_PATH = '/api/terminal/';
 const PAIRING_PATH = '/api/terminal/parear/';
+const LOCAL_RECOVERY_PATH = '/api/terminal/recuperar-local/';
 const OPERATOR_CONTEXT_PATH = '/api/terminal/operador/contexto/';
 const OPERATOR_LOGOUT_PATH = '/api/terminal/operador/logout/';
 const OPERATOR_SCOPED_PATHS = [
@@ -26,7 +27,10 @@ export const terminalAuthInterceptor: HttpInterceptorFn = (req, next) => {
   const router = inject(Router);
   const isExternalUrl = /^https?:\/\//i.test(req.url);
   const isAuthenticatedTerminalRequest =
-    !isExternalUrl && req.url.startsWith(AUTHENTICATED_TERMINAL_PATH) && req.url !== PAIRING_PATH;
+    !isExternalUrl &&
+    req.url.startsWith(AUTHENTICATED_TERMINAL_PATH) &&
+    req.url !== PAIRING_PATH &&
+    req.url !== LOCAL_RECOVERY_PATH;
 
   const token = credentialStore.getToken();
   const request =

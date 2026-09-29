@@ -56,6 +56,18 @@ describe('terminalAuthInterceptor', () => {
     request.flush({});
   });
 
+  it('nao adiciona token nem limpa credencial em /recuperar-local/', () => {
+    credentialStore.getToken.and.returnValue('token-ficticio');
+
+    http.post('/api/terminal/recuperar-local/', {}).subscribe({ error: () => undefined });
+    const request = httpMock.expectOne('/api/terminal/recuperar-local/');
+    request.flush({}, { status: 404, statusText: 'Not Found' });
+
+    expect(request.request.headers.has('Authorization')).toBeFalse();
+    expect(credentialStore.clearToken).not.toHaveBeenCalled();
+    expect(router.navigateByUrl).not.toHaveBeenCalled();
+  });
+
   it('nao adiciona token em URL externa', () => {
     credentialStore.getToken.and.returnValue('token-ficticio');
 

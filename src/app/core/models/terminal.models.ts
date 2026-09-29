@@ -58,6 +58,8 @@ export interface PareamentoResponse {
   empresa: HubEmpresa;
 }
 
+export interface RecuperacaoTerminalLocalResponse extends PareamentoResponse {}
+
 export interface HeartbeatRequest {
   hostname?: string;
 }

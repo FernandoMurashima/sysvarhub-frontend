@@ -84,6 +84,32 @@ describe('HubTerminalService', () => {
     request.flush(terminalContextoStub);
   });
 
+  it('recuperacao local usa endpoint correto e persiste credencial pela abstracao', (done) => {
+    service.recuperarLocal({ hostname: 'PDV-BARRA-01' }).subscribe((response) => {
+      expect(response.token).toBe('token-recuperado');
+      expect(response.terminal.codigo).toBe('PDV-01');
+      expect(response.caixa?.codigo).toBe('CX-01');
+      done();
+    });
+
+    const request = httpMock.expectOne('/api/terminal/recuperar-local/');
+    expect(request.request.method).toBe('POST');
+    expect(request.request.body).toEqual({ hostname: 'PDV-BARRA-01' });
+    request.flush({
+      token: 'token-recuperado',
+      terminal: {
+        uuid: 'terminal-uuid-ficticio',
+        codigo: 'PDV-01',
+        nome: 'PDV-01',
+      },
+      caixa: terminalContextoStub.caixa,
+      loja: terminalContextoStub.loja,
+      empresa: terminalContextoStub.empresa,
+    });
+
+    expect(credentialStore.setToken).toHaveBeenCalledWith('token-recuperado');
+  });
+
   it('contexto aceita caixa null', (done) => {
     service.contexto().subscribe((contexto) => {
       expect(contexto.caixa).toBeNull();

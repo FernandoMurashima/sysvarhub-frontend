@@ -21,6 +21,7 @@ describe('TerminalSessionService', () => {
     ]);
     hubTerminalService = jasmine.createSpyObj<HubTerminalService>('HubTerminalService', [
       'parear',
+      'recuperarLocal',
       'contexto',
       'heartbeat',
     ]);
@@ -45,13 +46,45 @@ describe('TerminalSessionService', () => {
     service.invalidarSessao();
   });
 
-  it('sem token fica nao pareado', (done) => {
+  it('sem token e sem recuperacao local fica nao pareado', (done) => {
     credentialStore.hasToken.and.returnValue(false);
+    hubTerminalService.recuperarLocal.and.returnValue(
+      throwError(() => new HttpErrorResponse({ status: 404 })),
+    );
 
     service.bootstrap().subscribe((valid) => {
       expect(valid).toBeFalse();
+      expect(hubTerminalService.recuperarLocal).toHaveBeenCalled();
       expect(service.status()).toBe('nao-pareado');
       expect(service.contexto()).toBeNull();
+      done();
+    });
+  });
+
+  it('sem localStorage recupera identidade local e carrega contexto', (done) => {
+    credentialStore.hasToken.and.returnValue(false);
+    hubTerminalService.recuperarLocal.and.callFake(() => {
+      credentialStore.hasToken.and.returnValue(true);
+      return of({
+        token: 'token-recuperado',
+        terminal: {
+          uuid: terminalContextoStub.terminal.uuid,
+          codigo: terminalContextoStub.terminal.codigo,
+          nome: terminalContextoStub.terminal.nome,
+        },
+        caixa: terminalContextoStub.caixa,
+        loja: terminalContextoStub.loja,
+        empresa: terminalContextoStub.empresa,
+      });
+    });
+    hubTerminalService.contexto.and.returnValue(of(terminalContextoStub));
+
+    service.bootstrap().subscribe((valid) => {
+      expect(valid).toBeTrue();
+      expect(hubTerminalService.recuperarLocal).toHaveBeenCalled();
+      expect(hubTerminalService.contexto).toHaveBeenCalled();
+      expect(service.status()).toBe('contexto-carregado');
+      expect(service.contexto()).toEqual(terminalContextoStub);
       done();
     });
   });
@@ -78,6 +111,20 @@ describe('TerminalSessionService', () => {
       expect(valid).toBeFalse();
       expect(credentialStore.clearToken).toHaveBeenCalled();
       expect(service.status()).toBe('nao-pareado');
+      done();
+    });
+  });
+
+  it('erro de operador nao apaga identidade terminal durante bootstrap', (done) => {
+    credentialStore.hasToken.and.returnValue(true);
+    hubTerminalService.contexto.and.returnValue(
+      throwError(() => new HttpErrorResponse({ status: 500 })),
+    );
+
+    service.bootstrap().subscribe((valid) => {
+      expect(valid).toBeFalse();
+      expect(credentialStore.clearToken).not.toHaveBeenCalled();
+      expect(service.status()).toBe('erro');
       done();
     });
   });
@@ -122,16 +169,23 @@ describe('TerminalSessionService', () => {
     credentialStore.hasToken.and.returnValue(true);
     hubTerminalService.contexto.and.returnValue(of(terminalContextoStub));
 
-    service.bootstrap().subscribe(() => {
-      credentialStore.hasToken.and.returnValue(false);
+    service.bootstrap().subscribe({
+      complete: () => {
+        setTimeout(() => {
+          credentialStore.hasToken.and.returnValue(false);
+          hubTerminalService.recuperarLocal.and.returnValue(
+            throwError(() => new HttpErrorResponse({ status: 404 })),
+          );
 
-      service.bootstrap().subscribe((valid) => {
-        expect(valid).toBeFalse();
-        expect(service.contexto()).toBeNull();
-        expect(service.status()).toBe('nao-pareado');
-        expect(credentialStore.clearToken).toHaveBeenCalled();
-        done();
-      });
+          service.bootstrap().subscribe((valid) => {
+            expect(valid).toBeFalse();
+            expect(service.contexto()).toBeNull();
+            expect(service.status()).toBe('nao-pareado');
+            expect(credentialStore.clearToken).toHaveBeenCalled();
+            done();
+          });
+        });
+      },
     });
   });
 

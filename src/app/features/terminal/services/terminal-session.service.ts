@@ -1,6 +1,6 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { computed, inject, Injectable, signal } from '@angular/core';
-import { catchError, EMPTY, finalize, map, Observable, of, Subscription, tap, timer } from 'rxjs';
+import { catchError, EMPTY, finalize, map, Observable, of, Subscription, switchMap, tap, timer } from 'rxjs';
 
 import { TERMINAL_CREDENTIAL_STORE } from '../../../core/auth/terminal-credential-store';
 import { TerminalContexto, TerminalSessionStatus } from '../../../core/models/terminal.models';
@@ -21,24 +21,20 @@ export class TerminalSessionService {
   readonly hasValidSession = computed(() => this.statusSignal() === 'contexto-carregado');
 
   bootstrap(): Observable<boolean> {
-    if (!this.credentialStore.hasToken()) {
-      this.clearSession('nao-pareado');
-      return of(false);
-    }
-
-    if (this.statusSignal() === 'contexto-carregado' && this.contextoSignal()) {
+    if (this.statusSignal() === 'contexto-carregado' && this.contextoSignal() && this.credentialStore.hasToken()) {
       return of(true);
     }
 
     if (!this.bootstrapRequest$) {
-      this.statusSignal.set('pareado');
-      this.bootstrapRequest$ = this.hubTerminalService.contexto().pipe(
-        tap((contexto) => {
-          this.contextoSignal.set(contexto);
-          this.statusSignal.set('contexto-carregado');
-          this.startHeartbeat();
+      this.statusSignal.set('inicializando');
+      this.bootstrapRequest$ = this.ensureTerminalCredential().pipe(
+        switchMap((hasCredential) => {
+          if (!hasCredential) {
+            this.clearSession('nao-pareado');
+            return of(false);
+          }
+          return this.carregarContexto().pipe(map(() => true));
         }),
-        map(() => true),
         catchError((error: unknown) => {
           if (this.isAuthenticationError(error)) {
             this.clearSession('nao-pareado');
@@ -96,6 +92,17 @@ export class TerminalSessionService {
         }),
       )
       .subscribe();
+  }
+
+  private ensureTerminalCredential(): Observable<boolean> {
+    if (this.credentialStore.hasToken()) {
+      return of(true);
+    }
+
+    return this.hubTerminalService.recuperarLocal().pipe(
+      map(() => true),
+      catchError(() => of(false)),
+    );
   }
 
   private stopHeartbeat(): void {
