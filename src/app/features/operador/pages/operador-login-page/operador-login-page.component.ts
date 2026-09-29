@@ -1,6 +1,6 @@
 import { Component, ElementRef, inject, OnInit, ViewChild } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { ActivatedRoute, Router } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { finalize } from 'rxjs';
 
 import { TerminalSessionService } from '../../../terminal/services/terminal-session.service';
@@ -9,7 +9,7 @@ import { OperatorSessionService } from '../../services/operator-session.service'
 @Component({
   selector: 'app-operador-login-page',
   standalone: true,
-  imports: [FormsModule],
+  imports: [FormsModule, RouterLink],
   templateUrl: './operador-login-page.component.html',
   styleUrl: './operador-login-page.component.scss',
 })

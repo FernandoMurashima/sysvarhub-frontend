@@ -1,6 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
 import { ActivatedRoute, Router, convertToParamMap } from '@angular/router';
+import { RouterTestingModule } from '@angular/router/testing';
 import { signal } from '@angular/core';
 import { of } from 'rxjs';
 
@@ -12,16 +13,16 @@ import { OperadorLoginPageComponent } from './operador-login-page.component';
 describe('OperadorLoginPageComponent', () => {
   let fixture: ComponentFixture<OperadorLoginPageComponent>;
   let operatorSession: jasmine.SpyObj<OperatorSessionService>;
-  let router: jasmine.SpyObj<Router>;
+  let router: Router;
+  let navigateByUrlSpy: jasmine.Spy;
 
   beforeEach(async () => {
     localStorage.clear();
     sessionStorage.clear();
     operatorSession = jasmine.createSpyObj<OperatorSessionService>('OperatorSessionService', ['login']);
-    router = jasmine.createSpyObj<Router>('Router', ['navigateByUrl']);
 
     await TestBed.configureTestingModule({
-      imports: [OperadorLoginPageComponent],
+      imports: [OperadorLoginPageComponent, RouterTestingModule.withRoutes([])],
       providers: [
         {
           provide: TerminalSessionService,
@@ -29,10 +30,11 @@ describe('OperadorLoginPageComponent', () => {
         },
         { provide: OperatorSessionService, useValue: operatorSession },
         { provide: ActivatedRoute, useValue: { snapshot: { queryParamMap: convertToParamMap({}) } } },
-        { provide: Router, useValue: router },
       ],
     }).compileComponents();
 
+    router = TestBed.inject(Router);
+    navigateByUrlSpy = spyOn(router, 'navigateByUrl').and.resolveTo(true);
     fixture = TestBed.createComponent(OperadorLoginPageComponent);
     fixture.detectChanges();
   });
@@ -56,6 +58,15 @@ describe('OperadorLoginPageComponent', () => {
     const form = fixture.debugElement.query(By.css('form.login-card'));
 
     expect(form.nativeElement.getAttribute('autocomplete')).toBe('off');
+  });
+
+  it('exibe botao Voltar a Home sem autenticar', () => {
+    const link = fixture.debugElement.query(By.css('a.home-link'));
+
+    expect(link).toBeTruthy();
+    expect(link.nativeElement.textContent).toContain('Voltar à Home');
+    expect(link.nativeElement.getAttribute('href')).toBe('/');
+    expect(operatorSession.login).not.toHaveBeenCalled();
   });
 
   it('campo operador nao usa autocomplete username', () => {
@@ -91,17 +102,16 @@ describe('OperadorLoginPageComponent', () => {
     expect(component.senha).toBe('');
     expect(localStorage.getItem('credencial-digitada')).toBeNull();
     expect(sessionStorage.getItem('credencial-digitada')).toBeNull();
-    expect(router.navigateByUrl).toHaveBeenCalledWith('/pdv');
+    expect(navigateByUrlSpy).toHaveBeenCalledWith('/pdv');
   });
 
   it('apos autenticacao valida retorna ao modulo solicitado', () => {
     TestBed.resetTestingModule();
     operatorSession = jasmine.createSpyObj<OperatorSessionService>('OperatorSessionService', ['login']);
-    router = jasmine.createSpyObj<Router>('Router', ['navigateByUrl']);
     operatorSession.login.and.returnValue(of(true));
 
     TestBed.configureTestingModule({
-      imports: [OperadorLoginPageComponent],
+      imports: [OperadorLoginPageComponent, RouterTestingModule.withRoutes([])],
       providers: [
         {
           provide: TerminalSessionService,
@@ -109,17 +119,18 @@ describe('OperadorLoginPageComponent', () => {
         },
         { provide: OperatorSessionService, useValue: operatorSession },
         { provide: ActivatedRoute, useValue: { snapshot: { queryParamMap: convertToParamMap({ returnUrl: '/consulta-vendas' }) } } },
-        { provide: Router, useValue: router },
       ],
     });
 
+    router = TestBed.inject(Router);
+    navigateByUrlSpy = spyOn(router, 'navigateByUrl').and.resolveTo(true);
     const localFixture = TestBed.createComponent(OperadorLoginPageComponent);
     const component = localFixture.componentInstance;
     component.codigo = 'caixa.barra';
     component.senha = 'credencial-digitada';
     component.entrar(new Event('submit'));
 
-    expect(router.navigateByUrl).toHaveBeenCalledWith('/consulta-vendas');
+    expect(navigateByUrlSpy).toHaveBeenCalledWith('/consulta-vendas');
   });
 
   it('erro 400 mostra mensagem generica e limpa senha', () => {
@@ -135,7 +146,7 @@ describe('OperadorLoginPageComponent', () => {
     expect(JSON.stringify(localStorage)).not.toContain('credencial-incorreta');
     expect(JSON.stringify(sessionStorage)).not.toContain('credencial-incorreta');
     expect(fixture.nativeElement.textContent).toContain('Operador ou credencial inválidos.');
-    expect(router.navigateByUrl).not.toHaveBeenCalled();
+    expect(navigateByUrlSpy).not.toHaveBeenCalled();
   });
 
   it('nenhum storage guarda a senha digitada', () => {

@@ -25,6 +25,10 @@ PDV e um modulo protegido do Hub. Caixa e a sessao financeira do PDV, separada d
 
 Login do operador nao abre caixa automaticamente.
 
+Entrar no PDV consulta a situacao real do caixa e nao cria sessao financeira sozinho. Sair do PDV para a Home ou para outros modulos nao fecha caixa, nao encerra a sessao do operador e nao cancela venda em andamento.
+
+A venda ativa continua tendo como fonte operacional o Backend Hub local. Ao retornar ao PDV, a tela reconcilia o estado com a venda aberta persistida do terminal, preservando UUID, itens, cliente, vendedor, pagamentos e totais quando a venda ainda esta aberta. Vendas finalizadas ou canceladas nao sao reativadas como venda aberta.
+
 ## Arquitetura de API
 
 Em producao, o frontend chama somente caminhos relativos em same origin:

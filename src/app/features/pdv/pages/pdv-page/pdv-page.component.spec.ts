@@ -1,4 +1,5 @@
 import { ComponentFixture, fakeAsync, TestBed, tick } from '@angular/core/testing';
+import { By } from '@angular/platform-browser';
 import { Component, signal } from '@angular/core';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Router } from '@angular/router';
@@ -518,6 +519,38 @@ describe('PdvPageComponent', () => {
     expect(text).toContain('Filial 1');
     expect(text).toContain('Caixa 01');
     expect(text).toContain('PDV-01');
+  });
+
+  it('ao entrar no PDV consulta caixa e venda aberta sem abrir caixa automaticamente', () => {
+    expect(caixaSession.bootstrap).toHaveBeenCalled();
+    expect(vendaSession.bootstrap).toHaveBeenCalled();
+    expect(caixaSession.abrir).not.toHaveBeenCalled();
+  });
+
+  it('botao Home preserva operador caixa e venda no estado local', () => {
+    const home = fixture.debugElement.query(By.css('a.home-button[routerLink="/"]'));
+
+    expect(home).toBeTruthy();
+    expect(operatorSession.logout).not.toHaveBeenCalled();
+    expect(caixaSession.fechar).not.toHaveBeenCalled();
+    expect(vendaSession.limparEstado).not.toHaveBeenCalled();
+    expect(sessaoCaixaSignal()).toBe(sessaoCaixaAbertaStub);
+    expect(vendaSignal()).toBe(vendaAbertaStub.venda);
+  });
+
+  it('se caixa estiver fechado entra no modulo sem iniciar venda nem abrir caixa', () => {
+    caixaSession.bootstrap.calls.reset();
+    vendaSession.bootstrap.calls.reset();
+    vendaSession.limparEstado.calls.reset();
+    caixaSession.abrir.calls.reset();
+    caixaSession.bootstrap.and.returnValue(of(false));
+
+    fixture.componentInstance.ngOnInit();
+
+    expect(caixaSession.bootstrap).toHaveBeenCalled();
+    expect(vendaSession.bootstrap).not.toHaveBeenCalled();
+    expect(vendaSession.limparEstado).toHaveBeenCalled();
+    expect(caixaSession.abrir).not.toHaveBeenCalled();
   });
 
   it('abre fechamento do dia pela acao superior e consulta data atual no Hub local', () => {

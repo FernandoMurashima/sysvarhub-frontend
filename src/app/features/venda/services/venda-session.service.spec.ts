@@ -111,6 +111,40 @@ describe('VendaSessionService', () => {
     });
   });
 
+  it('bootstrap recupera venda aberta persistida sem duplicar pagamentos', (done) => {
+    const vendaComPagamento = {
+      ...vendaAbertaStub,
+      venda: {
+        ...vendaAbertaStub.venda!,
+        pagamentos: [
+          {
+            uuid: 'pagamento-uuid',
+            formaPagamentoId: 1,
+            formaRetaguardaId: 10,
+            codigo: 'DIN',
+            descricao: 'Dinheiro',
+            tipo: 'DINHEIRO',
+            numParcelas: 1,
+            valor: '50.00',
+            autorizacao: '',
+            origemCaptura: 'PDV',
+            criadoEm: '2026-09-13T12:20:00',
+          },
+        ],
+      },
+    };
+    hubVendaService.atual.and.returnValue(of(vendaComPagamento));
+
+    service.bootstrap().subscribe(() => {
+      expect(service.venda()?.uuid).toBe('venda-hub-uuid');
+      expect(service.venda()?.itens.length).toBe(1);
+      expect(service.venda()?.pagamentos.length).toBe(1);
+      expect(service.venda()?.pagamentos[0].uuid).toBe('pagamento-uuid');
+      expect(hubVendaService.iniciarVenda).not.toHaveBeenCalled();
+      done();
+    });
+  });
+
   it('cancelar limpa venda', (done) => {
     hubVendaService.cancelar.and.returnValue(of(vendaAbertaStub));
 
