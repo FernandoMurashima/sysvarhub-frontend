@@ -2,6 +2,7 @@ import { Component, OnInit, computed, inject } from '@angular/core';
 import { RouterLink } from '@angular/router';
 
 import { OperatorSessionService } from '../../../operador/services/operator-session.service';
+import { CentralConnectivityService } from '../../../terminal/services/central-connectivity.service';
 import { TerminalSessionService } from '../../../terminal/services/terminal-session.service';
 
 interface HubModuleLink {
@@ -22,6 +23,7 @@ interface HubModuleLink {
 export class HubHomePageComponent {
   private readonly terminalSession = inject(TerminalSessionService);
   private readonly operatorSession = inject(OperatorSessionService);
+  private readonly centralConnectivity = inject(CentralConnectivityService);
 
   readonly contexto = this.terminalSession.contexto;
   readonly sessionStatus = this.terminalSession.status;
@@ -33,7 +35,13 @@ export class HubHomePageComponent {
   readonly terminalNome = computed(() => this.contexto()?.terminal.nome || this.contexto()?.terminal.codigo || '-');
   readonly caixaNome = computed(() => this.contexto()?.caixa?.descricao || this.contexto()?.caixa?.codigo || 'Sem caixa vinculado');
   readonly hubEstado = computed(() => this.sessionStatus() === 'contexto-carregado' ? 'Operacional' : 'Carregando contexto');
-  readonly comunicacaoCentral = computed(() => this.sessionStatus() === 'contexto-carregado' ? 'Heartbeat local ativo' : 'Não avaliada');
+  readonly centralStatus = this.centralConnectivity.status;
+  readonly centralUltimoContato = this.centralConnectivity.lastContactLabel;
+  readonly comunicacaoCentral = computed(() => {
+    const status = this.centralStatus();
+    const ultimoContato = this.centralUltimoContato();
+    return ultimoContato ? `${status} · ${ultimoContato}` : status;
+  });
   readonly operadorPerfil = computed(() => this.operador()?.perfil?.nome || this.operador()?.tipo || '');
 
   readonly modules: HubModuleLink[] = [
@@ -71,6 +79,7 @@ export class HubHomePageComponent {
   ];
 
   ngOnInit(): void {
+    this.centralConnectivity.startPolling();
     this.operatorSession.bootstrap().subscribe();
   }
 

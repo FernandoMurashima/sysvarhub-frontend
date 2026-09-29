@@ -83,6 +83,49 @@ article small {
   color: #64748b;
 }
 
+.central-state {
+  border-color: #cbd5e1;
+}
+
+.central-state small {
+  color: #64748b;
+  font-weight: 800;
+}
+
+.central-state small::before {
+  content: '';
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  margin-right: 7px;
+  border-radius: 50%;
+  background: #94a3b8;
+}
+
+.central-state.online {
+  border-color: #86efac;
+}
+
+.central-state.online small {
+  color: #15803d;
+}
+
+.central-state.online small::before {
+  background: #22c55e;
+}
+
+.central-state.offline {
+  border-color: #fecaca;
+}
+
+.central-state.offline small {
+  color: #b91c1c;
+}
+
+.central-state.offline small::before {
+  background: #ef4444;
+}
+
 .actions {
   display: flex;
   gap: 10px;

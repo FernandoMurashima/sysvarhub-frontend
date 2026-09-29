@@ -153,7 +153,16 @@
         <button type="button" (click)="abrirAtalho($event, 'fechamento')">F10<br /><span>Fechar Caixa</span></button>
         <button type="button" (click)="abrirAtalho($event, 'abertura-caixa')">F11<br /><span>Abrir Caixa</span></button>
         <button type="button" (click)="abrirAtalho($event, 'consulta-vendas')">F12<br /><span>Consulta de Vendas</span></button>
-        <button type="button" (click)="abrirDevolucao($event)">DEV<br /><span>Devolução</span></button>
+        <button
+          type="button"
+          class="shortcut-central"
+          [class.online]="centralStatus() === 'ONLINE'"
+          [class.offline]="centralStatus() === 'OFFLINE'"
+          [style.background]="centralStatus() === 'ONLINE' ? '#166534' : centralStatus() === 'OFFLINE' ? '#991b1b' : '#475569'"
+          (click)="abrirDevolucao($event)"
+        >
+          DEV<br /><span>Devolução / Troca</span><small>{{ centralStatusLabel() }}</small>
+        </button>
         <button type="button" (click)="abrirAtalho($event, 'fechar-pdv')">F13<br /><span>Fechar PDV</span></button>
       </div>
     </aside>

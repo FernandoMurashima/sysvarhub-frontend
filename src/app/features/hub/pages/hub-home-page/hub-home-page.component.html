@@ -75,7 +75,9 @@
         </div>
         <div>
           <dt>Central</dt>
-          <dd>{{ comunicacaoCentral() }}</dd>
+          <dd class="central-status" [class.online]="centralStatus() === 'ONLINE'" [class.offline]="centralStatus() === 'OFFLINE'">
+            {{ comunicacaoCentral() }}
+          </dd>
         </div>
       </dl>
     </section>

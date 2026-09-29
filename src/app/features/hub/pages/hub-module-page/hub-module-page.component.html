@@ -32,6 +32,12 @@
         <strong>Estado</strong>
         <small>Estrutura pronta para próxima etapa</small>
       </article>
+      @if (moduleKey === 'devolucao-troca') {
+        <article class="central-state" [class.online]="centralStatus() === 'ONLINE'" [class.offline]="centralStatus() === 'OFFLINE'">
+          <strong>Central</strong>
+          <small>{{ centralResumo() }}</small>
+        </article>
+      }
     </section>
 
     <div class="actions">

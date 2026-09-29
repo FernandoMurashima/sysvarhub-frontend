@@ -2,6 +2,7 @@ import { Component, computed, inject } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 
 import { OperatorSessionService } from '../../../operador/services/operator-session.service';
+import { CentralConnectivityService } from '../../../terminal/services/central-connectivity.service';
 import { TerminalSessionService } from '../../../terminal/services/terminal-session.service';
 
 type HubModuleKey = 'devolucao-troca' | 'consulta-vendas' | 'vale-troca' | 'pendencias-sincronizacao';
@@ -40,6 +41,7 @@ export class HubModulePageComponent {
   private readonly route = inject(ActivatedRoute);
   private readonly terminalSession = inject(TerminalSessionService);
   private readonly operatorSession = inject(OperatorSessionService);
+  private readonly centralConnectivity = inject(CentralConnectivityService);
 
   readonly contexto = this.terminalSession.contexto;
   readonly operador = this.operatorSession.operador;
@@ -48,4 +50,11 @@ export class HubModulePageComponent {
   readonly loja = computed(() => this.contexto()?.loja.apelido || this.contexto()?.loja.nome || '-');
   readonly terminal = computed(() => this.contexto()?.terminal.nome || this.contexto()?.terminal.codigo || '-');
   readonly operadorPerfil = computed(() => this.operador()?.perfil?.nome || this.operador()?.tipo || '-');
+  readonly centralStatus = this.centralConnectivity.status;
+  readonly centralUltimoContato = this.centralConnectivity.lastContactLabel;
+  readonly centralResumo = computed(() => this.centralUltimoContato() ? `${this.centralStatus()} · ${this.centralUltimoContato()}` : this.centralStatus());
+
+  ngOnInit(): void {
+    this.centralConnectivity.startPolling();
+  }
 }

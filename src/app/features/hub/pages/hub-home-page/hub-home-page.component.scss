@@ -178,6 +178,36 @@ dd {
   overflow-wrap: anywhere;
 }
 
+.central-status {
+  color: #64748b;
+}
+
+.central-status::before {
+  content: '';
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  margin-right: 7px;
+  border-radius: 50%;
+  background: #94a3b8;
+}
+
+.central-status.online {
+  color: #15803d;
+}
+
+.central-status.online::before {
+  background: #22c55e;
+}
+
+.central-status.offline {
+  color: #b91c1c;
+}
+
+.central-status.offline::before {
+  background: #ef4444;
+}
+
 .modules {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));

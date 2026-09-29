@@ -6,6 +6,7 @@ import { HUB_TERMINAL_API_PATH } from '../../../core/api/api.config';
 import {
   HeartbeatRequest,
   HeartbeatResponse,
+  CentralConnectivityResponse,
   PareamentoRequest,
   PareamentoResponse,
   RecuperacaoTerminalLocalResponse,
@@ -40,5 +41,9 @@ export class HubTerminalService {
 
   heartbeat(payload: HeartbeatRequest = {}): Observable<HeartbeatResponse> {
     return this.http.post<HeartbeatResponse>(`${HUB_TERMINAL_API_PATH}/heartbeat/`, payload);
+  }
+
+  centralStatus(): Observable<CentralConnectivityResponse> {
+    return this.http.get<CentralConnectivityResponse>(`${HUB_TERMINAL_API_PATH}/central/status/`);
   }
 }

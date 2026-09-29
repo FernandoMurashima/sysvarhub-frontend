@@ -31,6 +31,7 @@ import { HubTiposDespesaPdvService } from '../../../caixa/services/hub-tipos-des
 import { ClienteCadastroComunicacaoIncertError, ClienteSessionExpiredError, ClienteSessionService } from '../../../cliente/services/cliente-session.service';
 import { normalizarValorAbertura } from '../../../caixa/services/caixa-valor.parser';
 import { OperatorSessionService } from '../../../operador/services/operator-session.service';
+import { CentralConnectivityService } from '../../../terminal/services/central-connectivity.service';
 import { VendaSessionService } from '../../../venda/services/venda-session.service';
 import { HubVendaService } from '../../../venda/services/hub-venda.service';
 import { VendedorSessionExpiredError, VendedorSessionService } from '../../../vendedor/services/vendedor-session.service';
@@ -101,6 +102,7 @@ export class PdvPageComponent implements OnInit, OnDestroy {
   private readonly clienteSession = inject(ClienteSessionService);
   private readonly vendedorSession = inject(VendedorSessionService);
   private readonly fechamentoDiaService = inject(HubFechamentoDiaService);
+  private readonly centralConnectivity = inject(CentralConnectivityService);
   private readonly router = inject(Router);
 
   busca = '';
@@ -210,8 +212,10 @@ export class PdvPageComponent implements OnInit, OnDestroy {
   readonly clientePreselecionado = this.vendaSession.clientePreselecionado;
   readonly vendedorPreselecionado = this.vendaSession.vendedorPreselecionado;
   readonly vendaLoading = this.vendaSession.loadingOperacao;
+  readonly centralStatus = this.centralConnectivity.status;
 
   ngOnInit(): void {
+    this.centralConnectivity.startPolling();
     this.atualizarEstadoTelaCheia();
     this.caixaSession.bootstrap().subscribe((aberto) => {
       if (aberto) {
@@ -1303,6 +1307,10 @@ export class PdvPageComponent implements OnInit, OnDestroy {
   abrirDevolucao(event?: Event): void {
     event?.preventDefault();
     void this.router.navigateByUrl('/devolucao-troca');
+  }
+
+  centralStatusLabel(): string {
+    return this.centralStatus();
   }
 
   consultarVendaDevolucao(): void {

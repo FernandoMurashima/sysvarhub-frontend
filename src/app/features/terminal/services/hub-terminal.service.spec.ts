@@ -137,4 +137,24 @@ describe('HubTerminalService', () => {
       servidor_em: '2026-09-13T10:20:00Z',
     });
   });
+
+  it('central status usa endpoint correto e contrato sem segredos', (done) => {
+    service.centralStatus().subscribe((response) => {
+      expect(response.status).toBe('ONLINE');
+      expect(response.online).toBeTrue();
+      expect(response.ultimo_contato_em).toBe('2026-09-29T10:20:30Z');
+      expect('retaguarda_token' in response).toBeFalse();
+      expect('retaguarda_url' in response).toBeFalse();
+      done();
+    });
+
+    const request = httpMock.expectOne('/api/terminal/central/status/');
+    expect(request.request.method).toBe('GET');
+    request.flush({
+      status: 'ONLINE',
+      online: true,
+      ultimo_contato_em: '2026-09-29T10:20:30Z',
+      ultima_tentativa_em: '2026-09-29T10:20:30Z',
+    });
+  });
 });

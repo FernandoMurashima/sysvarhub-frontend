@@ -69,3 +69,12 @@ export interface HeartbeatResponse {
   terminal_uuid: string;
   servidor_em: string;
 }
+
+export type CentralConnectivityStatus = 'VERIFICANDO' | 'ONLINE' | 'OFFLINE';
+
+export interface CentralConnectivityResponse {
+  status: CentralConnectivityStatus;
+  online: boolean;
+  ultimo_contato_em: string | null;
+  ultima_tentativa_em: string | null;
+}

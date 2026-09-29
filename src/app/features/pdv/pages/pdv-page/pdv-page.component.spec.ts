@@ -18,6 +18,7 @@ import { HubResumoCaixaService } from '../../../caixa/services/hub-resumo-caixa.
 import { HubTiposDespesaPdvService } from '../../../caixa/services/hub-tipos-despesa-pdv.service';
 import { ClienteSessionExpiredError, ClienteSessionService } from '../../../cliente/services/cliente-session.service';
 import { OperatorSessionService } from '../../../operador/services/operator-session.service';
+import { CentralConnectivityService } from '../../../terminal/services/central-connectivity.service';
 import { HubVendaService } from '../../../venda/services/hub-venda.service';
 import { VendaSessionService } from '../../../venda/services/venda-session.service';
 import { clientePreselecionadoStub, sessaoCaixaAbertaStub, vendedorStub, vendaAbertaStub } from '../../../../testing/terminal-test-data';
@@ -317,6 +318,7 @@ describe('PdvPageComponent', () => {
   let fechamentoDiaService: jasmine.SpyObj<HubFechamentoDiaService>;
   let vendaSession: jasmine.SpyObj<VendaSessionService>;
   let hubVendaService: jasmine.SpyObj<HubVendaService>;
+  let centralConnectivity: jasmine.SpyObj<CentralConnectivityService>;
   let caixaStatusSignal = signal<'inicializando' | 'fechado' | 'aberto' | 'erro'>('aberto');
   let sessaoCaixaSignal = signal<SessaoCaixaHubResumo | null>(sessaoCaixaAbertaStub);
   let vendaSignal = signal(vendaAbertaStub.venda);
@@ -324,6 +326,7 @@ describe('PdvPageComponent', () => {
   let vendedorPreselecionadoSignal = signal(null as VendedorHubResumo | null);
   let vendaStatusSignal = signal<'inicializando' | 'sem-venda' | 'aberta' | 'erro'>('aberta');
   let vendaLoadingSignal = signal(false);
+  let centralStatusSignal = signal<'VERIFICANDO' | 'ONLINE' | 'OFFLINE'>('VERIFICANDO');
   let router: Router;
 
   function catalogo(itens: PdvProdutoConsulta[]): PdvCatalogoConsulta {
@@ -455,6 +458,7 @@ describe('PdvPageComponent', () => {
     vendedorPreselecionadoSignal = signal(null as VendedorHubResumo | null);
     vendaStatusSignal = signal<'inicializando' | 'sem-venda' | 'aberta' | 'erro'>('aberta');
     vendaLoadingSignal = signal(false);
+    centralStatusSignal = signal<'VERIFICANDO' | 'ONLINE' | 'OFFLINE'>('VERIFICANDO');
     vendaSession = jasmine.createSpyObj<VendaSessionService>('VendaSessionService', ['bootstrap', 'iniciarVenda', 'adicionarItem', 'alterarQuantidade', 'removerItem', 'cancelarVenda', 'limparEstado', 'listarFormasPagamento', 'adicionarPagamento', 'removerPagamento', 'finalizarVenda', 'selecionarCliente', 'removerCliente', 'selecionarVendedor', 'removerVendedor'], {
       venda: vendaSignal.asReadonly(),
       clientePreselecionado: clientePreselecionadoSignal.asReadonly(),
@@ -478,6 +482,9 @@ describe('PdvPageComponent', () => {
     vendaSession.removerVendedor.and.returnValue(of({ ok: true }));
     hubVendaService = jasmine.createSpyObj<HubVendaService>('HubVendaService', ['obterDanfeNfce']);
     hubVendaService.obterDanfeNfce.and.returnValue(of(danfeNfceStub()));
+    centralConnectivity = jasmine.createSpyObj<CentralConnectivityService>('CentralConnectivityService', ['startPolling'], {
+      status: centralStatusSignal.asReadonly(),
+    });
 
     await TestBed.configureTestingModule({
       imports: [PdvPageComponent, RouterTestingModule.withRoutes([{ path: 'operador', component: EmptyRouteComponent }])],
@@ -493,6 +500,7 @@ describe('PdvPageComponent', () => {
         { provide: HubFechamentoDiaService, useValue: fechamentoDiaService },
         { provide: VendaSessionService, useValue: vendaSession },
         { provide: HubVendaService, useValue: hubVendaService },
+        { provide: CentralConnectivityService, useValue: centralConnectivity },
       ],
     }).compileComponents();
 
@@ -525,6 +533,26 @@ describe('PdvPageComponent', () => {
     expect(caixaSession.bootstrap).toHaveBeenCalled();
     expect(vendaSession.bootstrap).toHaveBeenCalled();
     expect(caixaSession.abrir).not.toHaveBeenCalled();
+    expect(centralConnectivity.startPolling).toHaveBeenCalled();
+  });
+
+  it('botao DEV mostra estado da Central e continua navegavel', () => {
+    centralStatusSignal.set('ONLINE');
+    fixture.detectChanges();
+
+    const host = fixture.nativeElement as HTMLElement;
+    const botao = Array.from(host.querySelectorAll<HTMLButtonElement>('.shortcuts button'))
+      .find((element) => element.textContent?.includes('Devolução / Troca')) as HTMLButtonElement;
+
+    expect(botao.textContent).toContain('ONLINE');
+    expect(botao.classList).toContain('online');
+
+    botao.click();
+    expect(router.navigateByUrl).toHaveBeenCalledWith('/devolucao-troca');
+
+    centralStatusSignal.set('OFFLINE');
+    fixture.detectChanges();
+    expect(botao.classList).toContain('offline');
   });
 
   it('botao Home preserva operador caixa e venda no estado local', () => {
