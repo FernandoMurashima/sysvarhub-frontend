@@ -1,0 +1,13 @@
+<main class="access-denied">
+  <section>
+    <span>Acesso não autorizado</span>
+    <h1>{{ moduleTitle() }}</h1>
+    <p>
+      O operador {{ operador()?.nome || 'autenticado' }} não possui autorização disponível para acessar este módulo no Hub.
+    </p>
+    <div>
+      <a routerLink="/">Voltar à Home</a>
+      <a routerLink="/operador">Trocar operador</a>
+    </div>
+  </section>
+</main>

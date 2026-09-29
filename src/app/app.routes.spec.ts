@@ -18,6 +18,7 @@ describe('routes', () => {
     expect(pdvRoute?.canActivate).toContain(terminalSessionGuard);
     expect(pdvRoute?.canActivate).toContain(operatorSessionGuard);
     expect(pdvRoute?.canActivate).toEqual([terminalSessionGuard, operatorSessionGuard]);
+    expect(pdvRoute?.data?.['moduleKey']).toBe('pdv');
     expect(operadorRoute?.canActivate).toEqual([terminalSessionGuard]);
     expect(suporteRoute?.canActivate).toContain(terminalSessionGuard);
     expect(suporteRoute?.canActivate).not.toContain(operatorSessionGuard);
@@ -28,9 +29,24 @@ describe('routes', () => {
       const route = routes.find((item) => item.path === path);
 
       expect(route).toBeTruthy();
-      expect(route?.canActivate).toEqual([terminalSessionGuard]);
+      expect(route?.canActivate).toEqual([terminalSessionGuard, operatorSessionGuard]);
       expect(route?.data?.['moduleKey']).toBe(path);
     }
+  });
+
+  it('mantem Home sem exigir operador autenticado', () => {
+    const rootRoute = routes.find((route) => route.path === '');
+
+    expect(rootRoute?.canActivate).toEqual([terminalSessionGuard]);
+    expect(rootRoute?.canActivate).not.toContain(operatorSessionGuard);
+  });
+
+  it('cria rota amigavel para acesso negado sem exigir outro login', () => {
+    const route = routes.find((item) => item.path === 'acesso-negado');
+
+    expect(route).toBeTruthy();
+    expect(route?.canActivate).toEqual([terminalSessionGuard]);
+    expect(route?.canActivate).not.toContain(operatorSessionGuard);
   });
 
   it('existe rota publica de ativacao sem guards', () => {

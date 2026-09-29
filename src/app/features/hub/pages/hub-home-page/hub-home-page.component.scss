@@ -96,6 +96,62 @@ p {
   color: #59667a;
 }
 
+.operator-panel {
+  margin-top: 24px;
+  padding: 16px;
+  background: #f6f8fb;
+  border: 1px solid #e2e8f0;
+}
+
+.operator-panel span,
+.operator-panel strong,
+.operator-panel small {
+  display: block;
+}
+
+.operator-panel span {
+  color: #67748a;
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.operator-panel strong {
+  margin-top: 8px;
+  font-size: 18px;
+}
+
+.operator-panel small {
+  margin-top: 4px;
+  color: #59667a;
+}
+
+.operator-panel div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.operator-panel a,
+.operator-panel button {
+  appearance: none;
+  padding: 9px 11px;
+  border: 1px solid #172033;
+  background: #172033;
+  color: #fff;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.operator-panel button {
+  background: #fff;
+  color: #172033;
+}
+
 dl {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

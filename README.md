@@ -15,6 +15,16 @@ O Sysvar Hub representa a aplicacao operacional da loja. O PDV e um modulo desse
 
 As areas fora do PDV foram estruturadas para evolucao funcional posterior, sem antecipar regras de negocio.
 
+## Sessao do operador
+
+O Sysvar Hub e a aplicacao operacional da loja. A Home permanece acessivel com empresa, loja e terminal identificados, mesmo sem operador autenticado.
+
+Operador e a sessao pessoal autenticada no Hub. A autenticacao reutiliza o mecanismo local existente de operador, guarda apenas o token de sessao em `sessionStorage` e nunca persiste senha no frontend. Ao acessar um modulo protegido sem sessao ativa, o usuario e enviado para `/operador` e retorna automaticamente ao modulo solicitado apos login valido.
+
+PDV e um modulo protegido do Hub. Caixa e a sessao financeira do PDV, separada da autenticacao pessoal.
+
+Login do operador nao abre caixa automaticamente.
+
 ## Arquitetura de API
 
 Em producao, o frontend chama somente caminhos relativos em same origin:

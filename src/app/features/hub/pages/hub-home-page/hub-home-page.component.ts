@@ -1,6 +1,7 @@
-import { Component, computed, inject } from '@angular/core';
+import { Component, OnInit, computed, inject } from '@angular/core';
 import { RouterLink } from '@angular/router';
 
+import { OperatorSessionService } from '../../../operador/services/operator-session.service';
 import { TerminalSessionService } from '../../../terminal/services/terminal-session.service';
 
 interface HubModuleLink {
@@ -20,9 +21,12 @@ interface HubModuleLink {
 })
 export class HubHomePageComponent {
   private readonly terminalSession = inject(TerminalSessionService);
+  private readonly operatorSession = inject(OperatorSessionService);
 
   readonly contexto = this.terminalSession.contexto;
   readonly sessionStatus = this.terminalSession.status;
+  readonly operador = this.operatorSession.operador;
+  readonly operatorStatus = this.operatorSession.status;
 
   readonly empresaNome = computed(() => this.contexto()?.empresa.nome || 'Sysvar Hub');
   readonly lojaNome = computed(() => this.contexto()?.loja.apelido || this.contexto()?.loja.nome || '-');
@@ -30,6 +34,7 @@ export class HubHomePageComponent {
   readonly caixaNome = computed(() => this.contexto()?.caixa?.descricao || this.contexto()?.caixa?.codigo || 'Sem caixa vinculado');
   readonly hubEstado = computed(() => this.sessionStatus() === 'contexto-carregado' ? 'Operacional' : 'Carregando contexto');
   readonly comunicacaoCentral = computed(() => this.sessionStatus() === 'contexto-carregado' ? 'Heartbeat local ativo' : 'Não avaliada');
+  readonly operadorPerfil = computed(() => this.operador()?.perfil?.nome || this.operador()?.tipo || '');
 
   readonly modules: HubModuleLink[] = [
     {
@@ -64,4 +69,12 @@ export class HubHomePageComponent {
       state: 'Estrutura pronta',
     },
   ];
+
+  ngOnInit(): void {
+    this.operatorSession.bootstrap().subscribe();
+  }
+
+  sairOperador(): void {
+    this.operatorSession.logout().subscribe();
+  }
 }

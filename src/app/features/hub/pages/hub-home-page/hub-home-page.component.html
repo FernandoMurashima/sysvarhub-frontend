@@ -23,6 +23,26 @@
         <span class="eyebrow">Loja conectada</span>
         <h1>{{ empresaNome() }}</h1>
         <p>{{ lojaNome() }} · Terminal {{ terminalNome() }}</p>
+        <section class="operator-panel" aria-label="Sessão do operador">
+          @if (operador()) {
+            <span>Operador autenticado</span>
+            <strong>{{ operador()?.nome }}</strong>
+            @if (operadorPerfil()) {
+              <small>{{ operadorPerfil() }}</small>
+            }
+            <div>
+              <a routerLink="/operador">Trocar operador</a>
+              <button type="button" (click)="sairOperador()">Sair</button>
+            </div>
+          } @else {
+            <span>Nenhum operador autenticado</span>
+            <strong>Hub operacional</strong>
+            <small>O login será solicitado ao abrir um módulo protegido.</small>
+            <div>
+              <a routerLink="/operador">Entrar como operador</a>
+            </div>
+          }
+        </section>
       </div>
       <dl>
         <div>
@@ -44,6 +64,10 @@
         <div>
           <dt>Caixa</dt>
           <dd>{{ caixaNome() }}</dd>
+        </div>
+        <div>
+          <dt>Operador</dt>
+          <dd>{{ operador()?.nome || 'Nenhum operador autenticado' }}</dd>
         </div>
         <div>
           <dt>Hub</dt>

@@ -3,6 +3,7 @@ import { Routes } from '@angular/router';
 import { operatorSessionGuard } from './core/guards/operator-session.guard';
 import { terminalSessionGuard } from './core/guards/terminal-session.guard';
 import { AtivacaoPageComponent } from './features/ativacao/pages/ativacao-page/ativacao-page.component';
+import { HubAccessDeniedPageComponent } from './features/hub/pages/hub-access-denied-page/hub-access-denied-page.component';
 import { HubHomePageComponent } from './features/hub/pages/hub-home-page/hub-home-page.component';
 import { HubModulePageComponent } from './features/hub/pages/hub-module-page/hub-module-page.component';
 import { OperadorLoginPageComponent } from './features/operador/pages/operador-login-page/operador-login-page.component';
@@ -29,30 +30,36 @@ export const routes: Routes = [
     path: 'pdv',
     component: PdvPageComponent,
     canActivate: [terminalSessionGuard, operatorSessionGuard],
+    data: { moduleKey: 'pdv' },
   },
   {
     path: 'devolucao-troca',
     component: HubModulePageComponent,
-    canActivate: [terminalSessionGuard],
+    canActivate: [terminalSessionGuard, operatorSessionGuard],
     data: { moduleKey: 'devolucao-troca' },
   },
   {
     path: 'consulta-vendas',
     component: HubModulePageComponent,
-    canActivate: [terminalSessionGuard],
+    canActivate: [terminalSessionGuard, operatorSessionGuard],
     data: { moduleKey: 'consulta-vendas' },
   },
   {
     path: 'vale-troca',
     component: HubModulePageComponent,
-    canActivate: [terminalSessionGuard],
+    canActivate: [terminalSessionGuard, operatorSessionGuard],
     data: { moduleKey: 'vale-troca' },
   },
   {
     path: 'pendencias-sincronizacao',
     component: HubModulePageComponent,
-    canActivate: [terminalSessionGuard],
+    canActivate: [terminalSessionGuard, operatorSessionGuard],
     data: { moduleKey: 'pendencias-sincronizacao' },
+  },
+  {
+    path: 'acesso-negado',
+    component: HubAccessDeniedPageComponent,
+    canActivate: [terminalSessionGuard],
   },
   {
     path: 'operador',

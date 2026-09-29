@@ -1,6 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
-import { Router } from '@angular/router';
+import { ActivatedRoute, Router, convertToParamMap } from '@angular/router';
 import { signal } from '@angular/core';
 import { of } from 'rxjs';
 
@@ -28,6 +28,7 @@ describe('OperadorLoginPageComponent', () => {
           useValue: { contexto: signal(terminalContextoStub).asReadonly() },
         },
         { provide: OperatorSessionService, useValue: operatorSession },
+        { provide: ActivatedRoute, useValue: { snapshot: { queryParamMap: convertToParamMap({}) } } },
         { provide: Router, useValue: router },
       ],
     }).compileComponents();
@@ -91,6 +92,34 @@ describe('OperadorLoginPageComponent', () => {
     expect(localStorage.getItem('credencial-digitada')).toBeNull();
     expect(sessionStorage.getItem('credencial-digitada')).toBeNull();
     expect(router.navigateByUrl).toHaveBeenCalledWith('/pdv');
+  });
+
+  it('apos autenticacao valida retorna ao modulo solicitado', () => {
+    TestBed.resetTestingModule();
+    operatorSession = jasmine.createSpyObj<OperatorSessionService>('OperatorSessionService', ['login']);
+    router = jasmine.createSpyObj<Router>('Router', ['navigateByUrl']);
+    operatorSession.login.and.returnValue(of(true));
+
+    TestBed.configureTestingModule({
+      imports: [OperadorLoginPageComponent],
+      providers: [
+        {
+          provide: TerminalSessionService,
+          useValue: { contexto: signal(terminalContextoStub).asReadonly() },
+        },
+        { provide: OperatorSessionService, useValue: operatorSession },
+        { provide: ActivatedRoute, useValue: { snapshot: { queryParamMap: convertToParamMap({ returnUrl: '/consulta-vendas' }) } } },
+        { provide: Router, useValue: router },
+      ],
+    });
+
+    const localFixture = TestBed.createComponent(OperadorLoginPageComponent);
+    const component = localFixture.componentInstance;
+    component.codigo = 'caixa.barra';
+    component.senha = 'credencial-digitada';
+    component.entrar(new Event('submit'));
+
+    expect(router.navigateByUrl).toHaveBeenCalledWith('/consulta-vendas');
   });
 
   it('erro 400 mostra mensagem generica e limpa senha', () => {

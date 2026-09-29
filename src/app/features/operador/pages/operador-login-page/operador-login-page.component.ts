@@ -1,6 +1,6 @@
 import { Component, ElementRef, inject, OnInit, ViewChild } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { Router } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { finalize } from 'rxjs';
 
 import { TerminalSessionService } from '../../../terminal/services/terminal-session.service';
@@ -16,6 +16,7 @@ import { OperatorSessionService } from '../../services/operator-session.service'
 export class OperadorLoginPageComponent implements OnInit {
   private readonly operatorSession = inject(OperatorSessionService);
   private readonly terminalSession = inject(TerminalSessionService);
+  private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
 
   @ViewChild('codigoInput') private codigoInput?: ElementRef<HTMLInputElement>;
@@ -62,11 +63,20 @@ export class OperadorLoginPageComponent implements OnInit {
       )
       .subscribe((autenticado) => {
         if (autenticado) {
-          void this.router.navigateByUrl('/pdv');
+          void this.router.navigateByUrl(this.returnUrl());
           return;
         }
 
         this.errorMessage = 'Operador ou credencial inválidos.';
       });
+  }
+
+  private returnUrl(): string {
+    const value = this.route.snapshot.queryParamMap.get('returnUrl');
+    if (!value || !value.startsWith('/') || value.startsWith('//') || value.startsWith('/operador')) {
+      return '/pdv';
+    }
+
+    return value;
   }
 }
