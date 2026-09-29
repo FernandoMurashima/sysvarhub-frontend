@@ -1,0 +1,38 @@
+<section class="hub-module">
+  <header>
+    <a routerLink="/">← Home</a>
+    <nav aria-label="Navegação principal">
+      <a routerLink="/pdv">PDV</a>
+      <a routerLink="/devolucao-troca">Devolução / Troca</a>
+      <a routerLink="/consulta-vendas">Consulta de Vendas</a>
+      <a routerLink="/vale-troca">Vale-Troca</a>
+      <a routerLink="/pendencias-sincronizacao">Pendências</a>
+    </nav>
+  </header>
+
+  <main>
+    <span>{{ content().eyebrow }}</span>
+    <h1>{{ content().title }}</h1>
+    <p>{{ content().description }}</p>
+
+    <section class="module-state">
+      <article>
+        <strong>Loja</strong>
+        <small>{{ loja() }}</small>
+      </article>
+      <article>
+        <strong>Terminal</strong>
+        <small>{{ terminal() }}</small>
+      </article>
+      <article>
+        <strong>Estado</strong>
+        <small>Estrutura pronta para próxima etapa</small>
+      </article>
+    </section>
+
+    <div class="actions">
+      <a routerLink="/">Retornar à Home</a>
+      <a routerLink="/pdv">Abrir PDV</a>
+    </div>
+  </main>
+</section>

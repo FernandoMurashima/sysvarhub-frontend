@@ -52,7 +52,6 @@ type PdvAtalho =
   | 'fechamento'
   | 'abertura-caixa'
   | 'consulta-vendas'
-  | 'devolucao'
   | 'fechar-pdv';
 
 type ClienteModalModo = 'busca' | 'cadastro';
@@ -467,7 +466,7 @@ export class PdvPageComponent implements OnInit, OnDestroy {
     }
 
     if (atalho === 'consulta-vendas') {
-      this.mensagem = 'Consulta de vendas ainda não implementada.';
+      void this.router.navigateByUrl('/consulta-vendas');
       return;
     }
 
@@ -1303,12 +1302,7 @@ export class PdvPageComponent implements OnInit, OnDestroy {
 
   abrirDevolucao(event?: Event): void {
     event?.preventDefault();
-    this.modalAtalho = 'devolucao';
-    this.devolucaoDocumento = '';
-    this.devolucaoMotivo = '';
-    this.devolucaoConsulta = null;
-    this.devolucaoQuantidades = {};
-    this.devolucaoResultado = null;
+    void this.router.navigateByUrl('/devolucao-troca');
   }
 
   consultarVendaDevolucao(): void {

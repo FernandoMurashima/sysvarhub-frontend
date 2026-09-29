@@ -1,0 +1,69 @@
+<section class="hub-home">
+  <header class="hub-topbar">
+    <div class="brand">
+      <div class="brand-mark">S</div>
+      <div>
+        <strong>Sysvar Hub</strong>
+        <span>Aplicação operacional da loja</span>
+      </div>
+    </div>
+    <nav aria-label="Navegação principal">
+      <a routerLink="/" aria-current="page">Home</a>
+      <a routerLink="/pdv">PDV</a>
+      <a routerLink="/devolucao-troca">Devolução / Troca</a>
+      <a routerLink="/consulta-vendas">Consulta de Vendas</a>
+      <a routerLink="/vale-troca">Vale-Troca</a>
+      <a routerLink="/pendencias-sincronizacao">Pendências</a>
+    </nav>
+  </header>
+
+  <main>
+    <section class="overview">
+      <div>
+        <span class="eyebrow">Loja conectada</span>
+        <h1>{{ empresaNome() }}</h1>
+        <p>{{ lojaNome() }} · Terminal {{ terminalNome() }}</p>
+      </div>
+      <dl>
+        <div>
+          <dt>Empresa</dt>
+          <dd>{{ empresaNome() }}</dd>
+        </div>
+        <div>
+          <dt>CNPJ</dt>
+          <dd>Não informado no contexto local atual</dd>
+        </div>
+        <div>
+          <dt>Loja</dt>
+          <dd>{{ lojaNome() }}</dd>
+        </div>
+        <div>
+          <dt>Terminal</dt>
+          <dd>{{ terminalNome() }}</dd>
+        </div>
+        <div>
+          <dt>Caixa</dt>
+          <dd>{{ caixaNome() }}</dd>
+        </div>
+        <div>
+          <dt>Hub</dt>
+          <dd>{{ hubEstado() }}</dd>
+        </div>
+        <div>
+          <dt>Central</dt>
+          <dd>{{ comunicacaoCentral() }}</dd>
+        </div>
+      </dl>
+    </section>
+
+    <section class="modules" aria-label="Módulos do Sysvar Hub">
+      @for (module of modules; track module.route) {
+        <a class="module-card" [class.primary]="module.primary" [routerLink]="module.route">
+          <span>{{ module.state }}</span>
+          <strong>{{ module.title }}</strong>
+          <small>{{ module.description }}</small>
+        </a>
+      }
+    </section>
+  </main>
+</section>

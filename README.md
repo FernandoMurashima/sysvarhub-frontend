@@ -2,6 +2,19 @@
 
 Aplicacao operacional local do Sysvar Hub, servida pelo proprio Hub e acessada pelos terminais da loja pela LAN.
 
+O Sysvar Hub representa a aplicacao operacional da loja. O PDV e um modulo desse Hub, acessivel pela Home e preservado tambem em `/pdv` para compatibilidade operacional.
+
+## Estrutura operacional
+
+- `/` abre a Home do Sysvar Hub com contexto de empresa, loja, terminal, caixa e estado local disponivel.
+- `/pdv` abre o modulo PDV existente.
+- `/devolucao-troca` abre a area propria de Devolucao / Troca.
+- `/consulta-vendas` abre a area propria de Consulta de Vendas.
+- `/vale-troca` abre a area propria de Vale-Troca.
+- `/pendencias-sincronizacao` abre a area propria de Pendencias de Sincronizacao.
+
+As areas fora do PDV foram estruturadas para evolucao funcional posterior, sem antecipar regras de negocio.
+
 ## Arquitetura de API
 
 Em producao, o frontend chama somente caminhos relativos em same origin:
@@ -25,7 +38,8 @@ A recuperacao local so acontece quando existe terminal ativo, pareado, com parea
 ## Decisoes
 
 - O Hub Frontend nao copia a estrutura administrativa do Sysvar Central.
-- O PDV real sera migrado em etapa propria para `/pdv`.
+- O PDV real permanece em `/pdv` como modulo do Sysvar Hub.
+- Devolucao / Troca, Consulta de Vendas, Vale-Troca e Pendencias de Sincronizacao sao modulos proprios preparados para evolucao posterior.
 - A migracao do `PdvDesktopComponent` deve passar por uma camada operacional `PdvHubFacade`.
 - Servicos administrativos do Central devem ser analisados um a um antes de qualquer reaproveitamento.
 - Nao usar Electron, SQLite ou IndexedDB de catalogo neste passo.

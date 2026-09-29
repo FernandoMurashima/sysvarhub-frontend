@@ -973,13 +973,13 @@ describe('PdvPageComponent', () => {
     expect(text).toContain('Fechar PDV');
   });
 
-  it('F12 informa que consulta de vendas ainda nao foi implementada', () => {
+  it('F12 navega para Consulta de Vendas', () => {
     const component = fixture.componentInstance;
 
     component.abrirAtalho(new Event('click'), 'consulta-vendas');
 
     expect(component.modalAtalho).toBe('');
-    expect(component.mensagem).toBe('Consulta de vendas ainda não implementada.');
+    expect(router.navigateByUrl).toHaveBeenCalledWith('/consulta-vendas');
   });
 
   it('F13 sai do PDV pelo fluxo de operador sem fechar caixa', () => {
@@ -1014,7 +1014,7 @@ describe('PdvPageComponent', () => {
 
     component.fecharAberturaCaixa();
     component.atalhoF12(new KeyboardEvent('keydown', { key: 'F12' }));
-    expect(component.mensagem).toBe('Consulta de vendas ainda não implementada.');
+    expect(router.navigateByUrl).toHaveBeenCalledWith('/consulta-vendas');
 
     component.atalhoF13(new KeyboardEvent('keydown', { key: 'F13' }));
     expect(operatorSession.logout).toHaveBeenCalled();
@@ -2177,7 +2177,7 @@ describe('PdvPageComponent', () => {
   it('mantem Suporte no header fora do grupo NFC-e e TEF', () => {
     const host: HTMLElement = fixture.nativeElement;
     const indicadores = host.querySelector('.operation-indicators');
-    const suporte = host.querySelector('.top-actions .home-button');
+    const suporte = Array.from(host.querySelectorAll('.top-actions a')).find((item) => item.textContent?.includes('Suporte'));
     const topActions = host.querySelector('.top-actions');
 
     expect(indicadores?.textContent).toContain('NFC-e');

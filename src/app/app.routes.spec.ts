@@ -3,11 +3,11 @@ import { operatorSessionGuard } from './core/guards/operator-session.guard';
 import { terminalSessionGuard } from './core/guards/terminal-session.guard';
 
 describe('routes', () => {
-  it('redireciona raiz para pdv sem canActivate', () => {
+  it('usa Home do Hub na raiz com sessao de terminal', () => {
     const rootRoute = routes.find((route) => route.path === '');
 
-    expect(rootRoute?.redirectTo).toBe('pdv');
-    expect(rootRoute?.canActivate).toBeUndefined();
+    expect(rootRoute?.redirectTo).toBeUndefined();
+    expect(rootRoute?.canActivate).toEqual([terminalSessionGuard]);
   });
 
   it('mantem guard nas rotas operacionais', () => {
@@ -21,6 +21,16 @@ describe('routes', () => {
     expect(operadorRoute?.canActivate).toEqual([terminalSessionGuard]);
     expect(suporteRoute?.canActivate).toContain(terminalSessionGuard);
     expect(suporteRoute?.canActivate).not.toContain(operatorSessionGuard);
+  });
+
+  it('cria rotas dos modulos operacionais do Hub', () => {
+    for (const path of ['devolucao-troca', 'consulta-vendas', 'vale-troca', 'pendencias-sincronizacao']) {
+      const route = routes.find((item) => item.path === path);
+
+      expect(route).toBeTruthy();
+      expect(route?.canActivate).toEqual([terminalSessionGuard]);
+      expect(route?.data?.['moduleKey']).toBe(path);
+    }
   });
 
   it('existe rota publica de ativacao sem guards', () => {

@@ -52,6 +52,7 @@
       </div>
       <button class="switch-operator" type="button" (click)="trocarOperador()">Trocar operador</button>
       <button class="switch-operator day-close-button" type="button" (click)="abrirFechamentoDia()">Fechamento do Dia</button>
+      <a routerLink="/" class="home-button">Home</a>
       <a routerLink="/suporte" class="home-button">Suporte</a>
       <button
         class="home-button fullscreen-button"
@@ -1129,37 +1130,6 @@
                 <button type="submit" [disabled]="!formaPagamentoSelecionada || formaPagamentoSelecionada.tefHabilitado || vendaLoading()">Adicionar</button>
               </form>
             </div>
-          </div>
-        } @else if (modalAtalho === 'devolucao') {
-          <div class="payment-modal">
-            <section class="payment-summary">
-              <article><span>Valor</span><strong>{{ devolucaoResultado ? formatarMoeda(devolucaoResultado.valorTotal) : '-' }}</strong></article>
-              <article><span>Vale-Troca</span><strong>{{ devolucaoResultado?.valeDocumento || '-' }}</strong></article>
-            </section>
-            <form class="payment-form" (submit)="$event.preventDefault(); consultarVendaDevolucao()">
-              <label>Venda / Cupom<input name="devolucaoDocumento" [(ngModel)]="devolucaoDocumento" autocomplete="off" /></label>
-              <label>Motivo<input name="devolucaoMotivo" [(ngModel)]="devolucaoMotivo" maxlength="255" autocomplete="off" /></label>
-              <button type="submit" [disabled]="devolucaoCarregando">Localizar</button>
-            </form>
-            @if (devolucaoConsulta) {
-              <div class="vale-list">
-                <div class="vale-row head"><span>Item</span><span>Vendido</span><span>Disponível</span><span>Devolver</span></div>
-                @for (item of devolucaoConsulta.itens; track item.item_uuid) {
-                  <div class="vale-row">
-                    <span><strong>{{ item.descricao }}</strong><small>{{ formatarMoeda(item.total_item) }}</small></span>
-                    <span>{{ item.quantidade }}</span>
-                    <span>{{ item.quantidade_disponivel || item.quantidade }}</span>
-                    <input type="number" min="0" [max]="item.quantidade_disponivel || item.quantidade" name="dev{{ item.item_uuid }}" [(ngModel)]="devolucaoQuantidades[item.item_uuid]" />
-                  </div>
-                }
-              </div>
-              <div class="modal-actions">
-                <button type="button" class="primary" [disabled]="devolucaoCarregando" (click)="confirmarDevolucao()">Confirmar devolução</button>
-              </div>
-            }
-            @if (devolucaoResultado) {
-              <p class="summary-empty">Vale {{ devolucaoResultado.valeDocumento }} gerado com saldo {{ formatarMoeda(devolucaoResultado.valeSaldo) }}.</p>
-            }
           </div>
         } @else {
           <div class="modal-confirm">
