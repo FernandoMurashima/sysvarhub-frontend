@@ -1,59 +1,83 @@
 # Sysvar Hub Frontend
 
-Aplicacao operacional local do Sysvar Hub, servida pelo proprio Hub e acessada pelos terminais da loja pela LAN.
+Aplicação operacional local do Sysvar Hub, servida pelo próprio Hub e acessada pelos terminais da loja pela LAN.
 
-O Sysvar Hub representa a aplicacao operacional da loja. O PDV e um modulo desse Hub, acessivel pela Home e preservado tambem em `/pdv` para compatibilidade operacional.
+O Sysvar Hub representa a aplicação operacional da loja. O PDV é um módulo desse Hub, acessível pela Home e preservado também em `/pdv`.
 
 ## Estrutura operacional
 
-- `/` abre a Home do Sysvar Hub com contexto de empresa, loja, terminal, caixa e estado local disponivel.
-- `/pdv` abre o modulo PDV existente.
-- `/devolucao-troca` abre a area propria de Devolucao / Troca.
-- `/consulta-vendas` abre a area propria de Consulta de Vendas.
-- `/vale-troca` abre a area propria de Vale-Troca.
-- `/pendencias-sincronizacao` abre a area propria de Pendencias de Sincronizacao.
+- `/` — Home do Sysvar Hub com contexto operacional local.
+- `/pdv` — módulo PDV.
+- `/devolucao-troca` — Devolução / Troca.
+- `/consulta-vendas` — Consulta de Vendas.
+- `/vale-troca` — Vale-Troca.
+- `/pendencias-sincronizacao` — Pendências de Sincronização.
+- `/operador` — autenticação da sessão pessoal do operador.
+- `/pareamento` — fluxo de pareamento/recuperação da identidade do terminal quando necessário.
 
-As areas fora do PDV foram estruturadas para evolucao funcional posterior, sem antecipar regras de negocio.
+Os módulos devem refletir o estado funcional real do backend Hub e da Central. Não tratar Devolução/Troca ou Vale-Troca como simples placeholders quando os fluxos já estiverem implementados.
 
-## Sessao do operador
+## Sessão do operador
 
-O Sysvar Hub e a aplicacao operacional da loja. A Home permanece acessivel com empresa, loja e terminal identificados, mesmo sem operador autenticado.
+A Home pode permanecer acessível com empresa, loja e terminal identificados mesmo sem operador autenticado.
 
-Operador e a sessao pessoal autenticada no Hub. A autenticacao reutiliza o mecanismo local existente de operador, guarda apenas o token de sessao em `sessionStorage` e nunca persiste senha no frontend. Ao acessar um modulo protegido sem sessao ativa, o usuario e enviado para `/operador` e retorna automaticamente ao modulo solicitado apos login valido.
+Operador é a sessão pessoal autenticada no Hub. O frontend guarda apenas o token de sessão em `sessionStorage`; senha não é persistida.
 
-PDV e um modulo protegido do Hub. Caixa e a sessao financeira do PDV, separada da autenticacao pessoal.
+Módulos protegidos exigem sessão ativa do operador. Quando necessário, o usuário é enviado para `/operador` e retorna ao módulo solicitado após autenticação válida.
 
-Login do operador nao abre caixa automaticamente.
+PDV é um módulo protegido. Caixa é a sessão financeira do PDV e permanece separada da autenticação pessoal do operador.
 
-Entrar no PDV consulta a situacao real do caixa e nao cria sessao financeira sozinho. Sair do PDV para a Home ou para outros modulos nao fecha caixa, nao encerra a sessao do operador e nao cancela venda em andamento.
+Login do operador não abre caixa automaticamente.
 
-A venda ativa continua tendo como fonte operacional o Backend Hub local. Ao retornar ao PDV, a tela reconcilia o estado com a venda aberta persistida do terminal, preservando UUID, itens, cliente, vendedor, pagamentos e totais quando a venda ainda esta aberta. Vendas finalizadas ou canceladas nao sao reativadas como venda aberta.
+Entrar no PDV consulta a situação real do caixa e não cria sessão financeira sozinho. Sair do PDV para a Home ou para outros módulos não deve fechar caixa, encerrar operador ou cancelar venda em andamento.
+
+A venda ativa tem como fonte operacional o Backend Hub local. Ao retornar ao PDV, a tela reconcilia o estado com a venda aberta persistida do terminal.
 
 ## Arquitetura de API
 
-Em producao, o frontend chama somente caminhos relativos em same origin:
+Em produção, o frontend chama somente caminhos relativos em same origin sob `/api`.
 
-- `/api/terminal/parear/`
-- `/api/terminal/recuperar-local/`
-- `/api/terminal/contexto/`
-- `/api/terminal/heartbeat/`
-- `/api/terminal/catalogo/`
+Durante desenvolvimento, `npm start` usa `proxy.conf.json` para encaminhar `/api` ao Backend Hub local.
 
-Nao ha host, IP, token ou segredo versionado no frontend. Durante desenvolvimento, `npm start` usa `proxy.conf.json` para encaminhar `/api` para `http://127.0.0.1:8100`.
+Não versionar host operacional, IP de cliente, token ou segredo no frontend.
 
 ## Identidade do terminal
 
-A identidade persistente do terminal pertence ao Hub local. No pareamento, o backend guarda o token operacional em forma cifrada e mantem o hash para autenticacao normal das chamadas `Authorization: Terminal ...`.
+A identidade persistente do terminal pertence ao Hub local.
 
-O navegador usa `localStorage` apenas como cache da credencial para enviar as requisicoes autenticadas. Se o navegador for fechado, recriado ou perder o storage, o frontend tenta `/api/terminal/recuperar-local/` antes de redirecionar para `/pareamento`.
+No pareamento, o backend mantém a credencial operacional protegida localmente e o navegador usa `localStorage` somente como cache necessário às chamadas autenticadas.
 
-A recuperacao local so acontece quando existe terminal ativo, pareado, com pareamento usado nao revogado e credencial cifrada valida no Hub. Terminal nunca pareado, inativo, revogado ou com credencial invalida continua exigindo novo pareamento pelo fluxo administrativo normal.
+Se o navegador perder o storage, o frontend tenta recuperar a identidade local antes de exigir novo pareamento.
 
-## Decisoes
+Terminal inativo, revogado ou com credencial inválida deve retornar ao fluxo administrativo de pareamento/configuração apropriado.
 
-- O Hub Frontend nao copia a estrutura administrativa do Sysvar Central.
-- O PDV real permanece em `/pdv` como modulo do Sysvar Hub.
-- Devolucao / Troca, Consulta de Vendas, Vale-Troca e Pendencias de Sincronizacao sao modulos proprios preparados para evolucao posterior.
-- A migracao do `PdvDesktopComponent` deve passar por uma camada operacional `PdvHubFacade`.
-- Servicos administrativos do Central devem ser analisados um a um antes de qualquer reaproveitamento.
-- Nao usar Electron, SQLite ou IndexedDB de catalogo neste passo.
+## Relação com a Central
+
+O frontend do Hub não chama diretamente APIs web/JWT da Central para executar regras corporativas. Fluxos que dependem da Central passam pelo Backend Hub, que utiliza a autenticação e os contratos de integração próprios do Hub.
+
+Isso vale especialmente para operações como sincronização, consulta online, devolução/troca, Vale-Troca e demais fluxos que atravessem a fronteira Hub ↔ Central.
+
+## Decisões estruturais
+
+- O Hub Frontend não copia a estrutura administrativa do Sysvar Central.
+- O PDV permanece em `/pdv` como módulo do Sysvar Hub.
+- Operador, Terminal e Caixa são conceitos distintos.
+- A venda operacional local deve continuar reconciliável com o estado persistido no Backend Hub.
+- Serviços administrativos da Central devem ser analisados antes de qualquer reaproveitamento no Hub.
+- Não expor credenciais do Hub ao navegador.
+
+## Documentação
+
+A documentação central do Projeto Sysvar fica em:
+
+`FernandoMurashima/sysvar-vault`
+
+Pasta principal:
+
+`takeshi/10 Projetos/Sysvar`
+
+Contexto específico do Hub:
+
+`takeshi/10 Projetos/Sysvar/Contexto do Projeto/Sysvar Hub.md`
+
+Este README deve permanecer como referência técnica curta do repositório. Regras funcionais transversais, decisões arquiteturais, homologações e runbooks pertencem ao `sysvar-vault`.
