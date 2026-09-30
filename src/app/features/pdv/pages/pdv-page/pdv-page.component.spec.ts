@@ -459,7 +459,7 @@ describe('PdvPageComponent', () => {
     vendaStatusSignal = signal<'inicializando' | 'sem-venda' | 'aberta' | 'erro'>('aberta');
     vendaLoadingSignal = signal(false);
     centralStatusSignal = signal<'VERIFICANDO' | 'ONLINE' | 'OFFLINE'>('VERIFICANDO');
-    vendaSession = jasmine.createSpyObj<VendaSessionService>('VendaSessionService', ['bootstrap', 'iniciarVenda', 'adicionarItem', 'alterarQuantidade', 'removerItem', 'cancelarVenda', 'limparEstado', 'listarFormasPagamento', 'adicionarPagamento', 'removerPagamento', 'finalizarVenda', 'selecionarCliente', 'removerCliente', 'selecionarVendedor', 'removerVendedor'], {
+    vendaSession = jasmine.createSpyObj<VendaSessionService>('VendaSessionService', ['bootstrap', 'iniciarVenda', 'adicionarItem', 'alterarQuantidade', 'removerItem', 'cancelarVenda', 'limparEstado', 'listarFormasPagamento', 'adicionarPagamento', 'adicionarPagamentoValeTroca', 'removerPagamento', 'finalizarVenda', 'selecionarCliente', 'removerCliente', 'selecionarVendedor', 'removerVendedor'], {
       venda: vendaSignal.asReadonly(),
       clientePreselecionado: clientePreselecionadoSignal.asReadonly(),
       vendedorPreselecionado: vendedorPreselecionadoSignal.asReadonly(),
@@ -474,14 +474,40 @@ describe('PdvPageComponent', () => {
     vendaSession.cancelarVenda.and.returnValue(of({ ok: true }));
     vendaSession.listarFormasPagamento.and.returnValue(of({ versao: 1, sincronizadoEm: null, formas: [] }));
     vendaSession.adicionarPagamento.and.returnValue(of({ ok: true }));
+    vendaSession.adicionarPagamentoValeTroca.and.returnValue(of({ ok: true }));
     vendaSession.removerPagamento.and.returnValue(of({ ok: true }));
     vendaSession.finalizarVenda.and.returnValue(of({ ok: true }));
     vendaSession.selecionarCliente.and.returnValue(of({ ok: true }));
     vendaSession.removerCliente.and.returnValue(of({ ok: true }));
     vendaSession.selecionarVendedor.and.returnValue(of({ ok: true }));
     vendaSession.removerVendedor.and.returnValue(of({ ok: true }));
-    hubVendaService = jasmine.createSpyObj<HubVendaService>('HubVendaService', ['obterDanfeNfce']);
+    hubVendaService = jasmine.createSpyObj<HubVendaService>('HubVendaService', ['obterDanfeNfce', 'consultarBeneficiosCliente', 'consultarValeTroca']);
     hubVendaService.obterDanfeNfce.and.returnValue(of(danfeNfceStub()));
+    hubVendaService.consultarBeneficiosCliente.and.returnValue(of({
+      cashback: {
+        saldo: '25.00',
+        saldo_retaguarda: '40.00',
+        saldo_offline_utilizavel: '20.00',
+        limite_uso_percentual: '30.00',
+        valor_minimo_uso: '1.00',
+      },
+      vales_troca: [],
+    }));
+    hubVendaService.consultarValeTroca.and.returnValue(of({
+      vale_troca: {
+        id: 7,
+        documento: 'VT-001',
+        cliente: { id: 123, nome: 'Maria Silva', documento: '12345678901' },
+        valor_original: '80.00',
+        saldo_contabil: '80.00',
+        saldo_reservado: '5.00',
+        saldo_disponivel: '75.00',
+        status: 'ATIVO',
+        validade: '2026-12-31',
+        loja_origem: { id: 1, nome: 'Loja Centro' },
+        devolucao_origem: null,
+      },
+    }));
     centralConnectivity = jasmine.createSpyObj<CentralConnectivityService>('CentralConnectivityService', ['startPolling'], {
       status: centralStatusSignal.asReadonly(),
     });
@@ -2454,6 +2480,65 @@ describe('PdvPageComponent', () => {
 
     expect(component.modalAtalho).toBe('pagamentos');
     expect(vendaSession.listarFormasPagamento).toHaveBeenCalled();
+  });
+
+  it('modal de pagamentos separa cashback da experiencia de vale-troca', () => {
+    const component = fixture.componentInstance;
+    vendaSignal.set({ ...vendaAbertaStub.venda!, vendedor: vendedorStub, cliente: clienteAtivo });
+    hubVendaService.consultarBeneficiosCliente.and.returnValue(of({
+      cashback: {
+        saldo: '25.00',
+        saldo_retaguarda: '40.00',
+        saldo_offline_utilizavel: '20.00',
+        limite_uso_percentual: '30.00',
+        valor_minimo_uso: '1.00',
+      },
+      vales_troca: [
+        { documento: 'VT-LOCAL-1', saldo: '35.00', validade: null, utilizavel_offline: true },
+        { documento: 'VT-RETAG-2', saldo: '60.00', validade: null, utilizavel_offline: false },
+      ],
+    }));
+
+    component.abrirPagamentos('TODAS');
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('.cashback-panel')).not.toBeNull();
+    expect(fixture.nativeElement.querySelector('.vale-panel')).toBeNull();
+
+    component.selecionarPagamentoValeTroca();
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('.cashback-panel')).toBeNull();
+    expect(fixture.nativeElement.querySelector('.vale-panel')).not.toBeNull();
+    expect(fixture.nativeElement.querySelectorAll('.vale-picker-button').length).toBe(2);
+    expect(fixture.nativeElement.textContent).toContain('Adicionar Vale-Troca');
+  });
+
+  it('modal de vale-troca exibe resumo do vale consultado sem misturar autorizacao manual', () => {
+    const component = fixture.componentInstance;
+    vendaSignal.set({ ...vendaAbertaStub.venda!, vendedor: vendedorStub, cliente: clienteAtivo });
+    component.abrirPagamentos('TODAS');
+    component.selecionarPagamentoValeTroca();
+    component.valeTrocaConsulta = {
+      id: 7,
+      documento: 'VT-001',
+      cliente: { id: 123, nome: 'Maria Silva', documento: '12345678901' },
+      valor_original: '80.00',
+      saldo_contabil: '80.00',
+      saldo_reservado: '5.00',
+      saldo_disponivel: '75.00',
+      status: 'ATIVO',
+      validade: '2026-12-31',
+      loja_origem: { id: 1, nome: 'Loja Centro' },
+      devolucao_origem: null,
+    };
+
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('.selected-vale')).not.toBeNull();
+    expect(fixture.nativeElement.querySelector('.technical-id')?.textContent).toContain('VT-001');
+    expect(fixture.nativeElement.querySelector('input[name="autorizacaoPagamento"]')).toBeNull();
+    expect(fixture.nativeElement.querySelector('input[name="valeTrocaDocumento"]')).not.toBeNull();
   });
 
   it('finalizacao sem NFC-e mostra conclusao sem consultar DANFE', () => {

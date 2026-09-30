@@ -1121,39 +1121,59 @@
               </div>
 
               <form class="payment-form" (submit)="$event.preventDefault(); adicionarPagamento()">
-                @if (beneficiosCliente) {
-                  <div class="benefits-box">
-                    <strong>Cashback offline {{ formatarMoeda(beneficiosCliente.cashback.saldo_offline_utilizavel || beneficiosCliente.cashback.saldo) }}</strong>
+                @if (beneficiosCliente && !pagamentoValeTrocaSelecionado) {
+                  <section class="payment-panel cashback-panel">
+                    <div class="payment-panel-title">
+                      <strong>Cashback offline</strong>
+                      <span>{{ formatarMoeda(beneficiosCliente.cashback.saldo_offline_utilizavel || beneficiosCliente.cashback.saldo) }}</span>
+                    </div>
                     <small>Retaguarda {{ formatarMoeda(beneficiosCliente.cashback.saldo_retaguarda) }} · Limite {{ beneficiosCliente.cashback.limite_uso_percentual }}%</small>
-                    @if (beneficiosCliente.vales_troca.length) {
-                      <div class="vale-list">
-                        @for (vale of beneficiosCliente.vales_troca; track vale.documento) {
-                          <button type="button" class="vale-picker-button" [disabled]="!vale.utilizavel_offline" (click)="selecionarValeTroca(vale.documento, vale.saldo, vale.utilizavel_offline)">
-                            {{ vale.documento }} · {{ formatarMoeda(vale.saldo) }}{{ vale.utilizavel_offline ? '' : ' · retaguarda' }}
+                  </section>
+                }
+                @if (pagamentoValeTrocaSelecionado) {
+                  <section class="payment-panel vale-panel">
+                    <div class="payment-panel-title">
+                      <strong>Vale-Troca online</strong>
+                      <span>{{ centralStatus() }}</span>
+                    </div>
+                    <label>Número do Vale-Troca<input name="valeTrocaDocumento" [(ngModel)]="autorizacaoPagamento" maxlength="120" autocomplete="off" /></label>
+                    <button type="button" class="secondary-action" (click)="consultarValeTrocaOnline()" [disabled]="consultandoValeTroca || centralStatus() !== 'ONLINE'">Consultar</button>
+                    @if (beneficiosCliente?.vales_troca?.length) {
+                      <div class="vale-list compact">
+                        @for (vale of beneficiosCliente?.vales_troca || []; track vale.documento) {
+                          <button type="button" class="vale-picker-button" [class.selected]="autorizacaoPagamento === vale.documento" [disabled]="!vale.utilizavel_offline" (click)="selecionarValeTroca(vale.documento, vale.saldo, vale.utilizavel_offline)">
+                            <strong>Vale-Troca</strong>
+                            <span>Saldo disponível: {{ formatarMoeda(vale.saldo) }}</span>
+                            <small>{{ vale.documento }}{{ vale.utilizavel_offline ? '' : ' · retaguarda' }}</small>
                           </button>
                         }
                       </div>
                     }
-                  </div>
-                }
-                @if (pagamentoValeTrocaSelecionado) {
-                  <label>Número do Vale-Troca<input name="valeTrocaDocumento" [(ngModel)]="autorizacaoPagamento" maxlength="120" autocomplete="off" /></label>
-                  <button type="button" (click)="consultarValeTrocaOnline()" [disabled]="consultandoValeTroca || centralStatus() !== 'ONLINE'">Consultar</button>
+                  </section>
                   @if (valeTrocaConsulta) {
-                    <div class="benefits-box">
-                      <strong>{{ valeTrocaConsulta.cliente.nome }} · {{ formatarMoeda(valeTrocaConsulta.saldo_disponivel) }}</strong>
+                    <section class="payment-panel selected-vale">
+                      <div class="payment-panel-title">
+                        <strong>Vale selecionado</strong>
+                        <span>{{ formatarMoeda(valeTrocaConsulta.saldo_disponivel) }}</span>
+                      </div>
+                      <p>{{ valeTrocaConsulta.cliente.nome }}</p>
                       <small>{{ valeTrocaConsulta.status }} · reservado {{ formatarMoeda(valeTrocaConsulta.saldo_reservado) }} · validade {{ valeTrocaConsulta.validade || 'sem validade' }}</small>
-                    </div>
+                      <small class="technical-id">{{ valeTrocaConsulta.documento }}</small>
+                    </section>
                   }
                 }
-                <label>Valor<input name="valorPagamento" [(ngModel)]="valorPagamento" inputmode="decimal" autocomplete="off" /></label>
-                @if (!pagamentoValeTrocaSelecionado) {
-                  <label>Autorização<input name="autorizacaoPagamento" [(ngModel)]="autorizacaoPagamento" maxlength="120" autocomplete="off" /></label>
-                }
-                @if (formaPagamentoSelecionada?.tefHabilitado) {
-                  <p>Esta forma exige integração TEF.</p>
-                }
-                <button type="submit" [disabled]="(!formaPagamentoSelecionada && !pagamentoValeTrocaSelecionado) || !!formaPagamentoSelecionada?.tefHabilitado || vendaLoading()">Adicionar</button>
+                <section class="payment-panel payment-action-panel">
+                  <label>{{ pagamentoValeTrocaSelecionado ? 'Valor a utilizar' : 'Valor' }}<input name="valorPagamento" [(ngModel)]="valorPagamento" inputmode="decimal" autocomplete="off" /></label>
+                  @if (!pagamentoValeTrocaSelecionado) {
+                    <label>Autorização<input name="autorizacaoPagamento" [(ngModel)]="autorizacaoPagamento" maxlength="120" autocomplete="off" /></label>
+                  }
+                  @if (formaPagamentoSelecionada?.tefHabilitado) {
+                    <p>Esta forma exige integração TEF.</p>
+                  }
+                  <button type="submit" [disabled]="(!formaPagamentoSelecionada && !pagamentoValeTrocaSelecionado) || !!formaPagamentoSelecionada?.tefHabilitado || vendaLoading()">
+                    {{ pagamentoValeTrocaSelecionado ? 'Adicionar Vale-Troca' : 'Adicionar' }}
+                  </button>
+                </section>
               </form>
             </div>
           </div>
