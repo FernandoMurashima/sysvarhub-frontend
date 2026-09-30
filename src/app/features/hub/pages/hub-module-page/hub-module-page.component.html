@@ -40,6 +40,131 @@
       }
     </section>
 
+    @if (moduleKey === 'devolucao-troca') {
+      <section class="devolucao-workspace">
+        @if (centralStatus() !== 'ONLINE') {
+          <div class="offline-box">
+            <strong>Central OFFLINE</strong>
+            <span>Consulta e finalização online ficam indisponíveis. A contingência offline será tratada posteriormente.</span>
+          </div>
+        }
+
+        <div class="mode-tabs" role="tablist" aria-label="Modo de pesquisa">
+          <button type="button" [class.active]="modoBusca === 'cupom'" (click)="modoBusca = 'cupom'">Venda / Cupom</button>
+          <button type="button" [class.active]="modoBusca === 'cliente'" (click)="modoBusca = 'cliente'">Pesquisar cliente</button>
+        </div>
+
+        @if (modoBusca === 'cupom') {
+          <div class="search-row">
+            <label>
+              <span>Venda / Cupom</span>
+              <input [(ngModel)]="documentoBusca" placeholder="Documento, NFC-e, chave ou protocolo" [disabled]="centralStatus() !== 'ONLINE'" />
+            </label>
+            <button type="button" (click)="buscarCupom()" [disabled]="carregando || centralStatus() !== 'ONLINE'">Localizar</button>
+          </div>
+        } @else {
+          <div class="search-row">
+            <label>
+              <span>CPF/documento ou nome</span>
+              <input [(ngModel)]="clienteBusca" placeholder="Priorize CPF quando possível" [disabled]="centralStatus() !== 'ONLINE'" />
+            </label>
+            <button type="button" (click)="pesquisarCliente()" [disabled]="carregando || centralStatus() !== 'ONLINE'">Pesquisar</button>
+          </div>
+          @if (clientes.length) {
+            <div class="list-panel">
+              @for (cliente of clientes; track cliente.id) {
+                <button type="button" (click)="selecionarCliente(cliente)">
+                  <strong>{{ cliente.nome }}</strong>
+                  <span>{{ cliente.documento || 'Documento não informado' }}</span>
+                </button>
+              }
+            </div>
+          }
+          @if (vendasCliente.length) {
+            <div class="sales-panel">
+              @for (vendaCliente of vendasCliente; track vendaCliente.id) {
+                <button type="button" (click)="selecionarVendaCliente(vendaCliente)">
+                  <strong>{{ vendaCliente.documento }}</strong>
+                  <span>{{ vendaCliente.loja.nome }} · {{ vendaCliente.data_venda | date:'short' }} · {{ formatarMoeda(vendaCliente.total) }}</span>
+                  <small>{{ vendaCliente.quantidade_itens }} itens @if (vendaCliente.nfce?.numero) { · NFC-e {{ vendaCliente.nfce?.numero }} }</small>
+                </button>
+              }
+            </div>
+          }
+        }
+
+        @if (mensagem) {
+          <p class="message">{{ mensagem }}</p>
+        }
+
+        @if (venda && !resultado) {
+          <section class="sale-detail">
+            <div class="sale-summary">
+              <strong>{{ venda.documento }}</strong>
+              <span>{{ venda.loja_origem?.nome || venda.loja_nome }} → {{ loja() }}</span>
+              <span>{{ venda.cliente.nome }} · {{ venda.cliente.documento || 'sem documento' }}</span>
+              <span>{{ formatarMoeda(venda.total) }} · {{ venda.situacao || 'FINALIZADA' }}</span>
+            </div>
+
+            <div class="items-table">
+              <div class="items-head">
+                <span>Produto</span><span>Vendido</span><span>Já devolvido</span><span>Disponível</span><span>Qtd.</span><span>Crédito</span>
+              </div>
+              @for (item of venda.itens; track itemKey(item)) {
+                <div class="items-line">
+                  <span><strong>{{ item.descricao }}</strong><small>{{ item.referencia }} {{ item.ean }} {{ item.cor }} {{ item.tamanho }}</small></span>
+                  <span>{{ item.quantidade }}</span>
+                  <span>{{ item.quantidade_devolvida || 0 }}</span>
+                  <span>{{ item.quantidade_disponivel ?? item.quantidade }}</span>
+                  <input type="number" min="0" [max]="item.quantidade_disponivel ?? item.quantidade" [(ngModel)]="quantidades[itemKey(item)]" (ngModelChange)="ajustarQuantidade(itemKey(item), item.quantidade_disponivel ?? item.quantidade)" />
+                  <span>{{ formatarMoeda(item.valor_liquido_disponivel || item.total_item) }}</span>
+                </div>
+              }
+            </div>
+
+            <label class="motivo">
+              <span>Motivo</span>
+              <input [(ngModel)]="motivo" placeholder="Opcional" />
+            </label>
+
+            <div class="finish-bar">
+              <strong>Total do crédito: {{ formatarMoeda(totalCredito()) }}</strong>
+              <button type="button" (click)="confirmando = true" [disabled]="totalCredito() <= 0 || carregando">Finalizar devolução</button>
+            </div>
+          </section>
+        }
+
+        @if (confirmando && venda) {
+          <section class="confirm-box">
+            <h2>Confirmar devolução</h2>
+            <p>{{ venda.documento }} · {{ venda.loja_origem?.nome || venda.loja_nome }} → {{ loja() }}</p>
+            <strong>{{ venda.cliente.nome }} · {{ formatarMoeda(totalCredito()) }}</strong>
+            <div>
+              <button type="button" (click)="confirmando = false">Voltar</button>
+              <button type="button" (click)="finalizar()" [disabled]="carregando">Confirmar</button>
+            </div>
+          </section>
+        }
+
+        @if (resultado) {
+          <section class="result-box">
+            <h2>Devolução concluída</h2>
+            <p>{{ resultado.documento }} · {{ resultado.venda_documento }}</p>
+            <strong>{{ formatarMoeda(resultado.valor_total) }}</strong>
+            <span>Vale-Troca {{ resultado.vale_troca?.documento }} · saldo {{ formatarMoeda(resultado.vale_troca?.saldo) }}</span>
+            @if (resultado.fiscal?.status) {
+              <span>Fiscal: {{ resultado.fiscal?.status }}</span>
+            }
+            <div class="actions">
+              <a routerLink="/">Home</a>
+              <a routerLink="/pdv">PDV</a>
+              <button type="button" (click)="resultado = null; venda = null; quantidades = {}; documentoBusca = ''">Outra devolução</button>
+            </div>
+          </section>
+        }
+      </section>
+    }
+
     <div class="actions">
       <a routerLink="/">Retornar à Home</a>
       <a routerLink="/pdv">Abrir PDV</a>

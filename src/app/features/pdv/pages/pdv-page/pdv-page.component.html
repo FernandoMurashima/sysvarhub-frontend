@@ -158,10 +158,11 @@
           class="shortcut-central"
           [class.online]="centralStatus() === 'ONLINE'"
           [class.offline]="centralStatus() === 'OFFLINE'"
-          [style.background]="centralStatus() === 'ONLINE' ? '#166534' : centralStatus() === 'OFFLINE' ? '#991b1b' : '#475569'"
+          [attr.title]="'Central ' + centralStatusLabel()"
+          [attr.aria-label]="'DEV Devolução / Troca. Central ' + centralStatusLabel()"
           (click)="abrirDevolucao($event)"
         >
-          DEV<br /><span>Devolução / Troca</span><small>{{ centralStatusLabel() }}</small>
+          DEV<br /><span>Devolução / Troca</span><small aria-hidden="true"></small><em class="sr-only">{{ centralStatusLabel() }}</em>
         </button>
         <button type="button" (click)="abrirAtalho($event, 'fechar-pdv')">F13<br /><span>Fechar PDV</span></button>
       </div>

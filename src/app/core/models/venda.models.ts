@@ -212,21 +212,61 @@ export interface VendaDevolucaoConsultaResponse {
 }
 
 export interface VendaDevolucaoConsulta {
+  id?: number;
   uuid: string;
-  cliente: { id: number | null; uuid: string | null; nome: string };
+  documento?: string;
+  data_venda?: string;
+  loja_nome?: string;
+  loja_origem?: { id: number; nome: string };
+  cliente: { id: number | null; uuid?: string | null; nome: string; documento?: string };
+  situacao?: string;
+  nfce?: { numero?: number; chave_acesso?: string; status?: string } | null;
   total: string;
   itens: VendaDevolucaoItem[];
 }
 
 export interface VendaDevolucaoItem {
+  id?: number;
   item_uuid: string;
-  sku_id: number;
+  sku_id?: number;
+  sku?: number;
+  ean?: string;
+  referencia?: string;
+  cor?: string;
+  tamanho?: string;
   descricao: string;
   quantidade: number;
   quantidade_devolvida?: number;
   quantidade_disponivel?: number;
   preco_unitario: string;
+  desconto?: string;
   total_item: string;
+  valor_liquido_disponivel?: string;
+}
+
+export interface DevolucaoCliente {
+  id: number;
+  nome: string;
+  documento: string;
+}
+
+export interface DevolucaoClientesResponse {
+  clientes: DevolucaoCliente[];
+}
+
+export interface DevolucaoClienteVenda {
+  id: number;
+  documento: string;
+  data_venda: string;
+  loja: { id: number; nome: string };
+  total: string;
+  quantidade_itens: number;
+  nfce?: { numero?: number; chave_acesso?: string; status?: string } | null;
+}
+
+export interface DevolucaoClienteVendasResponse {
+  cliente: DevolucaoCliente;
+  vendas: DevolucaoClienteVenda[];
 }
 
 export interface VendaDevolucaoResultadoResponse {
@@ -236,9 +276,14 @@ export interface VendaDevolucaoResultadoResponse {
 export interface VendaDevolucaoResultado {
   uuid: string;
   venda_uuid: string;
+  documento?: string;
+  venda_documento?: string;
+  loja_origem?: string;
+  loja_recebimento?: string;
   valor_total: string;
   finalizada_em: string;
-  vale_troca: { documento: string; saldo: string } | null;
+  vale_troca: { documento: string; saldo: string; valor_original?: string; status?: string } | null;
+  fiscal?: { status: string; numero?: number; mensagem?: string } | null;
 }
 
 export function mapVendaAtual(response: VendaApiResponse): VendaAtualResponse {

@@ -13,6 +13,8 @@ import { DanfeNfce, DanfeNfceApi, DanfeVia, mapDanfeNfce } from '../../../core/m
 import {
   mapVendaAtual,
   BeneficiosClienteResponse,
+  DevolucaoClientesResponse,
+  DevolucaoClienteVendasResponse,
   VendaAtualResponse,
   VendaApiResponse,
   VendaDevolucaoConsultaResponse,
@@ -103,11 +105,26 @@ export class HubVendaService {
     return this.http.get<VendaDevolucaoConsultaResponse>(`${this.terminalUrl}/devolucoes/vendas/?documento=${encodeURIComponent(documento)}`);
   }
 
-  finalizarDevolucao(vendaUuid: string, itens: { item_uuid: string; quantidade: number }[], motivo: string): Observable<VendaDevolucaoResultadoResponse> {
-    return this.http.post<VendaDevolucaoResultadoResponse>(`${this.terminalUrl}/devolucoes/finalizar/`, {
+  consultarDevolucaoPorVendaId(vendaId: number): Observable<VendaDevolucaoConsultaResponse> {
+    return this.http.get<VendaDevolucaoConsultaResponse>(`${this.terminalUrl}/devolucoes/vendas/${vendaId}/`);
+  }
+
+  pesquisarClientesDevolucao(termo: string): Observable<DevolucaoClientesResponse> {
+    return this.http.get<DevolucaoClientesResponse>(`${this.terminalUrl}/devolucoes/clientes/?q=${encodeURIComponent(termo)}`);
+  }
+
+  listarVendasClienteDevolucao(clienteId: number): Observable<DevolucaoClienteVendasResponse> {
+    return this.http.get<DevolucaoClienteVendasResponse>(`${this.terminalUrl}/devolucoes/clientes/${clienteId}/vendas/`);
+  }
+
+  finalizarDevolucao(vendaUuid: string, itens: { item_uuid?: string; venda_item?: number; quantidade: number }[], motivo: string, devolucaoUuid?: string, vendaId?: number): Observable<VendaDevolucaoResultadoResponse> {
+    const body: { venda_uuid: string; itens: { item_uuid?: string; venda_item?: number; quantidade: number }[]; motivo: string; devolucao_uuid?: string; venda_id?: number } = {
       venda_uuid: vendaUuid,
       itens,
       motivo,
-    });
+    };
+    if (devolucaoUuid) body.devolucao_uuid = devolucaoUuid;
+    if (vendaId) body.venda_id = vendaId;
+    return this.http.post<VendaDevolucaoResultadoResponse>(`${this.terminalUrl}/devolucoes/finalizar/`, body);
   }
 }
