@@ -74,6 +74,10 @@ export interface ValeTrocaConsultaResponse {
   vale_troca: ValeTrocaOnline;
 }
 
+export interface ValesTrocaDisponiveisResponse {
+  vales_troca: ValeTrocaOnline[];
+}
+
 export function mapFormasPagamento(response: FormasPagamentoApiResponse): FormasPagamentoResponse {
   return {
     versao: response.versao,

@@ -1136,14 +1136,20 @@
                       <strong>Vale-Troca online</strong>
                       <span>{{ centralStatus() }}</span>
                     </div>
-                    @if (beneficiosCliente?.vales_troca?.length) {
+                    @if (carregandoValesTrocaOnline) {
+                      <small>Consultando vales...</small>
+                    }
+                    @if (valesTrocaOnlineDisponiveis.length) {
                       <div class="vale-list compact">
-                        @for (vale of beneficiosCliente?.vales_troca || []; track vale.documento) {
-                          <button type="button" class="vale-picker-button" [class.selected]="autorizacaoPagamento === vale.documento" [disabled]="centralStatus() !== 'ONLINE' && !vale.utilizavel_offline" (click)="selecionarValeTroca(vale.documento, vale.saldo, vale.utilizavel_offline)">
+                        @for (vale of valesTrocaOnlineDisponiveis; track vale.documento) {
+                          <button type="button" class="vale-picker-button" [class.selected]="autorizacaoPagamento === vale.documento" [disabled]="valeTrocaJaAdicionado(vale.documento)" (click)="selecionarValeTroca(vale)">
                             <strong>{{ vale.documento }}</strong>
-                            <span>{{ formatarMoeda(vale.saldo) }}</span>
+                            <span>{{ formatarMoeda(vale.saldo_disponivel) }}</span>
                             @if (vale.validade) {
                               <small>Validade {{ vale.validade }}</small>
+                            }
+                            @if (valeTrocaJaAdicionado(vale.documento)) {
+                              <small>Já utilizado nesta venda</small>
                             }
                           </button>
                         }

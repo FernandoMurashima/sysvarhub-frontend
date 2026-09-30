@@ -123,6 +123,8 @@ export class PdvPageComponent implements OnInit, OnDestroy {
   filtroPagamento: 'TODAS' | 'DINHEIRO' | 'CARTAO' | 'PIX' | 'OUTRAS' = 'TODAS';
   beneficiosCliente: BeneficiosClienteResponse | null = null;
   valeTrocaConsulta: ValeTrocaOnline | null = null;
+  valesTrocaOnlineDisponiveis: ValeTrocaOnline[] = [];
+  carregandoValesTrocaOnline = false;
   consultandoValeTroca = false;
   devolucaoDocumento = '';
   devolucaoMotivo = '';
@@ -1277,6 +1279,7 @@ export class PdvPageComponent implements OnInit, OnDestroy {
     this.formaPagamentoSelecionada = forma;
     this.pagamentoValeTrocaSelecionado = false;
     this.valeTrocaConsulta = null;
+    this.valesTrocaOnlineDisponiveis = [];
     this.valorPagamento = this.venda()?.pendente || '';
     if (forma.tipo === 'CASHBACK' && this.beneficiosCliente) {
       const pendente = Number(this.venda()?.pendente || 0);
@@ -1291,8 +1294,10 @@ export class PdvPageComponent implements OnInit, OnDestroy {
     this.formaPagamentoSelecionada = null;
     this.pagamentoValeTrocaSelecionado = true;
     this.valeTrocaConsulta = null;
+    this.valesTrocaOnlineDisponiveis = [];
     this.valorPagamento = '';
     this.autorizacaoPagamento = '';
+    this.carregarValesTrocaOnlineDisponiveis();
   }
 
   consultarValeTrocaOnline(): void {
@@ -1344,20 +1349,52 @@ export class PdvPageComponent implements OnInit, OnDestroy {
     });
   }
 
-  selecionarValeTroca(documento: string, saldo: string, utilizavelOffline = true): void {
-    const documentoNormalizado = this.normalizarDocumentoValeTroca(documento);
-    if (this.centralStatus() !== 'ONLINE' && !utilizavelOffline) {
+  selecionarValeTroca(vale: ValeTrocaOnline): void {
+    const documentoNormalizado = this.normalizarDocumentoValeTroca(vale.documento);
+    if (this.centralStatus() !== 'ONLINE') {
       this.mensagem = 'Central OFFLINE. Vale-Troca online fica indisponível.';
+      return;
+    }
+    if (this.valeTrocaJaAdicionado(documentoNormalizado)) {
+      this.mensagem = 'O mesmo Vale-Troca não pode ser usado duas vezes na venda.';
       return;
     }
     const troca = this.formasPagamento.find((forma) => ['TROCA', 'VALE_TROCA'].includes(forma.tipo));
     if (troca) this.formaPagamentoSelecionada = troca;
     this.autorizacaoPagamento = documentoNormalizado;
+    this.valeTrocaConsulta = vale;
     const pendente = Number(this.venda()?.pendente || 0);
-    this.valorPagamento = Math.max(0, Math.min(pendente, Number(saldo || 0))).toFixed(2);
-    if (this.centralStatus() === 'ONLINE') {
-      this.consultarValeTrocaOnline();
+    this.valorPagamento = Math.max(0, Math.min(pendente, Number(vale.saldo_disponivel || 0))).toFixed(2);
+  }
+
+  carregarValesTrocaOnlineDisponiveis(): void {
+    const venda = this.venda();
+    this.valesTrocaOnlineDisponiveis = [];
+    if (!this.pagamentoValeTrocaSelecionado) return;
+    if (!venda?.cliente) {
+      this.mensagem = 'Vale-Troca exige cliente identificado.';
+      return;
     }
+    if (venda.cliente.clientePadrao) {
+      this.mensagem = 'Vale-Troca não pode ser usado para Consumidor Final.';
+      return;
+    }
+    if (this.centralStatus() !== 'ONLINE') {
+      this.mensagem = 'Central offline. Consulta de Vale-Troca indisponível.';
+      return;
+    }
+    this.carregandoValesTrocaOnline = true;
+    this.hubVendaService.listarValesTrocaDisponiveis(venda.uuid).subscribe({
+      next: (resposta) => {
+        this.valesTrocaOnlineDisponiveis = resposta.vales_troca;
+        this.carregandoValesTrocaOnline = false;
+      },
+      error: (erro: HttpErrorResponse) => {
+        this.valesTrocaOnlineDisponiveis = [];
+        this.carregandoValesTrocaOnline = false;
+        this.mensagem = erro.error?.detail || 'Central offline. Consulta de Vale-Troca indisponível.';
+      },
+    });
   }
 
   carregarBeneficiosCliente(): void {
@@ -1483,6 +1520,7 @@ export class PdvPageComponent implements OnInit, OnDestroy {
     }
     this.vendaSession.adicionarPagamentoValeTroca(venda.uuid, documento, valor).subscribe((resultado) => {
       if (resultado.ok) {
+        this.valesTrocaOnlineDisponiveis = this.valesTrocaOnlineDisponiveis.filter((vale) => this.normalizarDocumentoValeTroca(vale.documento) !== documento);
         this.valorPagamento = this.venda()?.pendente || '';
         this.autorizacaoPagamento = '';
         this.valeTrocaConsulta = null;
@@ -1502,9 +1540,17 @@ export class PdvPageComponent implements OnInit, OnDestroy {
     return /^VT[0-9]{7}$/.test(documento);
   }
 
+  valeTrocaJaAdicionado(documento: string): boolean {
+    const normalizado = this.normalizarDocumentoValeTroca(documento);
+    return Boolean(this.venda()?.pagamentos?.some((pagamento) => this.normalizarDocumentoValeTroca(pagamento.valeTrocaDocumento || pagamento.autorizacao || '') === normalizado));
+  }
+
   removerPagamento(pagamentoUuid: string): void {
     this.vendaSession.removerPagamento(pagamentoUuid).subscribe((resultado) => {
       this.mensagem = resultado.ok ? 'Pagamento removido.' : resultado.detail || 'Falha ao remover pagamento.';
+      if (resultado.ok && this.pagamentoValeTrocaSelecionado) {
+        this.carregarValesTrocaOnlineDisponiveis();
+      }
     });
   }
 

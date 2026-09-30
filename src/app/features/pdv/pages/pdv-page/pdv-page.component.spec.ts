@@ -481,7 +481,7 @@ describe('PdvPageComponent', () => {
     vendaSession.removerCliente.and.returnValue(of({ ok: true }));
     vendaSession.selecionarVendedor.and.returnValue(of({ ok: true }));
     vendaSession.removerVendedor.and.returnValue(of({ ok: true }));
-    hubVendaService = jasmine.createSpyObj<HubVendaService>('HubVendaService', ['obterDanfeNfce', 'consultarBeneficiosCliente', 'consultarValeTroca']);
+    hubVendaService = jasmine.createSpyObj<HubVendaService>('HubVendaService', ['obterDanfeNfce', 'consultarBeneficiosCliente', 'consultarValeTroca', 'listarValesTrocaDisponiveis']);
     hubVendaService.obterDanfeNfce.and.returnValue(of(danfeNfceStub()));
     hubVendaService.consultarBeneficiosCliente.and.returnValue(of({
       cashback: {
@@ -496,7 +496,7 @@ describe('PdvPageComponent', () => {
     hubVendaService.consultarValeTroca.and.returnValue(of({
       vale_troca: {
         id: 7,
-        documento: 'VT-001',
+        documento: 'VT0000001',
         cliente: { id: 123, nome: 'Maria Silva', documento: '12345678901' },
         valor_original: '80.00',
         saldo_contabil: '80.00',
@@ -507,6 +507,36 @@ describe('PdvPageComponent', () => {
         loja_origem: { id: 1, nome: 'Loja Centro' },
         devolucao_origem: null,
       },
+    }));
+    hubVendaService.listarValesTrocaDisponiveis.and.returnValue(of({
+      vales_troca: [
+        {
+          id: 7,
+          documento: 'VT0000001',
+          cliente: { id: 123, nome: 'Maria Silva', documento: '12345678901' },
+          valor_original: '219.90',
+          saldo_contabil: '219.90',
+          saldo_reservado: '0.00',
+          saldo_disponivel: '219.90',
+          status: 'ABERTO',
+          validade: null,
+          loja_origem: { id: 1, nome: 'Loja Centro' },
+          devolucao_origem: null,
+        },
+        {
+          id: 8,
+          documento: 'VT0000002',
+          cliente: { id: 123, nome: 'Maria Silva', documento: '12345678901' },
+          valor_original: '219.90',
+          saldo_contabil: '219.90',
+          saldo_reservado: '0.00',
+          saldo_disponivel: '219.90',
+          status: 'ABERTO',
+          validade: null,
+          loja_origem: { id: 1, nome: 'Loja Centro' },
+          devolucao_origem: null,
+        },
+      ],
     }));
     centralConnectivity = jasmine.createSpyObj<CentralConnectivityService>('CentralConnectivityService', ['startPolling'], {
       status: centralStatusSignal.asReadonly(),
@@ -2485,6 +2515,7 @@ describe('PdvPageComponent', () => {
   it('modal de pagamentos separa cashback da experiencia de vale-troca', () => {
     const component = fixture.componentInstance;
     vendaSignal.set({ ...vendaAbertaStub.venda!, vendedor: vendedorStub, cliente: clienteAtivo });
+    centralStatusSignal.set('ONLINE');
     hubVendaService.consultarBeneficiosCliente.and.returnValue(of({
       cashback: {
         saldo: '25.00',
@@ -2494,8 +2525,7 @@ describe('PdvPageComponent', () => {
         valor_minimo_uso: '1.00',
       },
       vales_troca: [
-        { documento: 'VT0000001', saldo: '35.00', validade: null, utilizavel_offline: true },
-        { documento: 'VT0000002', saldo: '60.00', validade: null, utilizavel_offline: false },
+        { documento: 'VT-HUB-DEV-antigo', saldo: '35.00', validade: null, utilizavel_offline: true },
       ],
     }));
 
@@ -2510,12 +2540,57 @@ describe('PdvPageComponent', () => {
 
     expect(fixture.nativeElement.querySelector('.cashback-panel')).toBeNull();
     expect(fixture.nativeElement.querySelector('.vale-panel')).not.toBeNull();
+    expect(hubVendaService.listarValesTrocaDisponiveis).toHaveBeenCalledWith(vendaAbertaStub.venda!.uuid);
     expect(fixture.nativeElement.querySelectorAll('.vale-picker-button').length).toBe(2);
     expect(fixture.nativeElement.textContent).toContain('VT0000001');
-    expect(fixture.nativeElement.textContent).toContain('R$ 35,00');
+    expect(fixture.nativeElement.textContent).toContain('VT0000002');
+    expect(fixture.nativeElement.textContent).toContain('R$ 219,90');
+    expect(fixture.nativeElement.textContent).not.toContain('VT-HUB-DEV');
     expect(fixture.nativeElement.textContent).not.toContain('retaguarda');
-    expect(fixture.nativeElement.textContent).not.toContain('HUB-DEV');
     expect(fixture.nativeElement.textContent).toContain('Adicionar Vale-Troca');
+  });
+
+  it('selecao de vale online usa documento canonico e sugere menor valor entre saldo e pendente', () => {
+    const component = fixture.componentInstance;
+    vendaSignal.set({ ...vendaAbertaStub.venda!, vendedor: vendedorStub, cliente: clienteAtivo, pendente: '119.90' });
+    centralStatusSignal.set('ONLINE');
+
+    component.selecionarPagamentoValeTroca();
+    component.selecionarValeTroca(component.valesTrocaOnlineDisponiveis[0]);
+
+    expect(component.autorizacaoPagamento).toBe('VT0000001');
+    expect(component.valeTrocaConsulta?.documento).toBe('VT0000001');
+    expect(component.valorPagamento).toBe('119.90');
+  });
+
+  it('vale ja adicionado fica bloqueado para evitar duplicidade', () => {
+    const component = fixture.componentInstance;
+    vendaSignal.set({
+      ...vendaAbertaStub.venda!,
+      vendedor: vendedorStub,
+      cliente: clienteAtivo,
+      pagamentos: [{ uuid: 'vt-pag', formaPagamentoId: 0, formaRetaguardaId: 0, codigo: 'VT', descricao: 'Vale-Troca', tipo: 'VALE_TROCA', numParcelas: 1, valor: '119.90', autorizacao: 'VT0000001', valeTrocaDocumento: 'VT0000001', origemCaptura: 'MANUAL', criadoEm: '2026-09-30' }],
+    });
+    centralStatusSignal.set('ONLINE');
+
+    component.abrirPagamentos('TODAS');
+    component.selecionarPagamentoValeTroca();
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('.vale-picker-button')?.disabled).toBeTrue();
+  });
+
+  it('offline nao lista vale-troca do espelho local', () => {
+    const component = fixture.componentInstance;
+    vendaSignal.set({ ...vendaAbertaStub.venda!, vendedor: vendedorStub, cliente: clienteAtivo });
+    centralStatusSignal.set('OFFLINE');
+
+    component.selecionarPagamentoValeTroca();
+    fixture.detectChanges();
+
+    expect(hubVendaService.listarValesTrocaDisponiveis).not.toHaveBeenCalled();
+    expect(fixture.nativeElement.querySelectorAll('.vale-picker-button').length).toBe(0);
+    expect(component.mensagem).toBe('Central offline. Consulta de Vale-Troca indisponível.');
   });
 
   it('modal de vale-troca exibe resumo do vale consultado sem misturar autorizacao manual', () => {
