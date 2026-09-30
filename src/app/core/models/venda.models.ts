@@ -283,7 +283,7 @@ export interface VendaDevolucaoResultado {
   valor_total: string;
   finalizada_em: string;
   vale_troca: { documento: string; saldo: string; valor_original?: string; status?: string } | null;
-  fiscal?: { status: string; numero?: number; mensagem?: string } | null;
+  fiscal?: { status: string; modelo?: string; numero?: number; serie?: number; chave_acesso?: string; mensagem?: string } | null;
 }
 
 export function mapVendaAtual(response: VendaApiResponse): VendaAtualResponse {
