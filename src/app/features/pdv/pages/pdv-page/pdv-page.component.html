@@ -1114,6 +1114,10 @@
                     }
                   </button>
                 }
+                <button type="button" [class.selected]="pagamentoValeTrocaSelecionado" (click)="selecionarPagamentoValeTroca()">
+                  <strong>VT · Vale-Troca</strong>
+                  <span>Crédito Loja · online</span>
+                </button>
               </div>
 
               <form class="payment-form" (submit)="$event.preventDefault(); adicionarPagamento()">
@@ -1132,12 +1136,24 @@
                     }
                   </div>
                 }
+                @if (pagamentoValeTrocaSelecionado) {
+                  <label>Número do Vale-Troca<input name="valeTrocaDocumento" [(ngModel)]="autorizacaoPagamento" maxlength="120" autocomplete="off" /></label>
+                  <button type="button" (click)="consultarValeTrocaOnline()" [disabled]="consultandoValeTroca || centralStatus() !== 'ONLINE'">Consultar</button>
+                  @if (valeTrocaConsulta) {
+                    <div class="benefits-box">
+                      <strong>{{ valeTrocaConsulta.cliente.nome }} · {{ formatarMoeda(valeTrocaConsulta.saldo_disponivel) }}</strong>
+                      <small>{{ valeTrocaConsulta.status }} · reservado {{ formatarMoeda(valeTrocaConsulta.saldo_reservado) }} · validade {{ valeTrocaConsulta.validade || 'sem validade' }}</small>
+                    </div>
+                  }
+                }
                 <label>Valor<input name="valorPagamento" [(ngModel)]="valorPagamento" inputmode="decimal" autocomplete="off" /></label>
-                <label>Autorização<input name="autorizacaoPagamento" [(ngModel)]="autorizacaoPagamento" maxlength="120" autocomplete="off" /></label>
+                @if (!pagamentoValeTrocaSelecionado) {
+                  <label>Autorização<input name="autorizacaoPagamento" [(ngModel)]="autorizacaoPagamento" maxlength="120" autocomplete="off" /></label>
+                }
                 @if (formaPagamentoSelecionada?.tefHabilitado) {
                   <p>Esta forma exige integração TEF.</p>
                 }
-                <button type="submit" [disabled]="!formaPagamentoSelecionada || formaPagamentoSelecionada.tefHabilitado || vendaLoading()">Adicionar</button>
+                <button type="submit" [disabled]="(!formaPagamentoSelecionada && !pagamentoValeTrocaSelecionado) || !!formaPagamentoSelecionada?.tefHabilitado || vendaLoading()">Adicionar</button>
               </form>
             </div>
           </div>

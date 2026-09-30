@@ -56,6 +56,24 @@ export interface AdicionarPagamentoRequest {
   autorizacao: string;
 }
 
+export interface ValeTrocaOnline {
+  id: number;
+  documento: string;
+  cliente: { id: number; nome: string; documento: string };
+  valor_original: DecimalString;
+  saldo_contabil: DecimalString;
+  saldo_reservado: DecimalString;
+  saldo_disponivel: DecimalString;
+  status: string;
+  validade: string | null;
+  loja_origem: { id: number; nome: string };
+  devolucao_origem: { id: number; documento: string } | null;
+}
+
+export interface ValeTrocaConsultaResponse {
+  vale_troca: ValeTrocaOnline;
+}
+
 export function mapFormasPagamento(response: FormasPagamentoApiResponse): FormasPagamentoResponse {
   return {
     versao: response.versao,

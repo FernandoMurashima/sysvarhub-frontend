@@ -135,6 +135,20 @@ export class VendaSessionService {
     );
   }
 
+  adicionarPagamentoValeTroca(vendaUuid: string, documento: string, valor: string): Observable<VendaOperacaoResultado> {
+    const intencao = this.obterIntencaoPagamento(0, valor, documento);
+    this.loadingOperacaoSignal.set(true);
+    return this.hubVendaService.adicionarPagamentoValeTroca(vendaUuid, intencao.operacaoUuid, documento, valor).pipe(
+      tap((response) => {
+        this.intencaoPagamentoPendente = null;
+        this.definirEstado(response);
+      }),
+      map(() => ({ ok: true })),
+      catchError((error: unknown) => this.tratarErroPagamento(error)),
+      tap(() => this.loadingOperacaoSignal.set(false)),
+    );
+  }
+
   removerPagamento(pagamentoUuid: string): Observable<VendaOperacaoResultado> {
     return this.executarOperacao(this.hubVendaService.removerPagamento(pagamentoUuid));
   }

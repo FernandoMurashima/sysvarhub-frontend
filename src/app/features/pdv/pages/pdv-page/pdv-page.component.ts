@@ -18,7 +18,7 @@ import {
   mapFechamentoDiaRegistro,
 } from '../../../../core/models/fechamento-dia.models';
 import { TipoMovimentacaoCaixa } from '../../../../core/models/movimentacao-caixa.models';
-import { FormaPagamento } from '../../../../core/models/pagamento.models';
+import { FormaPagamento, ValeTrocaOnline } from '../../../../core/models/pagamento.models';
 import { ResumoCaixa } from '../../../../core/models/resumo-caixa.models';
 import { TipoDespesaPdv } from '../../../../core/models/tipo-despesa-pdv.models';
 import { DanfeNfce, DanfeVia } from '../../../../core/models/danfe-nfce.models';
@@ -119,8 +119,11 @@ export class PdvPageComponent implements OnInit, OnDestroy {
   modalAtalho: PdvAtalho | '' = '';
   formasPagamento: FormaPagamento[] = [];
   formaPagamentoSelecionada: FormaPagamento | null = null;
+  pagamentoValeTrocaSelecionado = false;
   filtroPagamento: 'TODAS' | 'DINHEIRO' | 'CARTAO' | 'PIX' | 'OUTRAS' = 'TODAS';
   beneficiosCliente: BeneficiosClienteResponse | null = null;
+  valeTrocaConsulta: ValeTrocaOnline | null = null;
+  consultandoValeTroca = false;
   devolucaoDocumento = '';
   devolucaoMotivo = '';
   devolucaoConsulta: VendaDevolucaoConsulta | null = null;
@@ -1272,6 +1275,8 @@ export class PdvPageComponent implements OnInit, OnDestroy {
 
   selecionarFormaPagamento(forma: FormaPagamento): void {
     this.formaPagamentoSelecionada = forma;
+    this.pagamentoValeTrocaSelecionado = false;
+    this.valeTrocaConsulta = null;
     this.valorPagamento = this.venda()?.pendente || '';
     if (forma.tipo === 'CASHBACK' && this.beneficiosCliente) {
       const pendente = Number(this.venda()?.pendente || 0);
@@ -1280,6 +1285,57 @@ export class PdvPageComponent implements OnInit, OnDestroy {
       const limiteVenda = Number(this.venda()?.total || 0) * limitePercentual / 100;
       this.valorPagamento = Math.max(0, Math.min(pendente, saldo, limiteVenda)).toFixed(2);
     }
+  }
+
+  selecionarPagamentoValeTroca(): void {
+    this.formaPagamentoSelecionada = null;
+    this.pagamentoValeTrocaSelecionado = true;
+    this.valeTrocaConsulta = null;
+    this.valorPagamento = '';
+    this.autorizacaoPagamento = '';
+  }
+
+  consultarValeTrocaOnline(): void {
+    const documento = this.autorizacaoPagamento.trim();
+    const venda = this.venda();
+    if (!venda?.cliente) {
+      this.mensagem = 'Vale-Troca exige cliente identificado.';
+      return;
+    }
+    if (venda.cliente.clientePadrao) {
+      this.mensagem = 'Vale-Troca não pode ser usado para Consumidor Final.';
+      return;
+    }
+    if (this.centralStatus() !== 'ONLINE') {
+      this.mensagem = 'Central OFFLINE. Vale-Troca online fica indisponível.';
+      return;
+    }
+    if (!documento) {
+      this.mensagem = 'Informe o número do Vale-Troca.';
+      return;
+    }
+    this.consultandoValeTroca = true;
+    this.hubVendaService.consultarValeTroca(documento).subscribe({
+      next: (resposta) => {
+        this.valeTrocaConsulta = resposta.vale_troca;
+        const clienteId = Number(venda.cliente?.retaguardaId || 0);
+        if (Number(resposta.vale_troca.cliente.id || 0) !== clienteId) {
+          this.mensagem = 'Vale-Troca pertence a outro cliente.';
+          this.consultandoValeTroca = false;
+          return;
+        }
+        const pendente = Number(venda.pendente || 0);
+        const saldo = Number(resposta.vale_troca.saldo_disponivel || 0);
+        this.valorPagamento = Math.max(0, Math.min(pendente, saldo)).toFixed(2);
+        this.mensagem = 'Vale-Troca consultado.';
+        this.consultandoValeTroca = false;
+      },
+      error: (erro: HttpErrorResponse) => {
+        this.mensagem = erro.error?.detail || 'Falha ao consultar Vale-Troca.';
+        this.valeTrocaConsulta = null;
+        this.consultandoValeTroca = false;
+      },
+    });
   }
 
   selecionarValeTroca(documento: string, saldo: string, utilizavelOffline = true): void {
@@ -1363,7 +1419,12 @@ export class PdvPageComponent implements OnInit, OnDestroy {
   adicionarPagamento(): void {
     const venda = this.venda();
     const forma = this.formaPagamentoSelecionada;
-    if (!venda || !forma) return;
+    if (!venda) return;
+    if (this.pagamentoValeTrocaSelecionado) {
+      this.adicionarPagamentoValeTroca(venda);
+      return;
+    }
+    if (!forma) return;
     if (forma.tefHabilitado) {
       this.mensagem = 'Esta forma exige integração TEF.';
       return;
@@ -1381,6 +1442,40 @@ export class PdvPageComponent implements OnInit, OnDestroy {
         return;
       }
       this.mensagem = resultado.detail || 'Falha ao adicionar pagamento.';
+    });
+  }
+
+  private adicionarPagamentoValeTroca(venda: VendaHubResumo): void {
+    const valor = normalizarValorPagamento(this.valorPagamento);
+    const documento = this.autorizacaoPagamento.trim();
+    const saldo = Number(this.valeTrocaConsulta?.saldo_disponivel || 0);
+    const pendente = Number(venda.pendente || 0);
+    if (!this.valeTrocaConsulta || this.valeTrocaConsulta.documento !== documento) {
+      this.mensagem = 'Consulte o Vale-Troca antes de adicionar.';
+      return;
+    }
+    if (!valor) {
+      this.mensagem = 'Valor de pagamento inválido.';
+      return;
+    }
+    if (Number(valor) > saldo) {
+      this.mensagem = 'Valor maior que o saldo disponível do Vale-Troca.';
+      return;
+    }
+    if (Number(valor) > pendente) {
+      this.mensagem = 'Valor maior que o saldo pendente da venda.';
+      return;
+    }
+    this.vendaSession.adicionarPagamentoValeTroca(venda.uuid, documento, valor).subscribe((resultado) => {
+      if (resultado.ok) {
+        this.valorPagamento = this.venda()?.pendente || '';
+        this.autorizacaoPagamento = '';
+        this.valeTrocaConsulta = null;
+        this.pagamentoValeTrocaSelecionado = false;
+        this.mensagem = 'Vale-Troca adicionado.';
+        return;
+      }
+      this.mensagem = resultado.detail || 'Falha ao adicionar Vale-Troca.';
     });
   }
 

@@ -8,6 +8,7 @@ import {
   FormasPagamentoApiResponse,
   FormasPagamentoResponse,
   mapFormasPagamento,
+  ValeTrocaConsultaResponse,
 } from '../../../core/models/pagamento.models';
 import { DanfeNfce, DanfeNfceApi, DanfeVia, mapDanfeNfce } from '../../../core/models/danfe-nfce.models';
 import {
@@ -82,6 +83,19 @@ export class HubVendaService {
       forma_pagamento_id: request.formaPagamentoId,
       valor: request.valor,
       autorizacao: request.autorizacao,
+    }).pipe(map(mapVendaAtual));
+  }
+
+  consultarValeTroca(documento: string): Observable<ValeTrocaConsultaResponse> {
+    return this.http.get<ValeTrocaConsultaResponse>(`${this.terminalUrl}/vale-troca/consultar/?documento=${encodeURIComponent(documento)}`);
+  }
+
+  adicionarPagamentoValeTroca(vendaUuid: string, operacaoUuid: string, documento: string, valor: string): Observable<VendaAtualResponse> {
+    return this.http.post<VendaApiResponse>(`${this.baseUrl}/pagamento/vale-troca/`, {
+      venda_uuid: vendaUuid,
+      operacao_uuid: operacaoUuid,
+      documento,
+      valor,
     }).pipe(map(mapVendaAtual));
   }
 
