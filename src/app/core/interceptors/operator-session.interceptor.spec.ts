@@ -152,6 +152,25 @@ describe('operatorSessionInterceptor', () => {
     fechamento.flush({});
   });
 
+  it('envia header nos endpoints de devolucao e troca', () => {
+    sessionStore.getToken.and.returnValue('sessao-operador-atual');
+
+    http.get('/api/terminal/devolucoes/vendas/?documento=3').subscribe();
+    http.get('/api/terminal/devolucoes/clientes/?q=Fernanda').subscribe();
+    http.post('/api/terminal/devolucoes/finalizar/', { venda_id: 7 }).subscribe();
+
+    const vendas = httpMock.expectOne('/api/terminal/devolucoes/vendas/?documento=3');
+    const clientes = httpMock.expectOne('/api/terminal/devolucoes/clientes/?q=Fernanda');
+    const finalizar = httpMock.expectOne('/api/terminal/devolucoes/finalizar/');
+
+    expect(vendas.request.headers.get('X-Sysvar-Operador-Session')).toBe('sessao-operador-atual');
+    expect(clientes.request.headers.get('X-Sysvar-Operador-Session')).toBe('sessao-operador-atual');
+    expect(finalizar.request.headers.get('X-Sysvar-Operador-Session')).toBe('sessao-operador-atual');
+    vendas.flush({});
+    clientes.flush({});
+    finalizar.flush({});
+  });
+
   it('nao envia header em pareamento nem URL externa', () => {
     sessionStore.getToken.and.returnValue('sessao-operador-ficticia');
 

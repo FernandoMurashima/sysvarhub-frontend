@@ -14,6 +14,7 @@ const OPERATOR_SESSION_PATHS = [
   '/api/terminal/vendedores/',
   '/api/terminal/tipos-despesa-pdv/',
   '/api/terminal/fechamento-dia/',
+  '/api/terminal/devolucoes/',
 ];
 
 export const operatorSessionInterceptor: HttpInterceptorFn = (req, next) => {
