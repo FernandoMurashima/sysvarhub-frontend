@@ -171,6 +171,21 @@ describe('operatorSessionInterceptor', () => {
     finalizar.flush({});
   });
 
+  it('envia header nos endpoints de vale-troca', () => {
+    sessionStore.getToken.and.returnValue('sessao-operador-atual');
+
+    http.get('/api/terminal/vale-troca/disponiveis/?venda_uuid=123').subscribe();
+    http.get('/api/terminal/vale-troca/consultar/?documento=VT0000001').subscribe();
+
+    const disponiveis = httpMock.expectOne('/api/terminal/vale-troca/disponiveis/?venda_uuid=123');
+    const consultar = httpMock.expectOne('/api/terminal/vale-troca/consultar/?documento=VT0000001');
+
+    expect(disponiveis.request.headers.get('X-Sysvar-Operador-Session')).toBe('sessao-operador-atual');
+    expect(consultar.request.headers.get('X-Sysvar-Operador-Session')).toBe('sessao-operador-atual');
+    disponiveis.flush({});
+    consultar.flush({});
+  });
+
   it('nao envia header em pareamento nem URL externa', () => {
     sessionStore.getToken.and.returnValue('sessao-operador-ficticia');
 

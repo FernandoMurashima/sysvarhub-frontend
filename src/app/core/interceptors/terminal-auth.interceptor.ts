@@ -21,6 +21,7 @@ const OPERATOR_SCOPED_PATHS = [
   '/api/terminal/tipos-despesa-pdv/',
   '/api/terminal/fechamento-dia/',
   '/api/terminal/devolucoes/',
+  '/api/terminal/vale-troca/',
 ];
 
 export const terminalAuthInterceptor: HttpInterceptorFn = (req, next) => {
