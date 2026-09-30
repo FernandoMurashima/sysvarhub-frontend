@@ -2494,8 +2494,8 @@ describe('PdvPageComponent', () => {
         valor_minimo_uso: '1.00',
       },
       vales_troca: [
-        { documento: 'VT-LOCAL-1', saldo: '35.00', validade: null, utilizavel_offline: true },
-        { documento: 'VT-RETAG-2', saldo: '60.00', validade: null, utilizavel_offline: false },
+        { documento: 'VT0000001', saldo: '35.00', validade: null, utilizavel_offline: true },
+        { documento: 'VT0000002', saldo: '60.00', validade: null, utilizavel_offline: false },
       ],
     }));
 
@@ -2511,6 +2511,10 @@ describe('PdvPageComponent', () => {
     expect(fixture.nativeElement.querySelector('.cashback-panel')).toBeNull();
     expect(fixture.nativeElement.querySelector('.vale-panel')).not.toBeNull();
     expect(fixture.nativeElement.querySelectorAll('.vale-picker-button').length).toBe(2);
+    expect(fixture.nativeElement.textContent).toContain('VT0000001');
+    expect(fixture.nativeElement.textContent).toContain('R$ 35,00');
+    expect(fixture.nativeElement.textContent).not.toContain('retaguarda');
+    expect(fixture.nativeElement.textContent).not.toContain('HUB-DEV');
     expect(fixture.nativeElement.textContent).toContain('Adicionar Vale-Troca');
   });
 
@@ -2521,7 +2525,7 @@ describe('PdvPageComponent', () => {
     component.selecionarPagamentoValeTroca();
     component.valeTrocaConsulta = {
       id: 7,
-      documento: 'VT-001',
+      documento: 'VT0000001',
       cliente: { id: 123, nome: 'Maria Silva', documento: '12345678901' },
       valor_original: '80.00',
       saldo_contabil: '80.00',
@@ -2536,7 +2540,9 @@ describe('PdvPageComponent', () => {
     fixture.detectChanges();
 
     expect(fixture.nativeElement.querySelector('.selected-vale')).not.toBeNull();
-    expect(fixture.nativeElement.querySelector('.technical-id')?.textContent).toContain('VT-001');
+    expect(fixture.nativeElement.textContent).toContain('Vale selecionado: VT0000001');
+    expect(fixture.nativeElement.textContent).toContain('Saldo: R$ 75,00');
+    expect(fixture.nativeElement.querySelector('.technical-id')).toBeNull();
     expect(fixture.nativeElement.querySelector('input[name="autorizacaoPagamento"]')).toBeNull();
     expect(fixture.nativeElement.querySelector('input[name="valeTrocaDocumento"]')).not.toBeNull();
   });

@@ -1296,7 +1296,8 @@ export class PdvPageComponent implements OnInit, OnDestroy {
   }
 
   consultarValeTrocaOnline(): void {
-    const documento = this.autorizacaoPagamento.trim();
+    const documento = this.normalizarDocumentoValeTroca(this.autorizacaoPagamento);
+    this.autorizacaoPagamento = documento;
     const venda = this.venda();
     if (!venda?.cliente) {
       this.mensagem = 'Vale-Troca exige cliente identificado.';
@@ -1314,10 +1315,15 @@ export class PdvPageComponent implements OnInit, OnDestroy {
       this.mensagem = 'Informe o número do Vale-Troca.';
       return;
     }
+    if (!this.documentoValeTrocaValido(documento)) {
+      this.mensagem = 'Número do Vale-Troca deve seguir o formato VT0000001.';
+      return;
+    }
     this.consultandoValeTroca = true;
     this.hubVendaService.consultarValeTroca(documento).subscribe({
       next: (resposta) => {
         this.valeTrocaConsulta = resposta.vale_troca;
+        this.autorizacaoPagamento = resposta.vale_troca.documento;
         const clienteId = Number(venda.cliente?.retaguardaId || 0);
         if (Number(resposta.vale_troca.cliente.id || 0) !== clienteId) {
           this.mensagem = 'Vale-Troca pertence a outro cliente.';
@@ -1339,15 +1345,19 @@ export class PdvPageComponent implements OnInit, OnDestroy {
   }
 
   selecionarValeTroca(documento: string, saldo: string, utilizavelOffline = true): void {
-    if (!utilizavelOffline) {
-      this.mensagem = 'Vale-troca da retaguarda não pode ser usado offline.';
+    const documentoNormalizado = this.normalizarDocumentoValeTroca(documento);
+    if (this.centralStatus() !== 'ONLINE' && !utilizavelOffline) {
+      this.mensagem = 'Central OFFLINE. Vale-Troca online fica indisponível.';
       return;
     }
     const troca = this.formasPagamento.find((forma) => ['TROCA', 'VALE_TROCA'].includes(forma.tipo));
     if (troca) this.formaPagamentoSelecionada = troca;
-    this.autorizacaoPagamento = documento;
+    this.autorizacaoPagamento = documentoNormalizado;
     const pendente = Number(this.venda()?.pendente || 0);
     this.valorPagamento = Math.max(0, Math.min(pendente, Number(saldo || 0))).toFixed(2);
+    if (this.centralStatus() === 'ONLINE') {
+      this.consultarValeTrocaOnline();
+    }
   }
 
   carregarBeneficiosCliente(): void {
@@ -1447,7 +1457,8 @@ export class PdvPageComponent implements OnInit, OnDestroy {
 
   private adicionarPagamentoValeTroca(venda: VendaHubResumo): void {
     const valor = normalizarValorPagamento(this.valorPagamento);
-    const documento = this.autorizacaoPagamento.trim();
+    const documento = this.normalizarDocumentoValeTroca(this.autorizacaoPagamento);
+    this.autorizacaoPagamento = documento;
     const saldo = Number(this.valeTrocaConsulta?.saldo_disponivel || 0);
     const pendente = Number(venda.pendente || 0);
     if (!this.valeTrocaConsulta || this.valeTrocaConsulta.documento !== documento) {
@@ -1456,6 +1467,10 @@ export class PdvPageComponent implements OnInit, OnDestroy {
     }
     if (!valor) {
       this.mensagem = 'Valor de pagamento inválido.';
+      return;
+    }
+    if (!this.documentoValeTrocaValido(documento)) {
+      this.mensagem = 'Número do Vale-Troca deve seguir o formato VT0000001.';
       return;
     }
     if (Number(valor) > saldo) {
@@ -1477,6 +1492,14 @@ export class PdvPageComponent implements OnInit, OnDestroy {
       }
       this.mensagem = resultado.detail || 'Falha ao adicionar Vale-Troca.';
     });
+  }
+
+  private normalizarDocumentoValeTroca(documento: string): string {
+    return documento.trim().toUpperCase();
+  }
+
+  private documentoValeTrocaValido(documento: string): boolean {
+    return /^VT[0-9]{7}$/.test(documento);
   }
 
   removerPagamento(pagamentoUuid: string): void {

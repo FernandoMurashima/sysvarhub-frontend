@@ -1136,29 +1136,29 @@
                       <strong>Vale-Troca online</strong>
                       <span>{{ centralStatus() }}</span>
                     </div>
-                    <label>Número do Vale-Troca<input name="valeTrocaDocumento" [(ngModel)]="autorizacaoPagamento" maxlength="120" autocomplete="off" /></label>
-                    <button type="button" class="secondary-action" (click)="consultarValeTrocaOnline()" [disabled]="consultandoValeTroca || centralStatus() !== 'ONLINE'">Consultar</button>
                     @if (beneficiosCliente?.vales_troca?.length) {
                       <div class="vale-list compact">
                         @for (vale of beneficiosCliente?.vales_troca || []; track vale.documento) {
-                          <button type="button" class="vale-picker-button" [class.selected]="autorizacaoPagamento === vale.documento" [disabled]="!vale.utilizavel_offline" (click)="selecionarValeTroca(vale.documento, vale.saldo, vale.utilizavel_offline)">
-                            <strong>Vale-Troca</strong>
-                            <span>Saldo disponível: {{ formatarMoeda(vale.saldo) }}</span>
-                            <small>{{ vale.documento }}{{ vale.utilizavel_offline ? '' : ' · retaguarda' }}</small>
+                          <button type="button" class="vale-picker-button" [class.selected]="autorizacaoPagamento === vale.documento" [disabled]="centralStatus() !== 'ONLINE' && !vale.utilizavel_offline" (click)="selecionarValeTroca(vale.documento, vale.saldo, vale.utilizavel_offline)">
+                            <strong>{{ vale.documento }}</strong>
+                            <span>{{ formatarMoeda(vale.saldo) }}</span>
+                            @if (vale.validade) {
+                              <small>Validade {{ vale.validade }}</small>
+                            }
                           </button>
                         }
                       </div>
                     }
+                    <label>Número do Vale-Troca<input name="valeTrocaDocumento" [(ngModel)]="autorizacaoPagamento" maxlength="9" placeholder="Ex.: VT0000001" autocomplete="off" /></label>
+                    <button type="button" class="secondary-action" (click)="consultarValeTrocaOnline()" [disabled]="consultandoValeTroca || centralStatus() !== 'ONLINE'">Consultar</button>
                   </section>
                   @if (valeTrocaConsulta) {
                     <section class="payment-panel selected-vale">
                       <div class="payment-panel-title">
-                        <strong>Vale selecionado</strong>
-                        <span>{{ formatarMoeda(valeTrocaConsulta.saldo_disponivel) }}</span>
+                        <strong>Vale selecionado: {{ valeTrocaConsulta.documento }}</strong>
                       </div>
-                      <p>{{ valeTrocaConsulta.cliente.nome }}</p>
-                      <small>{{ valeTrocaConsulta.status }} · reservado {{ formatarMoeda(valeTrocaConsulta.saldo_reservado) }} · validade {{ valeTrocaConsulta.validade || 'sem validade' }}</small>
-                      <small class="technical-id">{{ valeTrocaConsulta.documento }}</small>
+                      <p>Saldo: {{ formatarMoeda(valeTrocaConsulta.saldo_disponivel) }}</p>
+                      <small>Valor a utilizar: {{ formatarMoeda(valorPagamento) }}</small>
                     </section>
                   }
                 }
