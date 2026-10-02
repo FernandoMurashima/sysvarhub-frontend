@@ -282,7 +282,7 @@ export interface VendaDevolucaoResultado {
   loja_recebimento?: string;
   valor_total: string;
   finalizada_em: string;
-  vale_troca: { documento: string; saldo: string; valor_original?: string; status?: string } | null;
+  vale_troca: { documento: string; documento_tecnico?: string; saldo: string; valor_original?: string; status?: string; provisorio?: boolean; rotulo?: string } | null;
   fiscal?: { status: string; modelo?: string; numero?: number; serie?: number; chave_acesso?: string; mensagem?: string } | null;
 }
 

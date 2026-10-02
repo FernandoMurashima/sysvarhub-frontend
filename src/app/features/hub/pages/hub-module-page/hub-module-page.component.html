@@ -151,7 +151,7 @@
             <h2>Devolução concluída</h2>
             <p>{{ resultado.documento }} · {{ resultado.venda_documento }}</p>
             <strong>{{ formatarMoeda(resultado.valor_total) }}</strong>
-            <span>Vale-Troca {{ resultado.vale_troca?.documento }} · saldo {{ formatarMoeda(resultado.vale_troca?.saldo) }}</span>
+            <span>{{ resultado.vale_troca?.provisorio ? 'Crédito provisório' : ('Vale-Troca ' + (resultado.vale_troca?.documento || '')) }} · saldo {{ formatarMoeda(resultado.vale_troca?.saldo) }}</span>
             @if (resultado.fiscal?.status) {
               <span>
                 Documento fiscal de entrada

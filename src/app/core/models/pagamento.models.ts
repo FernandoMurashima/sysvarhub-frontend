@@ -68,6 +68,8 @@ export interface ValeTrocaOnline {
   validade: string | null;
   loja_origem: { id: number; nome: string };
   devolucao_origem: { id: number; documento: string } | null;
+  provisorio?: boolean;
+  rotulo?: string;
 }
 
 export interface ValeTrocaConsultaResponse {

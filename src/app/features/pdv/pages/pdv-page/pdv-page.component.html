@@ -1143,7 +1143,7 @@
                       <div class="vale-list compact">
                         @for (vale of valesTrocaOnlineDisponiveis; track vale.documento) {
                           <button type="button" class="vale-picker-button" [class.selected]="autorizacaoPagamento === vale.documento" [disabled]="valeTrocaJaAdicionado(vale.documento)" (click)="selecionarValeTroca(vale)">
-                            <strong>{{ vale.documento }}</strong>
+                            <strong>{{ vale.provisorio ? 'Crédito provisório' : vale.documento }}</strong>
                             <span>{{ formatarMoeda(vale.saldo_disponivel) }}</span>
                             @if (vale.validade) {
                               <small>Validade {{ vale.validade }}</small>
@@ -1161,7 +1161,7 @@
                   @if (valeTrocaConsulta) {
                     <section class="payment-panel selected-vale">
                       <div class="payment-panel-title">
-                        <strong>Vale selecionado: {{ valeTrocaConsulta.documento }}</strong>
+                        <strong>{{ valeTrocaConsulta.provisorio ? 'Crédito provisório selecionado' : ('Vale selecionado: ' + valeTrocaConsulta.documento) }}</strong>
                       </div>
                       <p>Saldo: {{ formatarMoeda(valeTrocaConsulta.saldo_disponivel) }}</p>
                       <small>Valor a utilizar: {{ formatarMoeda(valorPagamento) }}</small>
