@@ -81,6 +81,10 @@ export class PendenciasSincronizacaoPageComponent implements OnInit {
 
   retry(evento: PendenciaSyncEvento): void {
     if (!evento.acoes.retry_permitido) return;
+    if (this.centralOffline()) {
+      this.mensagem = 'Central OFFLINE. A ação ficará disponível quando a Central retornar.';
+      return;
+    }
     this.carregando = true;
     this.service.retry(evento.id).subscribe({
       next: () => this.carregar(),
@@ -112,5 +116,13 @@ export class PendenciasSincronizacaoPageComponent implements OnInit {
 
   json(valor: unknown): string {
     return JSON.stringify(valor || {}, null, 2);
+  }
+
+  centralOffline(): boolean {
+    return this.resposta?.central?.status === 'OFFLINE';
+  }
+
+  retryDesabilitado(evento: PendenciaSyncEvento): boolean {
+    return this.carregando || this.centralOffline() || !evento.acoes.retry_permitido;
   }
 }

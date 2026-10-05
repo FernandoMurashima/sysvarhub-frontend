@@ -76,7 +76,10 @@
             <span>{{ evento.mensagem_operacional }}</span>
             <span>
               @if (evento.acoes.retry_permitido) {
-                <button type="button" class="retry" (click)="$event.stopPropagation(); retry(evento)" [disabled]="carregando">Tentar novamente</button>
+                <button type="button" class="retry" (click)="$event.stopPropagation(); retry(evento)" [disabled]="retryDesabilitado(evento)">Tentar novamente</button>
+                @if (centralOffline()) {
+                  <small>Disponível quando a Central retornar</small>
+                }
               } @else if (evento.bloqueado_por_dependencia) {
                 Aguardando
               } @else if (evento.status === 'CONFLITO') {
