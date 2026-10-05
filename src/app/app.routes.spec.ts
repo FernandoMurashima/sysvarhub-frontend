@@ -1,6 +1,8 @@
 import { routes } from './app.routes';
 import { operatorSessionGuard } from './core/guards/operator-session.guard';
 import { terminalSessionGuard } from './core/guards/terminal-session.guard';
+import { HubModulePageComponent } from './features/hub/pages/hub-module-page/hub-module-page.component';
+import { PendenciasSincronizacaoPageComponent } from './features/sincronizacao/pages/pendencias-sincronizacao-page/pendencias-sincronizacao-page.component';
 
 describe('routes', () => {
   it('usa Home do Hub na raiz com sessao de terminal', () => {
@@ -32,6 +34,13 @@ describe('routes', () => {
       expect(route?.canActivate).toEqual([terminalSessionGuard, operatorSessionGuard]);
       expect(route?.data?.['moduleKey']).toBe(path);
     }
+  });
+
+  it('usa pagina dedicada para pendencias de sincronizacao', () => {
+    const route = routes.find((item) => item.path === 'pendencias-sincronizacao');
+
+    expect(route?.component).toBe(PendenciasSincronizacaoPageComponent);
+    expect(route?.component).not.toBe(HubModulePageComponent);
   });
 
   it('mantem Home sem exigir operador autenticado', () => {

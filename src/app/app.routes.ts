@@ -7,6 +7,7 @@ import { HubAccessDeniedPageComponent } from './features/hub/pages/hub-access-de
 import { HubHomePageComponent } from './features/hub/pages/hub-home-page/hub-home-page.component';
 import { HubModulePageComponent } from './features/hub/pages/hub-module-page/hub-module-page.component';
 import { OperadorLoginPageComponent } from './features/operador/pages/operador-login-page/operador-login-page.component';
+import { PendenciasSincronizacaoPageComponent } from './features/sincronizacao/pages/pendencias-sincronizacao-page/pendencias-sincronizacao-page.component';
 import { PareamentoPageComponent } from './features/terminal/pages/pareamento-page/pareamento-page.component';
 import { PdvPageComponent } from './features/pdv/pages/pdv-page/pdv-page.component';
 import { SuportePageComponent } from './features/suporte/pages/suporte-page/suporte-page.component';
@@ -52,7 +53,7 @@ export const routes: Routes = [
   },
   {
     path: 'pendencias-sincronizacao',
-    component: HubModulePageComponent,
+    component: PendenciasSincronizacaoPageComponent,
     canActivate: [terminalSessionGuard, operatorSessionGuard],
     data: { moduleKey: 'pendencias-sincronizacao' },
   },

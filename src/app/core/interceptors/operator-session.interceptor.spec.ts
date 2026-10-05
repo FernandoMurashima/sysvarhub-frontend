@@ -186,6 +186,21 @@ describe('operatorSessionInterceptor', () => {
     consultar.flush({});
   });
 
+  it('envia header nos endpoints de pendencias de sincronizacao', () => {
+    sessionStore.getToken.and.returnValue('sessao-operador-atual');
+
+    http.get('/api/terminal/pendencias-sync/?status=ERRO').subscribe();
+    http.post('/api/terminal/pendencias-sync/10/retry/', {}).subscribe();
+
+    const listagem = httpMock.expectOne('/api/terminal/pendencias-sync/?status=ERRO');
+    const retry = httpMock.expectOne('/api/terminal/pendencias-sync/10/retry/');
+
+    expect(listagem.request.headers.get('X-Sysvar-Operador-Session')).toBe('sessao-operador-atual');
+    expect(retry.request.headers.get('X-Sysvar-Operador-Session')).toBe('sessao-operador-atual');
+    listagem.flush({});
+    retry.flush({});
+  });
+
   it('nao envia header em pareamento nem URL externa', () => {
     sessionStore.getToken.and.returnValue('sessao-operador-ficticia');
 

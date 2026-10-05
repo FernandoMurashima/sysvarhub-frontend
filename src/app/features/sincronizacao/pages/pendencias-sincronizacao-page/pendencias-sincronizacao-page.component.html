@@ -1,0 +1,135 @@
+<section class="sync-page">
+  <header class="topbar">
+    <a routerLink="/">Home</a>
+    <nav aria-label="Navegação principal">
+      <a routerLink="/pdv">PDV</a>
+      <a routerLink="/devolucao-troca">Devolução / Troca</a>
+      <a routerLink="/consulta-vendas">Consulta de Vendas</a>
+      <a routerLink="/vale-troca">Vale-Troca</a>
+    </nav>
+  </header>
+
+  <main>
+    <section class="heading">
+      <div>
+        <span>Monitor operacional</span>
+        <h1>Pendências de Sincronização</h1>
+        <p>{{ loja() }} · {{ terminal() }} · {{ operador()?.nome || '-' }}</p>
+      </div>
+      <button type="button" (click)="carregar()" [disabled]="carregando">Atualizar</button>
+    </section>
+
+    <section class="summary">
+      <article><span>Pendentes</span><strong>{{ resposta?.resumo?.pendentes || 0 }}</strong></article>
+      <article><span>Processando</span><strong>{{ resposta?.resumo?.processando || 0 }}</strong></article>
+      <article><span>Erros</span><strong>{{ resposta?.resumo?.erros || 0 }}</strong></article>
+      <article><span>Conflitos</span><strong>{{ resposta?.resumo?.conflitos || 0 }}</strong></article>
+      <article><span>Sincronizados</span><strong>{{ resposta?.resumo?.sincronizados || 0 }}</strong></article>
+      <article class="central" [class.offline]="resposta?.central?.status === 'OFFLINE'" [class.online]="resposta?.central?.status === 'ONLINE'">
+        <span>Central</span><strong>{{ resposta?.central?.status || '-' }}</strong>
+      </article>
+    </section>
+
+    <section class="filters">
+      <div class="quick">
+        @for (atalho of atalhos; track atalho.label) {
+          <button type="button" [class.active]="status === atalho.status" (click)="aplicarAtalho(atalho.status)">{{ atalho.label }}</button>
+        }
+      </div>
+      <label>
+        <span>Tipo</span>
+        <select [(ngModel)]="tipo" (change)="pesquisar()">
+          <option value="">Todos</option>
+          @for (item of resposta?.tipos || []; track item) {
+            <option [value]="item">{{ item }}</option>
+          }
+        </select>
+      </label>
+      <label>
+        <span>Busca</span>
+        <input [(ngModel)]="busca" placeholder="Documento, UUID, tipo, erro ou idempotência" (keydown.enter)="pesquisar()" />
+      </label>
+      <label class="check">
+        <input type="checkbox" [(ngModel)]="somenteProblemas" (change)="pesquisar()" />
+        <span>Somente pendências/problemas</span>
+      </label>
+      <button type="button" (click)="pesquisar()" [disabled]="carregando">Filtrar</button>
+    </section>
+
+    @if (mensagem) {
+      <p class="message">{{ mensagem }}</p>
+    }
+
+    <section class="workspace">
+      <div class="table-panel">
+        <div class="table-head">
+          <span>Status</span><span>Tipo</span><span>Documento</span><span>Data/Hora</span><span>Tentativas</span><span>Próxima tentativa</span><span>Resumo</span><span>Ação</span>
+        </div>
+        @for (evento of resposta?.eventos || []; track evento.id) {
+          <button type="button" class="table-row" [class.selected]="selecionado?.id === evento.id" (click)="selecionar(evento)">
+            <span class="badge" [class]="evento.status_operacional.toLowerCase()">{{ statusLabel(evento.status_operacional) }}</span>
+            <span>{{ evento.tipo }}</span>
+            <span>{{ evento.documento }}</span>
+            <span>{{ evento.atualizado_em | date:'short' }}</span>
+            <span>{{ evento.tentativas }}</span>
+            <span>{{ evento.proxima_tentativa_em ? (evento.proxima_tentativa_em | date:'short') : '-' }}</span>
+            <span>{{ evento.mensagem_operacional }}</span>
+            <span>
+              @if (evento.acoes.retry_permitido) {
+                <button type="button" class="retry" (click)="$event.stopPropagation(); retry(evento)" [disabled]="carregando">Tentar novamente</button>
+              } @else if (evento.bloqueado_por_dependencia) {
+                Aguardando
+              } @else if (evento.status === 'CONFLITO') {
+                Revisão
+              } @else {
+                -
+              }
+            </span>
+          </button>
+        } @empty {
+          <div class="empty">Nenhum evento encontrado para os filtros atuais.</div>
+        }
+        <div class="pager">
+          <button type="button" (click)="pagina(-1)" [disabled]="carregando || page <= 1">Anterior</button>
+          <span>Página {{ resposta?.paginacao?.page || page }} de {{ resposta?.paginacao?.pages || 1 }} · {{ resposta?.paginacao?.total || 0 }} eventos</span>
+          <button type="button" (click)="pagina(1)" [disabled]="carregando || page >= (resposta?.paginacao?.pages || 1)">Próxima</button>
+        </div>
+      </div>
+
+      <aside class="detail">
+        @if (selecionado) {
+          <span class="badge" [class]="selecionado.status_operacional.toLowerCase()">{{ statusLabel(selecionado.status_operacional) }}</span>
+          <h2>{{ selecionado.tipo }}</h2>
+          <dl>
+            <div><dt>Documento</dt><dd>{{ selecionado.documento }}</dd></div>
+            <div><dt>Origem</dt><dd>{{ selecionado.origem }}</dd></div>
+            <div><dt>Criado</dt><dd>{{ selecionado.criado_em | date:'short' }}</dd></div>
+            <div><dt>Atualizado</dt><dd>{{ selecionado.atualizado_em | date:'short' }}</dd></div>
+            <div><dt>Sincronizado</dt><dd>{{ selecionado.sincronizado_em ? (selecionado.sincronizado_em | date:'short') : '-' }}</dd></div>
+            <div><dt>Tentativas</dt><dd>{{ selecionado.tentativas }}</dd></div>
+            <div><dt>Próxima tentativa</dt><dd>{{ selecionado.proxima_tentativa_em ? (selecionado.proxima_tentativa_em | date:'short') : '-' }}</dd></div>
+            <div><dt>Último erro</dt><dd>{{ selecionado.ultimo_erro || '-' }}</dd></div>
+          </dl>
+          @if (selecionado.dependencia) {
+            <section class="dependencia">
+              <strong>{{ selecionado.dependencia.resumo }}</strong>
+              @for (dep of selecionado.dependencia.itens; track dep.uuid) {
+                <span>{{ dep.tipo }} · {{ dep.documento || dep.uuid }} · {{ dep.status }} · {{ dep.motivo }}</span>
+              }
+            </section>
+          }
+          @if (selecionado.status === 'CONFLITO') {
+            <p class="conflict">Requer revisão administrativa. Não há ação de ignorar, excluir, editar payload ou forçar sincronização nesta tela.</p>
+          }
+          <details>
+            <summary>Diagnóstico técnico</summary>
+            <pre>{{ json(selecionado.payload_tecnico) }}</pre>
+            <pre>{{ json(selecionado.resposta_central) }}</pre>
+          </details>
+        } @else {
+          <p>Selecione um evento para ver detalhes.</p>
+        }
+      </aside>
+    </section>
+  </main>
+</section>
