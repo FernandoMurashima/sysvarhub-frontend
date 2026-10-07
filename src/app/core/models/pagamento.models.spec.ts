@@ -5,6 +5,7 @@ describe('pagamento models', () => {
     const response = mapFormasPagamento({
       versao: 1,
       sincronizado_em: '2026-09-14T10:00:00',
+      prazos: [],
       formas: [{
         id: 1,
         retaguarda_id: 10,

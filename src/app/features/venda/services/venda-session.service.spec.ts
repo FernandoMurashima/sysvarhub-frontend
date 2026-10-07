@@ -566,6 +566,7 @@ describe('VendaSessionService', () => {
     const formas: FormasPagamentoResponse = {
       versao: 1,
       sincronizadoEm: '2026-09-14T12:00:00Z',
+      prazos: [],
       formas: [
         {
           id: 1,

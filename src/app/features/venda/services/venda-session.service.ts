@@ -19,6 +19,7 @@ export interface VendaOperacaoResultado {
 export interface PagamentoIntencao {
   operacaoUuid: string;
   formaPagamentoId: number;
+  prazoPagamentoId: number | null;
   valor: string;
   autorizacao: string;
 }
@@ -114,12 +115,13 @@ export class VendaSessionService {
     );
   }
 
-  adicionarPagamento(vendaUuid: string, formaPagamentoId: number, valor: string, autorizacao = ''): Observable<VendaOperacaoResultado> {
-    const intencao = this.obterIntencaoPagamento(formaPagamentoId, valor, autorizacao);
+  adicionarPagamento(vendaUuid: string, formaPagamentoId: number, valor: string, autorizacao = '', prazoPagamentoId: number | null = null): Observable<VendaOperacaoResultado> {
+    const intencao = this.obterIntencaoPagamento(formaPagamentoId, valor, autorizacao, prazoPagamentoId);
     const request: AdicionarPagamentoRequest = {
       vendaUuid,
       operacaoUuid: intencao.operacaoUuid,
       formaPagamentoId,
+      prazoPagamentoId,
       valor,
       autorizacao,
     };
@@ -136,7 +138,7 @@ export class VendaSessionService {
   }
 
   adicionarPagamentoValeTroca(vendaUuid: string, documento: string, valor: string): Observable<VendaOperacaoResultado> {
-    const intencao = this.obterIntencaoPagamento(0, valor, documento);
+    const intencao = this.obterIntencaoPagamento(0, valor, documento, null);
     this.loadingOperacaoSignal.set(true);
     return this.hubVendaService.adicionarPagamentoValeTroca(vendaUuid, intencao.operacaoUuid, documento, valor).pipe(
       tap((response) => {
@@ -183,12 +185,12 @@ export class VendaSessionService {
     this.intencaoPagamentoPendente = null;
   }
 
-  private obterIntencaoPagamento(formaPagamentoId: number, valor: string, autorizacao: string): PagamentoIntencao {
+  private obterIntencaoPagamento(formaPagamentoId: number, valor: string, autorizacao: string, prazoPagamentoId: number | null): PagamentoIntencao {
     const atual = this.intencaoPagamentoPendente;
-    if (atual && atual.formaPagamentoId === formaPagamentoId && atual.valor === valor && atual.autorizacao === autorizacao) {
+    if (atual && atual.formaPagamentoId === formaPagamentoId && atual.prazoPagamentoId === prazoPagamentoId && atual.valor === valor && atual.autorizacao === autorizacao) {
       return atual;
     }
-    const nova = { operacaoUuid: crypto.randomUUID(), formaPagamentoId, valor, autorizacao };
+    const nova = { operacaoUuid: crypto.randomUUID(), formaPagamentoId, prazoPagamentoId, valor, autorizacao };
     this.intencaoPagamentoPendente = nova;
     return nova;
   }

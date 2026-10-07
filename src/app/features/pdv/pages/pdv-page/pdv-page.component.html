@@ -1169,6 +1169,15 @@
                   }
                 }
                 <section class="payment-panel payment-action-panel">
+                  @if (formaPagamentoSelecionada?.tipo === 'CREDITO') {
+                    <label>Prazo
+                      <select name="prazoPagamento" [(ngModel)]="prazoPagamentoSelecionado">
+                        @for (prazo of prazosCredito(); track prazo.id) {
+                          <option [ngValue]="prazo">{{ prazo.codigo }} · {{ prazo.descricao }}</option>
+                        }
+                      </select>
+                    </label>
+                  }
                   <label>{{ pagamentoValeTrocaSelecionado ? 'Valor a utilizar' : 'Valor' }}<input name="valorPagamento" [(ngModel)]="valorPagamento" inputmode="decimal" autocomplete="off" /></label>
                   @if (!pagamentoValeTrocaSelecionado) {
                     <label>Autorização<input name="autorizacaoPagamento" [(ngModel)]="autorizacaoPagamento" maxlength="120" autocomplete="off" /></label>
@@ -1176,7 +1185,7 @@
                   @if (formaPagamentoSelecionada?.tefHabilitado) {
                     <p>Esta forma exige integração TEF.</p>
                   }
-                  <button type="submit" [disabled]="(!formaPagamentoSelecionada && !pagamentoValeTrocaSelecionado) || !!formaPagamentoSelecionada?.tefHabilitado || vendaLoading()">
+                  <button type="submit" [disabled]="(!formaPagamentoSelecionada && !pagamentoValeTrocaSelecionado) || !!formaPagamentoSelecionada?.tefHabilitado || (formaPagamentoSelecionada?.tipo === 'CREDITO' && !prazoPagamentoSelecionado) || vendaLoading()">
                     {{ pagamentoValeTrocaSelecionado ? 'Adicionar Vale-Troca' : 'Adicionar' }}
                   </button>
                 </section>

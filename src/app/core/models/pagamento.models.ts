@@ -18,10 +18,21 @@ export interface FormaPagamentoApi {
   parcelas: FormaPagamentoParcelaApi[];
 }
 
+export interface PrazoPagamentoApi {
+  id: number;
+  retaguarda_id: number;
+  codigo: string;
+  descricao: string;
+  num_parcelas: number;
+  intervalo_dias: number | null;
+  parcelas: FormaPagamentoParcelaApi[];
+}
+
 export interface FormasPagamentoApiResponse {
   versao: number | null;
   sincronizado_em: string | null;
   formas: FormaPagamentoApi[];
+  prazos?: PrazoPagamentoApi[];
 }
 
 export interface FormaPagamentoParcela {
@@ -42,16 +53,28 @@ export interface FormaPagamento {
   parcelas: FormaPagamentoParcela[];
 }
 
+export interface PrazoPagamento {
+  id: number;
+  retaguardaId: number;
+  codigo: string;
+  descricao: string;
+  numParcelas: number;
+  intervaloDias: number | null;
+  parcelas: FormaPagamentoParcela[];
+}
+
 export interface FormasPagamentoResponse {
   versao: number | null;
   sincronizadoEm: string | null;
   formas: FormaPagamento[];
+  prazos: PrazoPagamento[];
 }
 
 export interface AdicionarPagamentoRequest {
   vendaUuid: string;
   operacaoUuid: string;
   formaPagamentoId: number;
+  prazoPagamentoId?: number | null;
   valor: DecimalString;
   autorizacao: string;
 }
@@ -85,6 +108,7 @@ export function mapFormasPagamento(response: FormasPagamentoApiResponse): Formas
     versao: response.versao,
     sincronizadoEm: response.sincronizado_em,
     formas: response.formas.map(mapFormaPagamento),
+    prazos: (response.prazos ?? []).map(mapPrazoPagamento),
   };
 }
 
@@ -98,6 +122,23 @@ export function mapFormaPagamento(forma: FormaPagamentoApi): FormaPagamento {
     numParcelas: forma.num_parcelas,
     tefHabilitado: forma.tef_habilitado,
     parcelas: forma.parcelas.map((parcela) => ({
+      ordem: parcela.ordem,
+      dias: parcela.dias,
+      percentual: parcela.percentual,
+      valorFixo: parcela.valor_fixo,
+    })),
+  };
+}
+
+export function mapPrazoPagamento(prazo: PrazoPagamentoApi): PrazoPagamento {
+  return {
+    id: prazo.id,
+    retaguardaId: prazo.retaguarda_id,
+    codigo: prazo.codigo,
+    descricao: prazo.descricao,
+    numParcelas: prazo.num_parcelas,
+    intervaloDias: prazo.intervalo_dias,
+    parcelas: prazo.parcelas.map((parcela) => ({
       ordem: parcela.ordem,
       dias: parcela.dias,
       percentual: parcela.percentual,

@@ -472,7 +472,7 @@ describe('PdvPageComponent', () => {
     vendaSession.alterarQuantidade.and.returnValue(of({ ok: true }));
     vendaSession.removerItem.and.returnValue(of({ ok: true }));
     vendaSession.cancelarVenda.and.returnValue(of({ ok: true }));
-    vendaSession.listarFormasPagamento.and.returnValue(of({ versao: 1, sincronizadoEm: null, formas: [] }));
+    vendaSession.listarFormasPagamento.and.returnValue(of({ versao: 1, sincronizadoEm: null, prazos: [], formas: [] }));
     vendaSession.adicionarPagamento.and.returnValue(of({ ok: true }));
     vendaSession.adicionarPagamentoValeTroca.and.returnValue(of({ ok: true }));
     vendaSession.removerPagamento.and.returnValue(of({ ok: true }));

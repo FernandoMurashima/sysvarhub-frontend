@@ -82,6 +82,7 @@ export class HubVendaService {
       venda_uuid: request.vendaUuid,
       operacao_uuid: request.operacaoUuid,
       forma_pagamento_id: request.formaPagamentoId,
+      prazo_pagamento_id: request.prazoPagamentoId ?? null,
       valor: request.valor,
       autorizacao: request.autorizacao,
     }).pipe(map(mapVendaAtual));

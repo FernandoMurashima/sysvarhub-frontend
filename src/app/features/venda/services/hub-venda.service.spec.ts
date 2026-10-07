@@ -140,6 +140,7 @@ describe('HubVendaService', () => {
     formas.flush({
       versao: 1,
       sincronizado_em: null,
+      prazos: [],
       formas: [{
         id: 1,
         retaguarda_id: 10,
@@ -165,6 +166,7 @@ describe('HubVendaService', () => {
       venda_uuid: 'venda',
       operacao_uuid: 'op',
       forma_pagamento_id: 1,
+      prazo_pagamento_id: null,
       valor: '199.90',
       autorizacao: '',
     });
