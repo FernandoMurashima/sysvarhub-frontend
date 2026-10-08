@@ -7,6 +7,20 @@ export interface FormaPagamentoParcelaApi {
   valor_fixo: DecimalString | null;
 }
 
+export interface FormaPagamentoCondicaoApi {
+  id: number;
+  retaguarda_id: number;
+  prazo_pagamento_id: number;
+  prazo_retaguarda_id: number;
+  prazo_codigo: string;
+  prazo_descricao: string;
+  prazo_num_parcelas: number;
+  prazo_intervalo_dias: number | null;
+  taxa_percentual: DecimalString;
+  taxa_fixa: DecimalString;
+  parcelas: FormaPagamentoParcelaApi[];
+}
+
 export interface FormaPagamentoApi {
   id: number;
   retaguarda_id: number;
@@ -14,7 +28,9 @@ export interface FormaPagamentoApi {
   descricao: string;
   tipo: string;
   num_parcelas: number;
+  permite_parcelamento?: boolean;
   tef_habilitado: boolean;
+  condicoes_parcelamento?: FormaPagamentoCondicaoApi[];
   parcelas: FormaPagamentoParcelaApi[];
 }
 
@@ -42,6 +58,20 @@ export interface FormaPagamentoParcela {
   valorFixo: DecimalString | null;
 }
 
+export interface FormaPagamentoCondicao {
+  id: number;
+  retaguardaId: number;
+  prazoPagamentoId: number;
+  prazoRetaguardaId: number;
+  prazoCodigo: string;
+  prazoDescricao: string;
+  prazoNumParcelas: number;
+  prazoIntervaloDias: number | null;
+  taxaPercentual: DecimalString;
+  taxaFixa: DecimalString;
+  parcelas: FormaPagamentoParcela[];
+}
+
 export interface FormaPagamento {
   id: number;
   retaguardaId: number;
@@ -49,7 +79,9 @@ export interface FormaPagamento {
   descricao: string;
   tipo: string;
   numParcelas: number;
+  permiteParcelamento: boolean;
   tefHabilitado: boolean;
+  condicoesParcelamento: FormaPagamentoCondicao[];
   parcelas: FormaPagamentoParcela[];
 }
 
@@ -120,13 +152,10 @@ export function mapFormaPagamento(forma: FormaPagamentoApi): FormaPagamento {
     descricao: forma.descricao,
     tipo: forma.tipo,
     numParcelas: forma.num_parcelas,
+    permiteParcelamento: forma.permite_parcelamento ?? false,
     tefHabilitado: forma.tef_habilitado,
-    parcelas: forma.parcelas.map((parcela) => ({
-      ordem: parcela.ordem,
-      dias: parcela.dias,
-      percentual: parcela.percentual,
-      valorFixo: parcela.valor_fixo,
-    })),
+    condicoesParcelamento: (forma.condicoes_parcelamento ?? []).map(mapFormaPagamentoCondicao),
+    parcelas: forma.parcelas.map(mapFormaPagamentoParcela),
   };
 }
 
@@ -138,11 +167,31 @@ export function mapPrazoPagamento(prazo: PrazoPagamentoApi): PrazoPagamento {
     descricao: prazo.descricao,
     numParcelas: prazo.num_parcelas,
     intervaloDias: prazo.intervalo_dias,
-    parcelas: prazo.parcelas.map((parcela) => ({
-      ordem: parcela.ordem,
-      dias: parcela.dias,
-      percentual: parcela.percentual,
-      valorFixo: parcela.valor_fixo,
-    })),
+    parcelas: prazo.parcelas.map(mapFormaPagamentoParcela),
+  };
+}
+
+export function mapFormaPagamentoCondicao(condicao: FormaPagamentoCondicaoApi): FormaPagamentoCondicao {
+  return {
+    id: condicao.id,
+    retaguardaId: condicao.retaguarda_id,
+    prazoPagamentoId: condicao.prazo_pagamento_id,
+    prazoRetaguardaId: condicao.prazo_retaguarda_id,
+    prazoCodigo: condicao.prazo_codigo,
+    prazoDescricao: condicao.prazo_descricao,
+    prazoNumParcelas: condicao.prazo_num_parcelas,
+    prazoIntervaloDias: condicao.prazo_intervalo_dias,
+    taxaPercentual: condicao.taxa_percentual,
+    taxaFixa: condicao.taxa_fixa,
+    parcelas: condicao.parcelas.map(mapFormaPagamentoParcela),
+  };
+}
+
+function mapFormaPagamentoParcela(parcela: FormaPagamentoParcelaApi): FormaPagamentoParcela {
+  return {
+    ordem: parcela.ordem,
+    dias: parcela.dias,
+    percentual: parcela.percentual,
+    valorFixo: parcela.valor_fixo,
   };
 }

@@ -18,7 +18,7 @@ import {
   mapFechamentoDiaRegistro,
 } from '../../../../core/models/fechamento-dia.models';
 import { TipoMovimentacaoCaixa } from '../../../../core/models/movimentacao-caixa.models';
-import { FormaPagamento, PrazoPagamento, ValeTrocaOnline } from '../../../../core/models/pagamento.models';
+import { FormaPagamento, FormaPagamentoCondicao, PrazoPagamento, ValeTrocaOnline } from '../../../../core/models/pagamento.models';
 import { ResumoCaixa } from '../../../../core/models/resumo-caixa.models';
 import { TipoDespesaPdv } from '../../../../core/models/tipo-despesa-pdv.models';
 import { DanfeNfce, DanfeVia } from '../../../../core/models/danfe-nfce.models';
@@ -120,7 +120,7 @@ export class PdvPageComponent implements OnInit, OnDestroy {
   formasPagamento: FormaPagamento[] = [];
   prazosPagamento: PrazoPagamento[] = [];
   formaPagamentoSelecionada: FormaPagamento | null = null;
-  prazoPagamentoSelecionado: PrazoPagamento | null = null;
+  condicaoPagamentoSelecionada: FormaPagamentoCondicao | null = null;
   pagamentoValeTrocaSelecionado = false;
   filtroPagamento: 'TODAS' | 'DINHEIRO' | 'CARTAO' | 'PIX' | 'OUTRAS' = 'TODAS';
   beneficiosCliente: BeneficiosClienteResponse | null = null;
@@ -1279,7 +1279,7 @@ export class PdvPageComponent implements OnInit, OnDestroy {
 
   selecionarFormaPagamento(forma: FormaPagamento): void {
     this.formaPagamentoSelecionada = forma;
-    this.prazoPagamentoSelecionado = forma.tipo === 'CREDITO' ? this.prazoCreditoPadrao() : null;
+    this.condicaoPagamentoSelecionada = this.condicaoPadraoForma(forma);
     this.pagamentoValeTrocaSelecionado = false;
     this.valeTrocaConsulta = null;
     this.valesTrocaOnlineDisponiveis = [];
@@ -1295,7 +1295,7 @@ export class PdvPageComponent implements OnInit, OnDestroy {
 
   selecionarPagamentoValeTroca(): void {
     this.formaPagamentoSelecionada = null;
-    this.prazoPagamentoSelecionado = null;
+    this.condicaoPagamentoSelecionada = null;
     this.pagamentoValeTrocaSelecionado = true;
     this.valeTrocaConsulta = null;
     this.valesTrocaOnlineDisponiveis = [];
@@ -1476,8 +1476,8 @@ export class PdvPageComponent implements OnInit, OnDestroy {
       return;
     }
     if (!forma) return;
-    if (forma.tipo === 'CREDITO' && !this.prazoPagamentoSelecionado) {
-      this.mensagem = 'Selecione o prazo do cartão de crédito.';
+    if (forma.permiteParcelamento && !this.condicaoPagamentoSelecionada) {
+      this.mensagem = 'Selecione a condição de pagamento.';
       return;
     }
     if (forma.tefHabilitado) {
@@ -1489,7 +1489,8 @@ export class PdvPageComponent implements OnInit, OnDestroy {
       this.mensagem = 'Valor de pagamento inválido.';
       return;
     }
-    this.vendaSession.adicionarPagamento(venda.uuid, forma.id, valor, this.autorizacaoPagamento.trim(), this.prazoPagamentoSelecionado?.id ?? null).subscribe((resultado) => {
+    const prazoPagamentoId = forma.permiteParcelamento ? this.condicaoPagamentoSelecionada?.prazoPagamentoId ?? null : null;
+    this.vendaSession.adicionarPagamento(venda.uuid, forma.id, valor, this.autorizacaoPagamento.trim(), prazoPagamentoId).subscribe((resultado) => {
       if (resultado.ok) {
         this.valorPagamento = this.venda()?.pendente || '';
         this.autorizacaoPagamento = '';
@@ -1796,7 +1797,7 @@ export class PdvPageComponent implements OnInit, OnDestroy {
         this.carregandoFormasPagamento = false;
         const formas = filtro === 'TODAS' ? response.formas : this.formasPorCategoria(filtro);
         this.formaPagamentoSelecionada = formas[0] || response.formas[0] || null;
-        this.prazoPagamentoSelecionado = this.formaPagamentoSelecionada?.tipo === 'CREDITO' ? this.prazoCreditoPadrao() : null;
+        this.condicaoPagamentoSelecionada = this.condicaoPadraoForma(this.formaPagamentoSelecionada);
         this.valorPagamento = this.venda()?.pendente || '';
       },
       error: () => {
@@ -1814,12 +1815,25 @@ export class PdvPageComponent implements OnInit, OnDestroy {
     return formas;
   }
 
-  prazosCredito(): PrazoPagamento[] {
-    return this.prazosPagamento.filter((prazo) => prazo.numParcelas >= 1);
+  condicoesFormaSelecionada(): FormaPagamentoCondicao[] {
+    return this.formaPagamentoSelecionada?.condicoesParcelamento ?? [];
   }
 
-  private prazoCreditoPadrao(): PrazoPagamento | null {
-    return this.prazosCredito()[0] || null;
+  rotuloCondicaoPagamento(condicao: FormaPagamentoCondicao): string {
+    const parcelas = condicao.parcelas.map((parcela) => parcela.dias).join('/');
+    return parcelas ? `${condicao.prazoNumParcelas}x · ${parcelas}` : `${condicao.prazoNumParcelas}x · ${condicao.prazoDescricao || condicao.prazoCodigo}`;
+  }
+
+  resumoCondicoesPagamento(forma: FormaPagamento): string {
+    if (!forma.permiteParcelamento) return forma.tipo;
+    const total = forma.condicoesParcelamento.length;
+    if (!total) return 'Parcelamento sem condições sincronizadas';
+    return total === 1 ? '1 condição de parcelamento' : `${total} condições de parcelamento`;
+  }
+
+  private condicaoPadraoForma(forma: FormaPagamento | null): FormaPagamentoCondicao | null {
+    if (!forma?.permiteParcelamento) return null;
+    return forma.condicoesParcelamento[0] || null;
   }
 
   private consultarClientes(termo: string): void {

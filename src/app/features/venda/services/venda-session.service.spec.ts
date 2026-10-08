@@ -575,6 +575,8 @@ describe('VendaSessionService', () => {
           descricao: 'Dinheiro',
           tipo: 'DINHEIRO',
           tefHabilitado: false,
+          permiteParcelamento: false,
+          condicoesParcelamento: [],
           numParcelas: 1,
           parcelas: [],
         },

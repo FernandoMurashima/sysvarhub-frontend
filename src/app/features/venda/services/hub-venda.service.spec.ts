@@ -148,7 +148,9 @@ describe('HubVendaService', () => {
         descricao: 'Dinheiro',
         tipo: 'DINHEIRO',
         num_parcelas: 1,
+        permite_parcelamento: false,
         tef_habilitado: false,
+        condicoes_parcelamento: [],
         parcelas: [],
       }],
     });

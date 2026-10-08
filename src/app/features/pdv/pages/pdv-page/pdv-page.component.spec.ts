@@ -2273,9 +2273,72 @@ describe('PdvPageComponent', () => {
     expect(host.querySelector('.right-panel input[placeholder="Valor"]')).toBeNull();
     expect(text).not.toContain('Adicionar pagamento');
     expect(text).toContain('F9');
-    ['DINHEIRO', 'CARTÃO', 'PIX', 'OUTRAS', 'FINALIZAR'].forEach((rotulo) => {
-      expect(text).toContain(rotulo);
+    ['DINHEIRO', 'CARTÃO', 'PIX', 'OUTRAS'].forEach((rotulo) => {
+      expect(text).not.toContain(rotulo);
     });
+    expect(text).toContain('FINALIZAR');
+  });
+
+
+  it('F9 usa somente condicoes vinculadas a forma e permite PIX parcelado', () => {
+    const component = fixture.componentInstance;
+    vendaSignal.set({ ...vendaAbertaStub.venda!, vendedor: vendedorStub });
+    vendaSession.listarFormasPagamento.and.returnValue(of({
+      versao: 1,
+      sincronizadoEm: null,
+      prazos: [{ id: 999, retaguardaId: 9999, codigo: 'GEN', descricao: 'Prazo geral', numParcelas: 9, intervaloDias: 30, parcelas: [] }],
+      formas: [
+        {
+          id: 2,
+          retaguardaId: 20,
+          codigo: 'PIX',
+          descricao: 'Pix parcelado',
+          tipo: 'PIX',
+          numParcelas: 1,
+          permiteParcelamento: true,
+          tefHabilitado: false,
+          condicoesParcelamento: [
+            { id: 10, retaguardaId: 100, prazoPagamentoId: 5, prazoRetaguardaId: 50, prazoCodigo: '1X', prazoDescricao: '30 dias', prazoNumParcelas: 1, prazoIntervaloDias: 30, taxaPercentual: '0.0000', taxaFixa: '0.00', parcelas: [{ ordem: 1, dias: 30, percentual: '1.000000', valorFixo: null }] },
+            { id: 11, retaguardaId: 101, prazoPagamentoId: 6, prazoRetaguardaId: 60, prazoCodigo: '2X', prazoDescricao: '30/60', prazoNumParcelas: 2, prazoIntervaloDias: 30, taxaPercentual: '1.0000', taxaFixa: '0.00', parcelas: [{ ordem: 1, dias: 30, percentual: '0.500000', valorFixo: null }, { ordem: 2, dias: 60, percentual: '0.500000', valorFixo: null }] },
+          ],
+          parcelas: [],
+        },
+      ],
+    }));
+
+    component.abrirPagamentos('TODAS');
+    fixture.detectChanges();
+
+    const text = fixture.nativeElement.textContent;
+    expect(component.formaPagamentoSelecionada?.tipo).toBe('PIX');
+    expect(component.condicoesFormaSelecionada().map((condicao) => condicao.prazoPagamentoId)).toEqual([5, 6]);
+    expect(text).toContain('1x · 30');
+    expect(text).toContain('2x · 30/60');
+    expect(text).not.toContain('Prazo geral');
+
+    component.condicaoPagamentoSelecionada = component.condicoesFormaSelecionada()[1];
+    component.valorPagamento = '100,00';
+    component.adicionarPagamento();
+
+    expect(vendaSession.adicionarPagamento).toHaveBeenCalledWith('venda-hub-uuid', 2, '100.00', '', 6);
+  });
+
+  it('F9 envia prazo null para forma sem parcelamento', () => {
+    const component = fixture.componentInstance;
+    vendaSignal.set({ ...vendaAbertaStub.venda!, vendedor: vendedorStub });
+    vendaSession.listarFormasPagamento.and.returnValue(of({
+      versao: 1,
+      sincronizadoEm: null,
+      prazos: [{ id: 999, retaguardaId: 9999, codigo: 'GEN', descricao: 'Prazo geral', numParcelas: 9, intervaloDias: 30, parcelas: [] }],
+      formas: [{ id: 1, retaguardaId: 10, codigo: 'CRE', descricao: 'Crédito sem parcelamento', tipo: 'CREDITO', numParcelas: 1, permiteParcelamento: false, tefHabilitado: false, condicoesParcelamento: [], parcelas: [] }],
+    }));
+
+    component.abrirPagamentos('TODAS');
+    component.valorPagamento = '100,00';
+    component.adicionarPagamento();
+
+    expect(component.condicaoPagamentoSelecionada).toBeNull();
+    expect(vendaSession.adicionarPagamento).toHaveBeenCalledWith('venda-hub-uuid', 1, '100.00', '', null);
   });
 
   it('mantem mensagem operacional em regiao propria acima dos botoes de pagamento', () => {

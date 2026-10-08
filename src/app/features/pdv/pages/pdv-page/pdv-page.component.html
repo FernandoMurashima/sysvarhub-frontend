@@ -310,10 +310,6 @@
       </div>
 
       <div class="payments">
-        <button class="cash" type="button" (click)="abrirPagamentos('DINHEIRO', $event)"><span>▣</span>DINHEIRO</button>
-        <button class="card" type="button" (click)="abrirPagamentos('CARTAO', $event)"><span>▭</span>CARTÃO</button>
-        <button class="pix" type="button" (click)="abrirPagamentos('PIX', $event)"><span>▦</span>PIX</button>
-        <button class="exchange" type="button" (click)="abrirPagamentos('OUTRAS', $event)"><span>↻</span>OUTRAS</button>
         <button class="finish" type="button" (click)="abrirConfirmacaoFinalizacao()" [disabled]="!venda() || !venda()?.itens?.length || !venda()?.pagamentos?.length || venda()?.pendente !== '0.00'">
           <span>✓</span>FINALIZAR
         </button>
@@ -1101,16 +1097,12 @@
                 @for (forma of formasPagamentoFiltradas(); track forma.id) {
                   <button type="button" [class.selected]="formaPagamentoSelecionada?.id === forma.id" (click)="selecionarFormaPagamento(forma)">
                     <strong>{{ forma.codigo }} · {{ forma.descricao }}</strong>
-                    <span>{{ forma.tipo }} · {{ forma.numParcelas }}x</span>
+                    <span>{{ resumoCondicoesPagamento(forma) }}</span>
+                    @if (forma.permiteParcelamento) {
+                      <small>Parcelamento</small>
+                    }
                     @if (forma.tefHabilitado) {
                       <b>TEF</b>
-                    }
-                    @if (forma.parcelas.length) {
-                      <small>
-                        @for (parcela of forma.parcelas; track parcela.ordem) {
-                          {{ parcela.ordem }}: {{ parcela.dias }}d
-                        }
-                      </small>
                     }
                   </button>
                 }
@@ -1169,11 +1161,11 @@
                   }
                 }
                 <section class="payment-panel payment-action-panel">
-                  @if (formaPagamentoSelecionada?.tipo === 'CREDITO') {
-                    <label>Prazo
-                      <select name="prazoPagamento" [(ngModel)]="prazoPagamentoSelecionado">
-                        @for (prazo of prazosCredito(); track prazo.id) {
-                          <option [ngValue]="prazo">{{ prazo.codigo }} · {{ prazo.descricao }}</option>
+                  @if (formaPagamentoSelecionada?.permiteParcelamento) {
+                    <label>Condição de pagamento
+                      <select name="condicaoPagamento" [(ngModel)]="condicaoPagamentoSelecionada">
+                        @for (condicao of condicoesFormaSelecionada(); track condicao.id) {
+                          <option [ngValue]="condicao">{{ rotuloCondicaoPagamento(condicao) }}</option>
                         }
                       </select>
                     </label>
@@ -1185,7 +1177,7 @@
                   @if (formaPagamentoSelecionada?.tefHabilitado) {
                     <p>Esta forma exige integração TEF.</p>
                   }
-                  <button type="submit" [disabled]="(!formaPagamentoSelecionada && !pagamentoValeTrocaSelecionado) || !!formaPagamentoSelecionada?.tefHabilitado || (formaPagamentoSelecionada?.tipo === 'CREDITO' && !prazoPagamentoSelecionado) || vendaLoading()">
+                  <button type="submit" [disabled]="(!formaPagamentoSelecionada && !pagamentoValeTrocaSelecionado) || !!formaPagamentoSelecionada?.tefHabilitado || (!!formaPagamentoSelecionada?.permiteParcelamento && !condicaoPagamentoSelecionada) || vendaLoading()">
                     {{ pagamentoValeTrocaSelecionado ? 'Adicionar Vale-Troca' : 'Adicionar' }}
                   </button>
                 </section>
