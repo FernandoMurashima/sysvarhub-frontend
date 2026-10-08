@@ -1162,13 +1162,14 @@
                 }
                 <section class="payment-panel payment-action-panel">
                   @if (formaPagamentoSelecionada?.permiteParcelamento) {
-                    <label>Condição de pagamento
-                      <select name="condicaoPagamento" [(ngModel)]="condicaoPagamentoSelecionada">
+                    <div class="parcelas-selector">
+                      <strong>Número de parcelas</strong>
+                      <div class="parcelas-options" role="group" aria-label="Número de parcelas">
                         @for (condicao of condicoesFormaSelecionada(); track condicao.id) {
-                          <option [ngValue]="condicao">{{ rotuloCondicaoPagamento(condicao) }}</option>
+                          <button type="button" class="parcelas-option" [class.selected]="condicaoPagamentoSelecionada?.id === condicao.id" (click)="selecionarCondicaoPagamento(condicao)">{{ condicao.prazoNumParcelas }}x</button>
                         }
-                      </select>
-                    </label>
+                      </div>
+                    </div>
                   }
                   <label>{{ pagamentoValeTrocaSelecionado ? 'Valor a utilizar' : 'Valor' }}<input name="valorPagamento" [(ngModel)]="valorPagamento" inputmode="decimal" autocomplete="off" /></label>
                   @if (!pagamentoValeTrocaSelecionado) {

@@ -1477,7 +1477,7 @@ export class PdvPageComponent implements OnInit, OnDestroy {
     }
     if (!forma) return;
     if (forma.permiteParcelamento && !this.condicaoPagamentoSelecionada) {
-      this.mensagem = 'Selecione a condição de pagamento.';
+      this.mensagem = 'Selecione o número de parcelas.';
       return;
     }
     if (forma.tefHabilitado) {
@@ -1819,9 +1819,8 @@ export class PdvPageComponent implements OnInit, OnDestroy {
     return this.formaPagamentoSelecionada?.condicoesParcelamento ?? [];
   }
 
-  rotuloCondicaoPagamento(condicao: FormaPagamentoCondicao): string {
-    const parcelas = condicao.parcelas.map((parcela) => parcela.dias).join('/');
-    return parcelas ? `${condicao.prazoNumParcelas}x · ${parcelas}` : `${condicao.prazoNumParcelas}x · ${condicao.prazoDescricao || condicao.prazoCodigo}`;
+  selecionarCondicaoPagamento(condicao: FormaPagamentoCondicao): void {
+    this.condicaoPagamentoSelecionada = condicao;
   }
 
   resumoCondicoesPagamento(forma: FormaPagamento): string {

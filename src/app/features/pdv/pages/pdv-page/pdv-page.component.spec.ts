@@ -2280,7 +2280,7 @@ describe('PdvPageComponent', () => {
   });
 
 
-  it('F9 usa somente condicoes vinculadas a forma e permite PIX parcelado', () => {
+  it('F9 renderiza botoes de parcelas, preserva a condicao interna e permite PIX parcelado', () => {
     const component = fixture.componentInstance;
     vendaSignal.set({ ...vendaAbertaStub.venda!, vendedor: vendedorStub });
     vendaSession.listarFormasPagamento.and.returnValue(of({
@@ -2300,6 +2300,7 @@ describe('PdvPageComponent', () => {
           condicoesParcelamento: [
             { id: 10, retaguardaId: 100, prazoPagamentoId: 5, prazoRetaguardaId: 50, prazoCodigo: '1X', prazoDescricao: '30 dias', prazoNumParcelas: 1, prazoIntervaloDias: 30, taxaPercentual: '0.0000', taxaFixa: '0.00', parcelas: [{ ordem: 1, dias: 30, percentual: '1.000000', valorFixo: null }] },
             { id: 11, retaguardaId: 101, prazoPagamentoId: 6, prazoRetaguardaId: 60, prazoCodigo: '2X', prazoDescricao: '30/60', prazoNumParcelas: 2, prazoIntervaloDias: 30, taxaPercentual: '1.0000', taxaFixa: '0.00', parcelas: [{ ordem: 1, dias: 30, percentual: '0.500000', valorFixo: null }, { ordem: 2, dias: 60, percentual: '0.500000', valorFixo: null }] },
+            { id: 12, retaguardaId: 102, prazoPagamentoId: 7, prazoRetaguardaId: 70, prazoCodigo: '3X', prazoDescricao: '30/60/90', prazoNumParcelas: 3, prazoIntervaloDias: 30, taxaPercentual: '2.0000', taxaFixa: '0.00', parcelas: [{ ordem: 1, dias: 30, percentual: '0.333333', valorFixo: null }, { ordem: 2, dias: 60, percentual: '0.333333', valorFixo: null }, { ordem: 3, dias: 90, percentual: '0.333334', valorFixo: null }] },
           ],
           parcelas: [],
         },
@@ -2309,21 +2310,33 @@ describe('PdvPageComponent', () => {
     component.abrirPagamentos('TODAS');
     fixture.detectChanges();
 
-    const text = fixture.nativeElement.textContent;
-    expect(component.formaPagamentoSelecionada?.tipo).toBe('PIX');
-    expect(component.condicoesFormaSelecionada().map((condicao) => condicao.prazoPagamentoId)).toEqual([5, 6]);
-    expect(text).toContain('1x · 30');
-    expect(text).toContain('2x · 30/60');
-    expect(text).not.toContain('Prazo geral');
+    const selector = fixture.nativeElement.querySelector('.parcelas-selector') as HTMLElement;
+    const botoes = Array.from(selector.querySelectorAll<HTMLButtonElement>('.parcelas-option'));
 
-    component.condicaoPagamentoSelecionada = component.condicoesFormaSelecionada()[1];
+    expect(component.formaPagamentoSelecionada?.tipo).toBe('PIX');
+    expect(component.condicoesFormaSelecionada().map((condicao) => condicao.prazoPagamentoId)).toEqual([5, 6, 7]);
+    expect(selector.textContent).toContain('Número de parcelas');
+    expect(botoes.map((botao) => botao.textContent?.trim())).toEqual(['1x', '2x', '3x']);
+    expect(selector.textContent).not.toContain('30 dias');
+    expect(selector.textContent).not.toContain('30/60');
+    expect(selector.textContent).not.toContain('30/60/90');
+    expect(selector.textContent).not.toContain('Prazo geral');
+    expect(botoes[0].classList).toContain('selected');
+
+    botoes[1].click();
+    fixture.detectChanges();
+
+    expect(component.condicaoPagamentoSelecionada?.prazoNumParcelas).toBe(2);
+    expect(component.condicaoPagamentoSelecionada?.prazoPagamentoId).toBe(6);
+    expect(botoes[1].classList).toContain('selected');
+
     component.valorPagamento = '100,00';
     component.adicionarPagamento();
 
     expect(vendaSession.adicionarPagamento).toHaveBeenCalledWith('venda-hub-uuid', 2, '100.00', '', 6);
   });
 
-  it('F9 envia prazo null para forma sem parcelamento', () => {
+  it('F9 envia prazo null e nao mostra parcelas para forma sem parcelamento', () => {
     const component = fixture.componentInstance;
     vendaSignal.set({ ...vendaAbertaStub.venda!, vendedor: vendedorStub });
     vendaSession.listarFormasPagamento.and.returnValue(of({
@@ -2334,9 +2347,11 @@ describe('PdvPageComponent', () => {
     }));
 
     component.abrirPagamentos('TODAS');
+    fixture.detectChanges();
     component.valorPagamento = '100,00';
     component.adicionarPagamento();
 
+    expect(fixture.nativeElement.querySelector('.parcelas-selector')).toBeNull();
     expect(component.condicaoPagamentoSelecionada).toBeNull();
     expect(vendaSession.adicionarPagamento).toHaveBeenCalledWith('venda-hub-uuid', 1, '100.00', '', null);
   });
