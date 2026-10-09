@@ -1,4 +1,4 @@
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpParams } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
 import { map, Observable } from 'rxjs';
 
@@ -15,8 +15,15 @@ import { DanfeNfce, DanfeNfceApi, DanfeVia, mapDanfeNfce } from '../../../core/m
 import {
   mapVendaAtual,
   BeneficiosClienteResponse,
+  ConsultaVendasFiltros,
+  ConsultaVendasPaginada,
+  ConsultaVendasPaginadaApi,
   DevolucaoClientesResponse,
   DevolucaoClienteVendasResponse,
+  mapConsultaVendas,
+  mapVendaConsultaDetalhe,
+  VendaConsultaDetalhe,
+  VendaConsultaDetalheApi,
   VendaAtualResponse,
   VendaApiResponse,
   VendaDevolucaoConsultaResponse,
@@ -117,6 +124,16 @@ export class HubVendaService {
     return this.http.get<DanfeNfceApi>(`${this.baseUrl}/${vendaUuid}/danfe-nfce/?via=${via}`).pipe(map(mapDanfeNfce));
   }
 
+  listarVendas(filtros: ConsultaVendasFiltros): Observable<ConsultaVendasPaginada> {
+    return this.http
+      .get<ConsultaVendasPaginadaApi>(`${this.terminalUrl}/vendas/`, { params: this.montarParametrosConsulta(filtros) })
+      .pipe(map(mapConsultaVendas));
+  }
+
+  detalharVenda(vendaUuid: string): Observable<VendaConsultaDetalhe> {
+    return this.http.get<VendaConsultaDetalheApi>(`${this.terminalUrl}/vendas/${vendaUuid}/`).pipe(map(mapVendaConsultaDetalhe));
+  }
+
   consultarBeneficiosCliente(clienteUuid: string): Observable<BeneficiosClienteResponse> {
     return this.http.get<BeneficiosClienteResponse>(`${this.terminalUrl}/clientes/${clienteUuid}/beneficios/`);
   }
@@ -146,5 +163,27 @@ export class HubVendaService {
     if (devolucaoUuid) body.devolucao_uuid = devolucaoUuid;
     if (vendaId) body.venda_id = vendaId;
     return this.http.post<VendaDevolucaoResultadoResponse>(`${this.terminalUrl}/devolucoes/finalizar/`, body);
+  }
+
+  private montarParametrosConsulta(filtros: ConsultaVendasFiltros): HttpParams {
+    let params = new HttpParams()
+      .set('data_ini', filtros.dataIni)
+      .set('data_fim', filtros.dataFim)
+      .set('status', filtros.status || 'FINALIZADA')
+      .set('page', String(filtros.page || 1))
+      .set('page_size', String(filtros.pageSize || 20));
+
+    const opcionais: Record<string, string | undefined> = {
+      documento: filtros.documento,
+      cliente: filtros.cliente,
+      vendedor: filtros.vendedor,
+      forma_pagamento: filtros.formaPagamento,
+      nfce: filtros.nfce,
+    };
+    for (const [chave, valor] of Object.entries(opcionais)) {
+      const normalizado = (valor || '').trim();
+      if (normalizado) params = params.set(chave, normalizado);
+    }
+    return params;
   }
 }

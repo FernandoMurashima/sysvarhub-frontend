@@ -3,6 +3,7 @@ import { operatorSessionGuard } from './core/guards/operator-session.guard';
 import { terminalSessionGuard } from './core/guards/terminal-session.guard';
 import { HubModulePageComponent } from './features/hub/pages/hub-module-page/hub-module-page.component';
 import { PendenciasSincronizacaoPageComponent } from './features/sincronizacao/pages/pendencias-sincronizacao-page/pendencias-sincronizacao-page.component';
+import { ConsultaVendasPageComponent } from './features/venda/pages/consulta-vendas-page/consulta-vendas-page.component';
 
 describe('routes', () => {
   it('usa Home do Hub na raiz com sessao de terminal', () => {
@@ -40,6 +41,13 @@ describe('routes', () => {
     const route = routes.find((item) => item.path === 'pendencias-sincronizacao');
 
     expect(route?.component).toBe(PendenciasSincronizacaoPageComponent);
+    expect(route?.component).not.toBe(HubModulePageComponent);
+  });
+
+  it('usa pagina dedicada para consulta de vendas', () => {
+    const route = routes.find((item) => item.path === 'consulta-vendas');
+
+    expect(route?.component).toBe(ConsultaVendasPageComponent);
     expect(route?.component).not.toBe(HubModulePageComponent);
   });
 

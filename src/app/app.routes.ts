@@ -11,6 +11,7 @@ import { PendenciasSincronizacaoPageComponent } from './features/sincronizacao/p
 import { PareamentoPageComponent } from './features/terminal/pages/pareamento-page/pareamento-page.component';
 import { PdvPageComponent } from './features/pdv/pages/pdv-page/pdv-page.component';
 import { SuportePageComponent } from './features/suporte/pages/suporte-page/suporte-page.component';
+import { ConsultaVendasPageComponent } from './features/venda/pages/consulta-vendas-page/consulta-vendas-page.component';
 
 export const routes: Routes = [
   {
@@ -41,7 +42,7 @@ export const routes: Routes = [
   },
   {
     path: 'consulta-vendas',
-    component: HubModulePageComponent,
+    component: ConsultaVendasPageComponent,
     canActivate: [terminalSessionGuard, operatorSessionGuard],
     data: { moduleKey: 'consulta-vendas' },
   },

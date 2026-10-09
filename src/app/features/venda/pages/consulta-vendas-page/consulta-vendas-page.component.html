@@ -1,0 +1,287 @@
+<section class="consulta-page">
+  <header class="topbar">
+    <a routerLink="/">Home</a>
+    <nav aria-label="Navegação principal">
+      <a routerLink="/pdv">PDV</a>
+      <a routerLink="/devolucao-troca">Devolução / Troca</a>
+      <a routerLink="/pendencias-sincronizacao">Pendências</a>
+    </nav>
+  </header>
+
+  <main>
+    <section class="heading">
+      <div>
+        <h1>Consulta de Vendas</h1>
+        <p>{{ loja() }} · {{ terminal() }} · {{ operador()?.nome || '-' }}</p>
+      </div>
+      <div class="heading-actions">
+        <span class="central" [class.offline]="centralStatus() === 'OFFLINE'" [class.online]="centralStatus() === 'ONLINE'">Central {{ centralStatus() }}</span>
+        <a routerLink="/pdv" class="secondary-action">Voltar ao PDV</a>
+      </div>
+    </section>
+
+    <section class="filters" aria-label="Filtros de consulta">
+      <fieldset class="date-filter">
+        <legend>Período</legend>
+        <label>
+          <span>De</span>
+          <input type="date" [(ngModel)]="filtros.dataIni" (change)="aoAlterarFiltro()" />
+        </label>
+        <label>
+          <span>Até</span>
+          <input type="date" [(ngModel)]="filtros.dataFim" (change)="aoAlterarFiltro()" />
+        </label>
+      </fieldset>
+
+      <div class="filter-grid">
+        <label>
+          <span>Venda</span>
+          <input [(ngModel)]="filtros.documento" (input)="aoAlterarFiltro()" (keydown.enter)="buscar()" placeholder="VE0050000004" />
+        </label>
+        <label>
+          <span>Cliente</span>
+          <input [(ngModel)]="filtros.cliente" (input)="aoAlterarFiltro()" (keydown.enter)="buscar()" placeholder="Nome ou CPF/documento" />
+        </label>
+        <label>
+          <span>Vendedor</span>
+          <input [(ngModel)]="filtros.vendedor" (input)="aoAlterarFiltro()" (keydown.enter)="buscar()" placeholder="Nome, matrícula ou id" />
+        </label>
+        <label>
+          <span>Forma</span>
+          <select [(ngModel)]="filtros.formaPagamento" (change)="aoAlterarFiltro()">
+            <option value="">Todas</option>
+            @for (forma of formasPagamento; track forma.codigo) {
+              <option [value]="forma.codigo">{{ forma.codigo }} - {{ forma.descricao }}</option>
+            }
+          </select>
+        </label>
+        <label>
+          <span>NFC-e</span>
+          <input [(ngModel)]="filtros.nfce" (input)="aoAlterarFiltro()" (keydown.enter)="buscar()" placeholder="Número, chave ou protocolo" />
+        </label>
+        <label>
+          <span>Status</span>
+          <select [(ngModel)]="filtros.status" (change)="aoAlterarFiltro()">
+            @for (status of statusOpcoes; track status.valor) {
+              <option [value]="status.valor">{{ status.label }}</option>
+            }
+          </select>
+        </label>
+      </div>
+
+      <div class="filter-actions">
+        <button type="button" (click)="buscar()" [disabled]="carregando">Buscar</button>
+        <button type="button" class="ghost" (click)="limpar()" [disabled]="carregando">Limpar</button>
+      </div>
+    </section>
+
+    @if (mensagem) {
+      <p class="message">{{ mensagem }}</p>
+    }
+
+    <section class="workspace">
+      <div class="grid-panel">
+        <div class="grid-toolbar">
+          <span>Página {{ resposta?.page || filtros.page }} de {{ resposta?.totalPages || 1 }} · Mostrando {{ resposta?.results?.length || 0 }} vendas</span>
+          <label>
+            <span>Itens por página</span>
+            <select [(ngModel)]="pageSize" (change)="alterarPageSize()">
+              <option [ngValue]="20">20</option>
+              <option [ngValue]="50">50</option>
+              <option [ngValue]="100">100</option>
+            </select>
+          </label>
+        </div>
+
+        <div class="sales-table" aria-label="Vendas encontradas">
+          <div class="table-head">
+            <span>Venda</span><span>Data/Hora</span><span>Cliente</span><span>Vendedor</span><span>Pagamento</span><span>NFC-e</span><span>Total</span><span>Sincronização</span>
+          </div>
+          @for (venda of resposta?.results || []; track venda.vendaUuid) {
+            <button type="button" class="table-row" [class.selected]="selecionada?.vendaUuid === venda.vendaUuid" (click)="selecionar(venda)">
+              <span class="documento">{{ venda.documento || '-' }}</span>
+              <span>{{ formatarData(venda.finalizadaEm) }}</span>
+              <span>
+                <strong>{{ venda.cliente.nome || 'Consumidor' }}</strong>
+                @if (venda.cliente.documento) {
+                  <small>{{ venda.cliente.documento }}</small>
+                }
+              </span>
+              <span>{{ venda.vendedor?.nome || '-' }}</span>
+              <span>{{ pagamentoResumo(venda.pagamentos) }}</span>
+              <span>
+                @if (venda.nfce) {
+                  NFC-e {{ venda.nfce.numero }} / {{ venda.nfce.serie }}
+                } @else {
+                  -
+                }
+              </span>
+              <span class="money">{{ formatarMoeda(venda.total) }}</span>
+              <span class="badge" [class]="venda.sincronizacao.status.toLowerCase()">{{ statusLabel(venda.sincronizacao.status) }}</span>
+            </button>
+          } @empty {
+            <div class="empty">{{ carregando ? 'Carregando vendas...' : 'Nenhuma venda encontrada para o período selecionado.' }}</div>
+          }
+        </div>
+
+        <div class="pager">
+          <button type="button" class="ghost" (click)="pagina(-1)" [disabled]="carregando || (resposta?.page || 1) <= 1">Anterior</button>
+          <span>{{ resposta?.count || 0 }} vendas no período</span>
+          <button type="button" class="ghost" (click)="pagina(1)" [disabled]="carregando || (resposta?.page || 1) >= (resposta?.totalPages || 1)">Próxima</button>
+        </div>
+      </div>
+
+      <aside class="detail-panel">
+        @if (carregandoDetalhe) {
+          <p>Carregando detalhe da venda...</p>
+        } @else if (mensagemDetalhe) {
+          <p class="message compact">{{ mensagemDetalhe }}</p>
+        } @else if (detalhe) {
+          <div class="detail-title">
+            <div>
+              <span class="documento">{{ detalhe.documento || '-' }}</span>
+              <h2>{{ formatarMoeda(detalhe.total) }}</h2>
+              <p>{{ formatarData(detalhe.finalizadaEm) }} · {{ detalhe.status }}</p>
+            </div>
+            <button type="button" class="ghost" (click)="selecionada = null; detalhe = null">Fechar</button>
+          </div>
+
+          <section class="detail-block">
+            <h3>Cliente</h3>
+            <dl>
+              <div><dt>Nome</dt><dd>{{ detalhe.cliente.nome || 'Consumidor' }}</dd></div>
+              <div><dt>Documento</dt><dd>{{ detalhe.cliente.documento || '-' }}</dd></div>
+            </dl>
+          </section>
+
+          <section class="detail-block">
+            <h3>Operação</h3>
+            <dl>
+              <div><dt>Loja</dt><dd>{{ detalhe.loja.lojaApelido || detalhe.loja.lojaNome || '-' }}</dd></div>
+              <div><dt>Caixa</dt><dd>{{ detalhe.caixa?.codigo || '-' }} {{ detalhe.caixa?.descricao || '' }}</dd></div>
+              <div><dt>Terminal</dt><dd>{{ detalhe.terminal?.codigo || '-' }} {{ detalhe.terminal?.nome || '' }}</dd></div>
+              <div><dt>Operador</dt><dd>{{ detalhe.operadorFinalizacao?.nome || '-' }}</dd></div>
+              <div><dt>Vendedor</dt><dd>{{ detalhe.vendedor?.nome || '-' }}</dd></div>
+            </dl>
+          </section>
+
+          <section class="detail-block wide">
+            <h3>Itens</h3>
+            <div class="items-table">
+              <span>Ref.</span><span>EAN</span><span>Descrição</span><span>Cor</span><span>Tam.</span><span>Qtd.</span><span>Unit.</span><span>Desc.</span><span>Total</span>
+              @for (item of detalhe.itens; track item.itemUuid) {
+                <span>{{ item.referencia || item.codigoItemRef || '-' }}</span>
+                <span>{{ item.ean || '-' }}</span>
+                <span>{{ item.descricao }}</span>
+                <span>{{ item.cor || '-' }}</span>
+                <span>{{ item.tamanho || '-' }}</span>
+                <span>{{ item.quantidade }}</span>
+                <span>{{ formatarMoeda(item.precoUnitario) }}</span>
+                <span>{{ formatarMoeda(item.desconto) }}</span>
+                <span>{{ formatarMoeda(item.totalItem) }}</span>
+              }
+            </div>
+          </section>
+
+          <section class="detail-block totals">
+            <h3>Totais</h3>
+            <dl>
+              <div><dt>Subtotal</dt><dd>{{ formatarMoeda(detalhe.subtotal) }}</dd></div>
+              <div><dt>Desconto geral</dt><dd>{{ formatarMoeda(detalhe.descontoGeral) }}</dd></div>
+              <div><dt>Total</dt><dd>{{ formatarMoeda(detalhe.total) }}</dd></div>
+              <div><dt>Recebido</dt><dd>{{ formatarMoeda(detalhe.valorRecebido) }}</dd></div>
+              <div><dt>Troco</dt><dd>{{ formatarMoeda(detalhe.troco) }}</dd></div>
+            </dl>
+          </section>
+
+          <section class="detail-block">
+            <h3>Pagamentos</h3>
+            @for (pagamento of detalhe.pagamentos; track pagamento.pagamentoUuid) {
+              <article class="payment-line">
+                <strong>{{ pagamento.codigo }} - {{ pagamento.descricao }}</strong>
+                <span>{{ pagamento.tipo }} · {{ formatarMoeda(pagamento.valor) }} · {{ pagamento.numParcelas }}x</span>
+                <small>{{ parcelasResumo(pagamento) }}</small>
+                @if (pagamento.autorizacao) {
+                  <small>Autorização {{ pagamento.autorizacao }}</small>
+                }
+                @if (pagamento.prazo.descricao) {
+                  <small>Prazo {{ pagamento.prazo.descricao }}</small>
+                }
+                @if (pagamento.valeTroca) {
+                  <small>Vale-Troca {{ pagamento.valeTroca.documento }} · {{ formatarMoeda(pagamento.valeTroca.valorReservado) }}</small>
+                }
+              </article>
+            }
+          </section>
+
+          <section class="detail-block">
+            <div class="block-head">
+              <h3>NFC-e</h3>
+              @if (detalhe.nfce) {
+                <button type="button" class="ghost" (click)="visualizarDanfe()" [disabled]="carregandoDanfe">Visualizar DANFE</button>
+              }
+            </div>
+            @if (detalhe.nfce) {
+              <dl>
+                <div><dt>Número</dt><dd>{{ detalhe.nfce.numero }}</dd></div>
+                <div><dt>Série</dt><dd>{{ detalhe.nfce.serie }}</dd></div>
+                <div><dt>Status</dt><dd>{{ detalhe.nfce.status }}</dd></div>
+                <div><dt>Chave</dt><dd>{{ detalhe.nfce.chaveAcesso }}</dd></div>
+                <div><dt>Protocolo</dt><dd>{{ detalhe.nfce.protocolo || '-' }}</dd></div>
+                <div><dt>Tipo emissão</dt><dd>{{ detalhe.nfce.tipoEmissao }}</dd></div>
+                <div><dt>Emitida</dt><dd>{{ formatarData(detalhe.nfce.emitidaEm) }}</dd></div>
+                <div><dt>Autorizada</dt><dd>{{ formatarData(detalhe.nfce.autorizadaEm) }}</dd></div>
+              </dl>
+              @if (erroDanfe) {
+                <p class="message compact">{{ erroDanfe }}</p>
+              }
+            } @else {
+              <p>NFC-e não vinculada à venda.</p>
+            }
+          </section>
+
+          <section class="detail-block">
+            <h3>Sincronização</h3>
+            <div class="sync-lines">
+              <article>
+                <strong>Venda finalizada</strong>
+                <span class="badge" [class]="detalhe.sincronizacao.vendaFinalizada.status.toLowerCase()">{{ statusLabel(detalhe.sincronizacao.vendaFinalizada.status) }}</span>
+                <small>Tentativas {{ detalhe.sincronizacao.vendaFinalizada.tentativas }} · {{ detalhe.sincronizacao.vendaFinalizada.sincronizadoEm ? formatarData(detalhe.sincronizacao.vendaFinalizada.sincronizadoEm) : 'Sem confirmação' }}</small>
+                @if (detalhe.sincronizacao.vendaFinalizada.ultimoErro) {
+                  <small>{{ detalhe.sincronizacao.vendaFinalizada.ultimoErro }}</small>
+                }
+              </article>
+              @if (detalhe.sincronizacao.nfceAtualizada) {
+                <article>
+                  <strong>NFC-e atualizada</strong>
+                  <span class="badge" [class]="detalhe.sincronizacao.nfceAtualizada.status.toLowerCase()">{{ statusLabel(detalhe.sincronizacao.nfceAtualizada.status) }}</span>
+                  <small>Tentativas {{ detalhe.sincronizacao.nfceAtualizada.tentativas }} · {{ detalhe.sincronizacao.nfceAtualizada.sincronizadoEm ? formatarData(detalhe.sincronizacao.nfceAtualizada.sincronizadoEm) : 'Sem confirmação' }}</small>
+                  @if (detalhe.sincronizacao.nfceAtualizada.ultimoErro) {
+                    <small>{{ detalhe.sincronizacao.nfceAtualizada.ultimoErro }}</small>
+                  }
+                </article>
+              }
+            </div>
+            @if (detalhe.sincronizacao.vendaFinalizada.status === 'ERRO' || detalhe.sincronizacao.vendaFinalizada.status === 'CONFLITO' || detalhe.sincronizacao.nfceAtualizada?.status === 'ERRO' || detalhe.sincronizacao.nfceAtualizada?.status === 'CONFLITO') {
+              <a routerLink="/pendencias-sincronizacao" class="sync-link">Ver pendências</a>
+            }
+          </section>
+        } @else {
+          <p>Selecione uma venda para abrir o detalhe.</p>
+        }
+      </aside>
+    </section>
+  </main>
+
+  @if (danfe) {
+    <section class="danfe-overlay" role="dialog" aria-modal="true" aria-label="DANFE NFC-e">
+      <div class="danfe-dialog">
+        <div class="block-head">
+          <h2>DANFE NFC-e</h2>
+          <button type="button" class="ghost" (click)="fecharDanfe()">Fechar</button>
+        </div>
+        <app-danfe-nfce [danfe]="danfe"></app-danfe-nfce>
+      </div>
+    </section>
+  }
+</section>

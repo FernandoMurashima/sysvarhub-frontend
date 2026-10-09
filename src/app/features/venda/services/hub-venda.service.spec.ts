@@ -238,6 +238,58 @@ describe('HubVendaService', () => {
     });
   });
 
+  it('lista e detalha vendas da consulta local', () => {
+    service.listarVendas({
+      dataIni: '2026-10-09',
+      dataFim: '2026-10-09',
+      documento: 'VE005',
+      cliente: 'Maria',
+      vendedor: '77',
+      formaPagamento: 'DIN',
+      nfce: '123',
+      status: 'FINALIZADA',
+      page: 2,
+      pageSize: 50,
+    }).subscribe((response) => {
+      expect(response.page).toBe(2);
+      expect(response.pageSize).toBe(50);
+      expect(response.results[0].vendaUuid).toBe('venda-uuid');
+      expect(response.results[0].sincronizacao.status).toBe('SINCRONIZADO');
+    });
+
+    const listagem = httpMock.expectOne((request) =>
+      request.url === '/api/terminal/vendas/'
+      && request.params.get('data_ini') === '2026-10-09'
+      && request.params.get('data_fim') === '2026-10-09'
+      && request.params.get('documento') === 'VE005'
+      && request.params.get('cliente') === 'Maria'
+      && request.params.get('vendedor') === '77'
+      && request.params.get('forma_pagamento') === 'DIN'
+      && request.params.get('nfce') === '123'
+      && request.params.get('status') === 'FINALIZADA'
+      && request.params.get('page') === '2'
+      && request.params.get('page_size') === '50'
+    );
+    expect(listagem.request.method).toBe('GET');
+    listagem.flush({
+      count: 1,
+      page: 2,
+      page_size: 50,
+      total_pages: 3,
+      results: [vendaConsultaResumoApi()],
+    });
+
+    service.detalharVenda('venda-uuid').subscribe((detalhe) => {
+      expect(detalhe.vendaUuid).toBe('venda-uuid');
+      expect(detalhe.itens[0].descricao).toBe('Calça Jeans');
+      expect(detalhe.pagamentos[0].parcelas[0].ordem).toBe(1);
+      expect(detalhe.sincronizacao.vendaFinalizada.status).toBe('SINCRONIZADO');
+    });
+    const detalhe = httpMock.expectOne('/api/terminal/vendas/venda-uuid/');
+    expect(detalhe.request.method).toBe('GET');
+    detalhe.flush(vendaConsultaDetalheApi());
+  });
+
   it('consulta beneficios de cliente para cashback e vale-troca', () => {
     service.consultarBeneficiosCliente('cliente-uuid').subscribe((response) => {
       expect(response.cashback.saldo).toBe('30.00');
@@ -294,3 +346,80 @@ describe('HubVendaService', () => {
     });
   });
 });
+
+function vendaConsultaResumoApi() {
+  return {
+    venda_uuid: 'venda-uuid',
+    documento: 'VE0050000002',
+    status: 'FINALIZADA',
+    finalizada_em: '2026-10-09T10:00:00-03:00',
+    total: '100.00',
+    subtotal: '100.00',
+    desconto_geral: '0.00',
+    cliente: { nome: 'Maria Silva', documento: '12345678901', cliente_uuid: 'cliente-uuid', retaguarda_id: 10 },
+    vendedor: { id: 77, retaguarda_id: 77, matricula: 'V077', nome: 'Ana Vendedora', apelido: 'Ana' },
+    terminal: { codigo: 'PDV-01', nome: 'PDV 01' },
+    caixa: { codigo: 'CX-01', descricao: 'Caixa 01', nome: 'Caixa 01' },
+    pagamentos: [{ codigo: 'DIN', descricao: 'Dinheiro', tipo: 'DINHEIRO', valor: '100.00' }],
+    nfce: { numero: 123, serie: 1, status: 'AUTORIZADA' },
+    sincronizacao: { status: 'SINCRONIZADO', ultimo_erro: '', tentativas: 1, sincronizado_em: '2026-10-09T10:01:00-03:00', tipo: 'VENDA_FINALIZADA' },
+  };
+}
+
+function vendaConsultaDetalheApi() {
+  return {
+    ...vendaConsultaResumoApi(),
+    criada_em: '2026-10-09T09:55:00-03:00',
+    valor_recebido: '100.00',
+    troco: '0.00',
+    hub: { hub_uuid: 'hub-uuid', empresa_id: 1, empresa_nome: 'Empresa', loja_id: 2, loja_nome: 'Loja Barra', loja_apelido: 'Filial 1' },
+    loja: { hub_uuid: 'hub-uuid', empresa_id: 1, empresa_nome: 'Empresa', loja_id: 2, loja_nome: 'Loja Barra', loja_apelido: 'Filial 1' },
+    operador_finalizacao: { id: 99, codigo: 'caixa', nome: 'Juliana Rocha' },
+    itens: [{
+      item_uuid: 'item-uuid',
+      ean: '789',
+      referencia: 'REF',
+      codigo_item_ref: '001',
+      descricao: 'Calça Jeans',
+      cor: 'Jeans',
+      tamanho: '34',
+      quantidade: 1,
+      preco_unitario: '100.0000',
+      desconto: '0.00',
+      total_item: '100.00',
+      promocao: null,
+    }],
+    pagamentos: [{
+      codigo: 'DIN',
+      descricao: 'Dinheiro',
+      tipo: 'DINHEIRO',
+      valor: '100.00',
+      pagamento_uuid: 'pagamento-uuid',
+      autorizacao: '',
+      prazo: { codigo: '', descricao: '', retaguarda_id: null },
+      num_parcelas: 1,
+      taxa_percentual: '0.0000',
+      taxa_fixa: '0.00',
+      parcelas: [{ ordem: 1, dias: 0, percentual: '100.000000', valor_fixo: null }],
+      vale_troca: null,
+    }],
+    nfce: {
+      numero: 123,
+      serie: 1,
+      status: 'AUTORIZADA',
+      nfce_uuid: 'nfce-uuid',
+      modelo: '65',
+      chave_acesso: '123456789',
+      protocolo: 'PROTO123',
+      tipo_emissao: '1',
+      retorno_codigo: '100',
+      retorno_mensagem: 'Autorizado',
+      emitida_em: '2026-10-09T10:00:00-03:00',
+      autorizada_em: '2026-10-09T10:00:05-03:00',
+    },
+    sincronizacao: {
+      venda_finalizada: { status: 'SINCRONIZADO', ultimo_erro: '', tentativas: 1, sincronizado_em: '2026-10-09T10:01:00-03:00', tipo: 'VENDA_FINALIZADA' },
+      nfce_atualizada: { status: 'PENDENTE', ultimo_erro: '', tentativas: 0, sincronizado_em: null, tipo: 'NFCE_ATUALIZADA' },
+    },
+  };
+}
