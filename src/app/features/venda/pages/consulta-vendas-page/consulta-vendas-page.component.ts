@@ -182,7 +182,13 @@ export class ConsultaVendasPageComponent implements OnInit {
 
   formatarData(valor: string | null | undefined): string {
     if (!valor) return '-';
-    return new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(valor));
+    return new Intl.DateTimeFormat('pt-BR', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    }).format(new Date(valor)).replace(',', '');
   }
 
   private carregarFormasPagamento(): void {

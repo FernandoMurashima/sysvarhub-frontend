@@ -21,17 +21,24 @@
     </section>
 
     <section class="filters" aria-label="Filtros de consulta">
-      <fieldset class="date-filter">
-        <legend>Período</legend>
-        <label>
-          <span>De</span>
-          <input type="date" [(ngModel)]="filtros.dataIni" (change)="aoAlterarFiltro()" />
-        </label>
-        <label>
-          <span>Até</span>
-          <input type="date" [(ngModel)]="filtros.dataFim" (change)="aoAlterarFiltro()" />
-        </label>
-      </fieldset>
+      <div class="period-row">
+        <div class="period-group">
+          <strong>Período</strong>
+          <label>
+            <span>De</span>
+            <input type="date" [(ngModel)]="filtros.dataIni" (change)="aoAlterarFiltro()" />
+          </label>
+          <label>
+            <span>Até</span>
+            <input type="date" [(ngModel)]="filtros.dataFim" (change)="aoAlterarFiltro()" />
+          </label>
+        </div>
+
+        <div class="filter-actions">
+          <button type="button" (click)="buscar()" [disabled]="carregando">Buscar</button>
+          <button type="button" class="ghost" (click)="limpar()" [disabled]="carregando">Limpar</button>
+        </div>
+      </div>
 
       <div class="filter-grid">
         <label>
@@ -40,11 +47,11 @@
         </label>
         <label>
           <span>Cliente</span>
-          <input [(ngModel)]="filtros.cliente" (input)="aoAlterarFiltro()" (keydown.enter)="buscar()" placeholder="Nome ou CPF/documento" />
+          <input [(ngModel)]="filtros.cliente" (input)="aoAlterarFiltro()" (keydown.enter)="buscar()" placeholder="Cliente" />
         </label>
         <label>
           <span>Vendedor</span>
-          <input [(ngModel)]="filtros.vendedor" (input)="aoAlterarFiltro()" (keydown.enter)="buscar()" placeholder="Nome, matrícula ou id" />
+          <input [(ngModel)]="filtros.vendedor" (input)="aoAlterarFiltro()" (keydown.enter)="buscar()" placeholder="Vendedor" />
         </label>
         <label>
           <span>Forma</span>
@@ -57,7 +64,7 @@
         </label>
         <label>
           <span>NFC-e</span>
-          <input [(ngModel)]="filtros.nfce" (input)="aoAlterarFiltro()" (keydown.enter)="buscar()" placeholder="Número, chave ou protocolo" />
+          <input [(ngModel)]="filtros.nfce" (input)="aoAlterarFiltro()" (keydown.enter)="buscar()" placeholder="NFC-e" />
         </label>
         <label>
           <span>Status</span>
@@ -67,11 +74,6 @@
             }
           </select>
         </label>
-      </div>
-
-      <div class="filter-actions">
-        <button type="button" (click)="buscar()" [disabled]="carregando">Buscar</button>
-        <button type="button" class="ghost" (click)="limpar()" [disabled]="carregando">Limpar</button>
       </div>
     </section>
 
@@ -83,14 +85,18 @@
       <div class="grid-panel">
         <div class="grid-toolbar">
           <span>Página {{ resposta?.page || filtros.page }} de {{ resposta?.totalPages || 1 }} · Mostrando {{ resposta?.results?.length || 0 }} vendas</span>
-          <label>
-            <span>Itens por página</span>
-            <select [(ngModel)]="pageSize" (change)="alterarPageSize()">
-              <option [ngValue]="20">20</option>
-              <option [ngValue]="50">50</option>
-              <option [ngValue]="100">100</option>
-            </select>
-          </label>
+          <div class="pager-controls">
+            <label>
+              <span>Itens por página</span>
+              <select [(ngModel)]="pageSize" (change)="alterarPageSize()">
+                <option [ngValue]="20">20</option>
+                <option [ngValue]="50">50</option>
+                <option [ngValue]="100">100</option>
+              </select>
+            </label>
+            <button type="button" class="ghost" (click)="pagina(-1)" [disabled]="carregando || (resposta?.page || 1) <= 1">Anterior</button>
+            <button type="button" class="ghost" (click)="pagina(1)" [disabled]="carregando || (resposta?.page || 1) >= (resposta?.totalPages || 1)">Próxima</button>
+          </div>
         </div>
 
         <div class="sales-table" aria-label="Vendas encontradas">
@@ -101,17 +107,12 @@
             <button type="button" class="table-row" [class.selected]="selecionada?.vendaUuid === venda.vendaUuid" (click)="selecionar(venda)">
               <span class="documento">{{ venda.documento || '-' }}</span>
               <span>{{ formatarData(venda.finalizadaEm) }}</span>
-              <span>
-                <strong>{{ venda.cliente.nome || 'Consumidor' }}</strong>
-                @if (venda.cliente.documento) {
-                  <small>{{ venda.cliente.documento }}</small>
-                }
-              </span>
+              <span>{{ venda.cliente.nome || 'Consumidor' }}</span>
               <span>{{ venda.vendedor?.nome || '-' }}</span>
               <span>{{ pagamentoResumo(venda.pagamentos) }}</span>
               <span>
                 @if (venda.nfce) {
-                  NFC-e {{ venda.nfce.numero }} / {{ venda.nfce.serie }}
+                  {{ venda.nfce.numero }} / {{ venda.nfce.serie }}
                 } @else {
                   -
                 }
@@ -125,12 +126,11 @@
         </div>
 
         <div class="pager">
-          <button type="button" class="ghost" (click)="pagina(-1)" [disabled]="carregando || (resposta?.page || 1) <= 1">Anterior</button>
           <span>{{ resposta?.count || 0 }} vendas no período</span>
-          <button type="button" class="ghost" (click)="pagina(1)" [disabled]="carregando || (resposta?.page || 1) >= (resposta?.totalPages || 1)">Próxima</button>
         </div>
       </div>
 
+      @if (carregandoDetalhe || mensagemDetalhe || detalhe) {
       <aside class="detail-panel">
         @if (carregandoDetalhe) {
           <p>Carregando detalhe da venda...</p>
@@ -270,6 +270,7 @@
           <p>Selecione uma venda para abrir o detalhe.</p>
         }
       </aside>
+      }
     </section>
   </main>
 
