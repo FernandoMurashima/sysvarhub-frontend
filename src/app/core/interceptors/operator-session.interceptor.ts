@@ -9,6 +9,7 @@ const OPERATOR_SESSION_PATHS = [
   '/api/terminal/operador/logout/',
   '/api/terminal/caixa/',
   '/api/terminal/venda/',
+  '/api/terminal/vendas/',
   '/api/terminal/formas-pagamento/',
   '/api/terminal/clientes/',
   '/api/terminal/vendedores/',

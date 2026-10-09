@@ -169,6 +169,23 @@ describe('terminalAuthInterceptor', () => {
     expect(router.navigateByUrl).not.toHaveBeenCalled();
   });
 
+  it('401 e 403 em consulta de vendas nao limpam Terminal nem navegam pareamento', () => {
+    credentialStore.getToken.and.returnValue('token-ficticio');
+
+    http.get('/api/terminal/vendas/?data_ini=2026-10-09&data_fim=2026-10-09').subscribe({ error: () => undefined });
+    http.get('/api/terminal/vendas/11111111-1111-4111-8111-111111111111/').subscribe({ error: () => undefined });
+
+    const listagem = httpMock.expectOne('/api/terminal/vendas/?data_ini=2026-10-09&data_fim=2026-10-09');
+    const detalhe = httpMock.expectOne('/api/terminal/vendas/11111111-1111-4111-8111-111111111111/');
+    listagem.flush({}, { status: 401, statusText: 'Unauthorized' });
+    detalhe.flush({}, { status: 403, statusText: 'Forbidden' });
+
+    expect(listagem.request.headers.get('Authorization')).toBe('Terminal token-ficticio');
+    expect(detalhe.request.headers.get('Authorization')).toBe('Terminal token-ficticio');
+    expect(credentialStore.clearToken).not.toHaveBeenCalled();
+    expect(router.navigateByUrl).not.toHaveBeenCalled();
+  });
+
   it('401 em formas de pagamento nao limpa Terminal nem navega pareamento', () => {
     credentialStore.getToken.and.returnValue('token-ficticio');
 

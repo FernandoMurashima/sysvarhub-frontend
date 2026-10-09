@@ -15,6 +15,7 @@ const OPERATOR_SCOPED_PATHS = [
   OPERATOR_LOGOUT_PATH,
   '/api/terminal/caixa/',
   '/api/terminal/venda/',
+  '/api/terminal/vendas/',
   '/api/terminal/formas-pagamento/',
   '/api/terminal/clientes/',
   '/api/terminal/vendedores/',

@@ -91,6 +91,21 @@ describe('operatorSessionInterceptor', () => {
     item.flush({});
   });
 
+  it('envia header nos endpoints de consulta de vendas', () => {
+    sessionStore.getToken.and.returnValue('sessao-operador-ficticia');
+
+    http.get('/api/terminal/vendas/?data_ini=2026-10-09&data_fim=2026-10-09').subscribe();
+    http.get('/api/terminal/vendas/11111111-1111-4111-8111-111111111111/').subscribe();
+
+    const listagem = httpMock.expectOne('/api/terminal/vendas/?data_ini=2026-10-09&data_fim=2026-10-09');
+    const detalhe = httpMock.expectOne('/api/terminal/vendas/11111111-1111-4111-8111-111111111111/');
+
+    expect(listagem.request.headers.get('X-Sysvar-Operador-Session')).toBe('sessao-operador-ficticia');
+    expect(detalhe.request.headers.get('X-Sysvar-Operador-Session')).toBe('sessao-operador-ficticia');
+    listagem.flush({});
+    detalhe.flush({});
+  });
+
   it('envia header em formas de pagamento', () => {
     sessionStore.getToken.and.returnValue('sessao-operador-ficticia');
 
