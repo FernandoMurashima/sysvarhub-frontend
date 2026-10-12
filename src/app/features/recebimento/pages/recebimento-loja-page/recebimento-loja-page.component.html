@@ -1,0 +1,144 @@
+<section class="recebimento-page">
+  <header class="topbar">
+    <a routerLink="/">Home</a>
+    <nav aria-label="Navegação principal">
+      <a routerLink="/pdv">PDV</a>
+      <a routerLink="/devolucao-troca">Devolução / Troca</a>
+      <a routerLink="/consulta-vendas">Consulta de Vendas</a>
+      <a routerLink="/pendencias-sincronizacao">Pendências</a>
+    </nav>
+  </header>
+
+  <main>
+    <section class="heading">
+      <div>
+        <span>Operação de loja</span>
+        <h1>Recebimento de Loja</h1>
+        <p>{{ loja() }} · {{ terminal() }} · {{ operador()?.nome || '-' }}</p>
+      </div>
+      <button type="button" (click)="carregar()" [disabled]="carregandoLista || carregandoDetalhe || finalizando">Atualizar</button>
+    </section>
+
+    @if (mensagem) {
+      <p class="message error">{{ mensagem }}</p>
+    }
+    @if (sucesso) {
+      <p class="message success">{{ sucesso }}</p>
+    }
+
+    <section class="workspace">
+      <aside class="list-panel" aria-label="Recebimentos disponíveis">
+        <div class="panel-title">
+          <strong>Recebimentos</strong>
+          <span>{{ recebimentos.length }} registros</span>
+        </div>
+        @for (recebimento of recebimentos; track recebimento.local_id) {
+          <button type="button" class="receipt-row" [class.selected]="selecionado?.local_id === recebimento.local_id" (click)="selecionar(recebimento)">
+            <span class="badge" [class]="recebimento.status_local.toLowerCase()">{{ statusLabel(recebimento.status_local) }}</span>
+            <strong>{{ fornecedor(recebimento) }}</strong>
+            <small>Documento {{ documento(recebimento) }}</small>
+            <small>{{ statusHint(recebimento) }}</small>
+          </button>
+        } @empty {
+          <p class="empty">Nenhum recebimento disponível para esta loja.</p>
+        }
+      </aside>
+
+      <section class="detail-panel">
+        @if (selecionado) {
+          <header class="detail-head">
+            <div>
+              <span class="badge" [class]="selecionado.status_local.toLowerCase()">{{ statusLabel(selecionado.status_local) }}</span>
+              <h2>{{ fornecedor(selecionado) }}</h2>
+              <p>{{ statusHint(selecionado) }}</p>
+            </div>
+            <dl>
+              <div>
+                <dt>Documento</dt>
+                <dd>{{ documento(selecionado) }}</dd>
+              </div>
+              <div>
+                <dt>SKUs</dt>
+                <dd>{{ selecionado.resumo?.quantidade_skus || itens.length }}</dd>
+              </div>
+              <div>
+                <dt>Esperado</dt>
+                <dd>{{ formatarQuantidade(selecionado.resumo?.quantidade_esperada_total) }}</dd>
+              </div>
+              <div>
+                <dt>Recebido</dt>
+                <dd>{{ formatarQuantidade(selecionado.resumo?.quantidade_recebida_total) }}</dd>
+              </div>
+            </dl>
+          </header>
+
+          @if (selecionado.mensagem_sync) {
+            <p class="message warning">{{ selecionado.mensagem_sync }}</p>
+          }
+
+          <section class="actions">
+            <div>
+              <button type="button" (click)="tudoRecebido()" [disabled]="!podeConferir()">Tudo recebido</button>
+              <button type="button" class="secondary" (click)="zerar()" [disabled]="!podeConferir()">Zerar</button>
+            </div>
+            <button type="button" class="finalize" (click)="finalizar()" [disabled]="finalizarDesabilitado()">
+              Lançar no estoque
+            </button>
+          </section>
+
+          <div class="table-panel">
+            <div class="table-head">
+              <span>Produto</span><span>EAN</span><span>Cor</span><span>Tamanho</span><span>Esperado</span><span>Recebido</span><span>Diferença</span>
+            </div>
+            @for (form of itens; track form.item.conferencia_item_id) {
+              <div class="table-row" [class.has-diff]="diferenca(form) !== 0">
+                <span>
+                  <strong>{{ form.item.descricao }}</strong>
+                  <small>{{ form.item.referencia || '-' }}</small>
+                </span>
+                <span>{{ form.item.ean || '-' }}</span>
+                <span>{{ form.item.cor?.nome || '-' }}</span>
+                <span>{{ form.item.tamanho?.nome || '-' }}</span>
+                <span>{{ formatarQuantidade(form.item.quantidade_esperada) }}</span>
+                <span>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.001"
+                    [(ngModel)]="form.quantidadeRecebida"
+                    [disabled]="!podeConferir()"
+                    aria-label="Quantidade recebida"
+                  />
+                </span>
+                <span class="diff">{{ formatarQuantidade(diferenca(form)) }}</span>
+              </div>
+            } @empty {
+              <p class="empty">Nenhum item retornado para este recebimento.</p>
+            }
+          </div>
+
+          <label class="observacao">
+            <span>Observação de divergência</span>
+            <textarea
+              [(ngModel)]="observacaoDivergencia"
+              [disabled]="!podeConferir()"
+              rows="4"
+              placeholder="Obrigatória quando a quantidade recebida divergir da esperada"
+            ></textarea>
+          </label>
+
+          @if (temDivergencia() && !observacaoDivergencia.trim()) {
+            <p class="message warning">Informe a observação para finalizar com divergência.</p>
+          }
+
+          <section class="sync-note">
+            <strong>Estoque</strong>
+            <span>Recebimentos conferidos no Hub ficam aguardando confirmação da Central antes de liberar saldo para venda.</span>
+          </section>
+        } @else {
+          <p class="empty">Selecione um recebimento para conferir os itens.</p>
+        }
+      </section>
+    </section>
+  </main>
+</section>

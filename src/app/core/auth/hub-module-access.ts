@@ -1,4 +1,4 @@
-export type HubProtectedModule = 'pdv' | 'devolucao-troca' | 'consulta-vendas' | 'vale-troca' | 'pendencias-sincronizacao';
+export type HubProtectedModule = 'pdv' | 'devolucao-troca' | 'consulta-vendas' | 'recebimento-loja' | 'pendencias-sincronizacao';
 
 export interface HubModuleAccessRule {
   module: HubProtectedModule;
@@ -18,9 +18,9 @@ export const HUB_PROTECTED_MODULES: Record<HubProtectedModule, HubModuleAccessRu
     module: 'consulta-vendas',
     title: 'Consulta de Vendas',
   },
-  'vale-troca': {
-    module: 'vale-troca',
-    title: 'Vale-Troca',
+  'recebimento-loja': {
+    module: 'recebimento-loja',
+    title: 'Recebimento de Loja',
   },
   'pendencias-sincronizacao': {
     module: 'pendencias-sincronizacao',

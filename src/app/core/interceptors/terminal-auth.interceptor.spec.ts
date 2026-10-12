@@ -270,6 +270,18 @@ describe('terminalAuthInterceptor', () => {
     expect(router.navigateByUrl).not.toHaveBeenCalled();
   });
 
+  it('401 em recebimentos nao limpa Terminal nem navega pareamento', () => {
+    credentialStore.getToken.and.returnValue('token-ficticio');
+
+    http.post('/api/terminal/recebimentos/7/finalizar/', { itens: [] }).subscribe({ error: () => undefined });
+    const request = httpMock.expectOne('/api/terminal/recebimentos/7/finalizar/');
+    request.flush({}, { status: 401, statusText: 'Unauthorized' });
+
+    expect(request.request.headers.get('Authorization')).toBe('Terminal token-ficticio');
+    expect(credentialStore.clearToken).not.toHaveBeenCalled();
+    expect(router.navigateByUrl).not.toHaveBeenCalled();
+  });
+
   it('401 em pendencias de sincronizacao nao limpa Terminal nem navega pareamento', () => {
     credentialStore.getToken.and.returnValue('token-ficticio');
 

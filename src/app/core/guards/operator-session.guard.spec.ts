@@ -67,11 +67,11 @@ describe('operatorSessionGuard', () => {
     authorization.canAccessModule.and.returnValue(false);
     router.createUrlTree.and.returnValue(tree);
 
-    const result$ = executeGuard({ data: { moduleKey: 'vale-troca' } } as never, { url: '/vale-troca' } as never) as Observable<boolean | UrlTree>;
+    const result$ = executeGuard({ data: { moduleKey: 'recebimento-loja' } } as never, { url: '/recebimento-loja' } as never) as Observable<boolean | UrlTree>;
 
     result$.subscribe((result) => {
       expect(result).toBe(tree);
-      expect(router.createUrlTree).toHaveBeenCalledWith(['/acesso-negado'], { queryParams: { module: 'vale-troca' } });
+      expect(router.createUrlTree).toHaveBeenCalledWith(['/acesso-negado'], { queryParams: { module: 'recebimento-loja' } });
       expect(session.bootstrap).toHaveBeenCalled();
       done();
     });

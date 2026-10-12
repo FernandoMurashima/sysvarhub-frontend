@@ -201,6 +201,21 @@ describe('operatorSessionInterceptor', () => {
     consultar.flush({});
   });
 
+  it('envia header nos endpoints de recebimento de loja', () => {
+    sessionStore.getToken.and.returnValue('sessao-operador-atual');
+
+    http.get('/api/terminal/recebimentos/').subscribe();
+    http.post('/api/terminal/recebimentos/7/finalizar/', { itens: [] }).subscribe();
+
+    const listagem = httpMock.expectOne('/api/terminal/recebimentos/');
+    const finalizar = httpMock.expectOne('/api/terminal/recebimentos/7/finalizar/');
+
+    expect(listagem.request.headers.get('X-Sysvar-Operador-Session')).toBe('sessao-operador-atual');
+    expect(finalizar.request.headers.get('X-Sysvar-Operador-Session')).toBe('sessao-operador-atual');
+    listagem.flush({});
+    finalizar.flush({});
+  });
+
   it('envia header nos endpoints de pendencias de sincronizacao', () => {
     sessionStore.getToken.and.returnValue('sessao-operador-atual');
 

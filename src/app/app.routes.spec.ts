@@ -2,6 +2,7 @@ import { routes } from './app.routes';
 import { operatorSessionGuard } from './core/guards/operator-session.guard';
 import { terminalSessionGuard } from './core/guards/terminal-session.guard';
 import { HubModulePageComponent } from './features/hub/pages/hub-module-page/hub-module-page.component';
+import { RecebimentoLojaPageComponent } from './features/recebimento/pages/recebimento-loja-page/recebimento-loja-page.component';
 import { PendenciasSincronizacaoPageComponent } from './features/sincronizacao/pages/pendencias-sincronizacao-page/pendencias-sincronizacao-page.component';
 import { ConsultaVendasPageComponent } from './features/venda/pages/consulta-vendas-page/consulta-vendas-page.component';
 
@@ -28,7 +29,7 @@ describe('routes', () => {
   });
 
   it('cria rotas dos modulos operacionais do Hub', () => {
-    for (const path of ['devolucao-troca', 'consulta-vendas', 'vale-troca', 'pendencias-sincronizacao']) {
+    for (const path of ['devolucao-troca', 'consulta-vendas', 'recebimento-loja', 'pendencias-sincronizacao']) {
       const route = routes.find((item) => item.path === path);
 
       expect(route).toBeTruthy();
@@ -48,6 +49,13 @@ describe('routes', () => {
     const route = routes.find((item) => item.path === 'consulta-vendas');
 
     expect(route?.component).toBe(ConsultaVendasPageComponent);
+    expect(route?.component).not.toBe(HubModulePageComponent);
+  });
+
+  it('usa pagina dedicada para recebimento de loja', () => {
+    const route = routes.find((item) => item.path === 'recebimento-loja');
+
+    expect(route?.component).toBe(RecebimentoLojaPageComponent);
     expect(route?.component).not.toBe(HubModulePageComponent);
   });
 

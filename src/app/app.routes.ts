@@ -10,6 +10,7 @@ import { OperadorLoginPageComponent } from './features/operador/pages/operador-l
 import { PendenciasSincronizacaoPageComponent } from './features/sincronizacao/pages/pendencias-sincronizacao-page/pendencias-sincronizacao-page.component';
 import { PareamentoPageComponent } from './features/terminal/pages/pareamento-page/pareamento-page.component';
 import { PdvPageComponent } from './features/pdv/pages/pdv-page/pdv-page.component';
+import { RecebimentoLojaPageComponent } from './features/recebimento/pages/recebimento-loja-page/recebimento-loja-page.component';
 import { SuportePageComponent } from './features/suporte/pages/suporte-page/suporte-page.component';
 import { ConsultaVendasPageComponent } from './features/venda/pages/consulta-vendas-page/consulta-vendas-page.component';
 
@@ -47,10 +48,10 @@ export const routes: Routes = [
     data: { moduleKey: 'consulta-vendas' },
   },
   {
-    path: 'vale-troca',
-    component: HubModulePageComponent,
+    path: 'recebimento-loja',
+    component: RecebimentoLojaPageComponent,
     canActivate: [terminalSessionGuard, operatorSessionGuard],
-    data: { moduleKey: 'vale-troca' },
+    data: { moduleKey: 'recebimento-loja' },
   },
   {
     path: 'pendencias-sincronizacao',

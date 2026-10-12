@@ -24,7 +24,7 @@ export class HubAuthorizationService {
       'pdv',
       'devolucao-troca',
       'consulta-vendas',
-      'vale-troca',
+      'recebimento-loja',
       'pendencias-sincronizacao',
     ]);
   }

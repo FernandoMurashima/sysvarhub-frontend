@@ -9,7 +9,7 @@ import { CentralConnectivityService } from '../../../terminal/services/central-c
 import { TerminalSessionService } from '../../../terminal/services/terminal-session.service';
 import { HubVendaService } from '../../../venda/services/hub-venda.service';
 
-type HubModuleKey = 'devolucao-troca' | 'consulta-vendas' | 'vale-troca' | 'pendencias-sincronizacao';
+type HubModuleKey = 'devolucao-troca' | 'consulta-vendas' | 'pendencias-sincronizacao';
 
 const MODULE_CONTENT: Record<HubModuleKey, { title: string; eyebrow: string; description: string }> = {
   'devolucao-troca': {
@@ -21,11 +21,6 @@ const MODULE_CONTENT: Record<HubModuleKey, { title: string; eyebrow: string; des
     title: 'Consulta de Vendas',
     eyebrow: 'Módulo operacional',
     description: 'Base para localização e acompanhamento de vendas realizadas no Hub.',
-  },
-  'vale-troca': {
-    title: 'Vale-Troca',
-    eyebrow: 'Módulo operacional',
-    description: 'Área reservada ao acompanhamento de vales-troca da operação local.',
   },
   'pendencias-sincronizacao': {
     title: 'Pendências de Sincronização',

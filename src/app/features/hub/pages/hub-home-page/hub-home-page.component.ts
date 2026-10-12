@@ -65,10 +65,10 @@ export class HubHomePageComponent {
       state: 'Estrutura pronta',
     },
     {
-      title: 'Vale-Troca',
-      route: '/vale-troca',
-      description: 'Base dedicada aos vales emitidos e consumidos pela loja.',
-      state: 'Estrutura pronta',
+      title: 'Recebimento de Loja',
+      route: '/recebimento-loja',
+      description: 'Conferência de mercadorias recebidas e envio seguro à Central.',
+      state: 'Operacional',
     },
     {
       title: 'Pendências de Sincronização',
