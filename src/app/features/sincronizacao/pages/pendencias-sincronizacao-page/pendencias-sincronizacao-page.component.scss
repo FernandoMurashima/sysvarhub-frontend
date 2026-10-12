@@ -185,10 +185,10 @@ select {
 .table-head,
 .table-row {
   display: grid;
-  grid-template-columns: 170px 170px minmax(180px, 1fr) 125px 88px 135px minmax(220px, 1.3fr) 135px;
-  gap: 8px;
+  grid-template-columns: 150px minmax(170px, .95fr) minmax(180px, 1fr) 118px 78px 128px minmax(240px, 1.35fr) 150px;
+  gap: 10px;
   align-items: center;
-  min-width: 1240px;
+  min-width: 1320px;
   padding: 9px 10px;
 }
 
@@ -209,8 +209,31 @@ select {
   font-weight: 500;
 }
 
+.table-row > span,
+.table-head > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
 .table-row.selected {
   background: #f1f5f9;
+}
+
+.type-cell,
+.document-cell {
+  font-weight: 800;
+  line-height: 1.3;
+}
+
+.summary-cell {
+  color: #475569;
+  line-height: 1.35;
+}
+
+.action-cell {
+  display: grid;
+  gap: 4px;
+  justify-items: start;
 }
 
 .badge {
@@ -250,6 +273,8 @@ select {
   padding: 8px 10px;
   background: #0f766e;
   font-size: 12px;
+  max-width: 100%;
+  white-space: normal;
 }
 
 .empty,

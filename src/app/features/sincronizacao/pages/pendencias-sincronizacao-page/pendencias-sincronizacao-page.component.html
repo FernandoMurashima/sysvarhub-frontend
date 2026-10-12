@@ -41,7 +41,7 @@
         <select [(ngModel)]="tipo" (change)="pesquisar()">
           <option value="">Todos</option>
           @for (item of resposta?.tipos || []; track item) {
-            <option [value]="item">{{ item }}</option>
+            <option [value]="item">{{ tipoLabel(item) }}</option>
           }
         </select>
       </label>
@@ -68,13 +68,13 @@
         @for (evento of resposta?.eventos || []; track evento.id) {
           <button type="button" class="table-row" [class.selected]="selecionado?.id === evento.id" (click)="selecionar(evento)">
             <span class="badge" [class]="evento.status_operacional.toLowerCase()">{{ statusLabel(evento.status_operacional) }}</span>
-            <span>{{ evento.tipo }}</span>
-            <span>{{ evento.documento }}</span>
+            <span class="type-cell">{{ tipoLabel(evento.tipo) }}</span>
+            <span class="document-cell">{{ documentoLabel(evento) }}</span>
             <span>{{ evento.atualizado_em | date:'short' }}</span>
             <span>{{ evento.tentativas }}</span>
             <span>{{ evento.proxima_tentativa_em ? (evento.proxima_tentativa_em | date:'short') : '-' }}</span>
-            <span>{{ evento.mensagem_operacional }}</span>
-            <span>
+            <span class="summary-cell">{{ evento.mensagem_operacional }}</span>
+            <span class="action-cell">
               @if (evento.acoes.retry_permitido) {
                 <button type="button" class="retry" (click)="$event.stopPropagation(); retry(evento)" [disabled]="retryDesabilitado(evento)">Tentar novamente</button>
                 @if (centralOffline()) {
@@ -102,9 +102,12 @@
       <aside class="detail">
         @if (selecionado) {
           <span class="badge" [class]="selecionado.status_operacional.toLowerCase()">{{ statusLabel(selecionado.status_operacional) }}</span>
-          <h2>{{ selecionado.tipo }}</h2>
+          <h2>{{ tipoLabel(selecionado.tipo) }}</h2>
           <dl>
-            <div><dt>Documento</dt><dd>{{ selecionado.documento }}</dd></div>
+            <div><dt>Documento</dt><dd>{{ documentoLabel(selecionado) }}</dd></div>
+            <div><dt>Tipo técnico</dt><dd>{{ selecionado.tipo }}</dd></div>
+            <div><dt>Identificador técnico</dt><dd>{{ documentoTecnico(selecionado) }}</dd></div>
+            <div><dt>Chave idempotente</dt><dd>{{ selecionado.chave_idempotencia }}</dd></div>
             <div><dt>Origem</dt><dd>{{ selecionado.origem }}</dd></div>
             <div><dt>Criado</dt><dd>{{ selecionado.criado_em | date:'short' }}</dd></div>
             <div><dt>Atualizado</dt><dd>{{ selecionado.atualizado_em | date:'short' }}</dd></div>
