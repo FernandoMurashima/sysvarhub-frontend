@@ -77,7 +77,14 @@ export class RecebimentoLojaPageComponent implements OnInit {
     this.carregandoDetalhe = true;
     this.mensagem = '';
     this.sucesso = '';
-    this.service.detalhar(recebimento.local_id).subscribe({
+    const recebimentoId = this.recebimentoCentralId(recebimento);
+    if (!recebimentoId) {
+      this.mensagem = 'Recebimento sem identificador da Central. Não foi possível consultar detalhes.';
+      this.itens = [];
+      this.carregandoDetalhe = false;
+      return;
+    }
+    this.service.detalhar(recebimentoId).subscribe({
       next: (response) => {
         this.aplicarDetalhe(response.recebimento);
         this.carregandoDetalhe = false;
@@ -101,10 +108,15 @@ export class RecebimentoLojaPageComponent implements OnInit {
 
   finalizar(): void {
     if (!this.selecionado || this.finalizarDesabilitado()) return;
+    const recebimentoId = this.recebimentoCentralId(this.selecionado);
+    if (!recebimentoId) {
+      this.mensagem = 'Recebimento sem identificador da Central. Não foi possível finalizar a conferência.';
+      return;
+    }
     this.finalizando = true;
     this.mensagem = '';
     this.sucesso = '';
-    this.service.finalizar(this.selecionado.local_id, this.montarPayload()).subscribe({
+    this.service.finalizar(recebimentoId, this.montarPayload()).subscribe({
       next: (response) => {
         this.aplicarDetalhe(response.recebimento);
         this.atualizarLista(response.recebimento);
@@ -123,7 +135,7 @@ export class RecebimentoLojaPageComponent implements OnInit {
   }
 
   finalizarDesabilitado(): boolean {
-    return !this.podeConferir() || this.itens.length === 0 || this.temQuantidadeInvalida() || this.observacaoObrigatoriaPendente();
+    return !this.podeConferir() || !this.recebimentoCentralId(this.selecionado) || this.itens.length === 0 || this.temQuantidadeInvalida() || this.observacaoObrigatoriaPendente();
   }
 
   temDivergencia(): boolean {
@@ -182,6 +194,11 @@ export class RecebimentoLojaPageComponent implements OnInit {
       item,
       quantidadeRecebida: this.numero(item.quantidade_recebida),
     }));
+  }
+
+  private recebimentoCentralId(recebimento: RecebimentoLoja | null): number | null {
+    const id = recebimento?.id;
+    return typeof id === 'number' && Number.isFinite(id) && id > 0 ? id : null;
   }
 
   private atualizarLista(recebimento: RecebimentoLoja): void {

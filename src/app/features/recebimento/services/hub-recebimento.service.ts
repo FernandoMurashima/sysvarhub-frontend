@@ -105,11 +105,11 @@ export class HubRecebimentoService {
     return this.http.get<RecebimentosResponse>(this.url);
   }
 
-  detalhar(localId: number): Observable<RecebimentoDetalheResponse> {
-    return this.http.get<RecebimentoDetalheResponse>(`${this.url}${localId}/`);
+  detalhar(recebimentoId: number): Observable<RecebimentoDetalheResponse> {
+    return this.http.get<RecebimentoDetalheResponse>(`${this.url}${recebimentoId}/`);
   }
 
-  finalizar(localId: number, request: RecebimentoFinalizarRequest): Observable<RecebimentoDetalheResponse> {
-    return this.http.post<RecebimentoDetalheResponse>(`${this.url}${localId}/finalizar/`, request);
+  finalizar(recebimentoId: number, request: RecebimentoFinalizarRequest): Observable<RecebimentoDetalheResponse> {
+    return this.http.post<RecebimentoDetalheResponse>(`${this.url}${recebimentoId}/finalizar/`, request);
   }
 }
