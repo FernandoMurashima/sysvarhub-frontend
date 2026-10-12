@@ -9,6 +9,7 @@ export type RecebimentoStatusLocal = 'PENDENTE' | 'CONFERIDO' | 'SINCRONIZADO' |
 export interface RecebimentoPessoa {
   id: number | null;
   nome: string;
+  apelido?: string;
   documento?: string;
 }
 
@@ -66,6 +67,8 @@ export interface RecebimentoLoja {
   status_retaguarda?: string;
   status_local: RecebimentoStatusLocal;
   loja?: RecebimentoPessoa | null;
+  unidade_origem?: RecebimentoPessoa | null;
+  loja_origem?: RecebimentoPessoa | null;
   fornecedor?: RecebimentoPessoa | null;
   documento_fiscal?: RecebimentoDocumentoFiscal | null;
   pedidos?: Array<number | string | { id?: number | string | null; numero?: string | null; codigo?: string | null; documento?: string | null }>;

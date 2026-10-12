@@ -2,6 +2,7 @@ import { CommonModule } from '@angular/common';
 import { Component, computed, inject, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
+import { forkJoin, map, of } from 'rxjs';
 
 import { OperatorSessionService } from '../../../operador/services/operator-session.service';
 import { TerminalSessionService } from '../../../terminal/services/terminal-session.service';
@@ -10,6 +11,7 @@ import {
   RecebimentoFinalizarItemRequest,
   RecebimentoItem,
   RecebimentoLoja,
+  RecebimentoPessoa,
   RecebimentoStatusLocal,
 } from '../../services/hub-recebimento.service';
 
@@ -19,6 +21,7 @@ interface RecebimentoItemForm {
 }
 
 type StatusVisual = 'pendente' | 'conferido' | 'recebido' | 'divergente' | 'conflito';
+type RecebimentoContrato = Record<string, unknown>;
 
 @Component({
   selector: 'app-recebimento-loja-page',
@@ -56,15 +59,8 @@ export class RecebimentoLojaPageComponent implements OnInit {
     this.mensagem = '';
     this.service.listar().subscribe({
       next: (response) => {
-        this.recebimentos = this.ordenarRecebimentos(response.recebimentos || []);
-        const atual = this.selecionado?.local_id;
-        const atualizado = atual ? this.recebimentos.find((item) => item.local_id === atual) : null;
-        if (this.selecionado && atualizado) {
-          this.selecionado = { ...this.selecionado, ...atualizado };
-        } else if (this.selecionado && !atualizado) {
-          this.voltarDocumentos();
-        }
-        this.carregandoLista = false;
+        this.aplicarLista(response.recebimentos || []);
+        this.enriquecerResumoRecebidos(this.recebimentos);
       },
       error: (erro) => {
         this.mensagem = erro.error?.detail || 'Falha ao carregar recebimentos da loja.';
@@ -206,7 +202,7 @@ export class RecebimentoLojaPageComponent implements OnInit {
 
   origem(recebimento: RecebimentoLoja | null): string {
     if (!recebimento) return '-';
-    return recebimento.fornecedor?.nome || recebimento.documento_fiscal?.emitente_nome || this.origemLabel(recebimento.origem);
+    return this.nomeUnidadeOrigem(recebimento) || recebimento.fornecedor?.nome || recebimento.documento_fiscal?.emitente_nome || this.origemLabel(recebimento.origem);
   }
 
   origemLabel(origem: string | undefined): string {
@@ -276,6 +272,43 @@ export class RecebimentoLojaPageComponent implements OnInit {
     }));
   }
 
+  private aplicarLista(recebimentos: RecebimentoLoja[]): void {
+    this.recebimentos = this.ordenarRecebimentos(recebimentos);
+    const atual = this.selecionado?.local_id;
+    const atualizado = atual ? this.recebimentos.find((item) => item.local_id === atual) : null;
+    if (this.selecionado && atualizado) {
+      this.selecionado = { ...this.selecionado, ...atualizado };
+    } else if (this.selecionado && !atualizado) {
+      this.voltarDocumentos();
+    }
+    this.carregandoLista = false;
+  }
+
+  private enriquecerResumoRecebidos(recebimentos: RecebimentoLoja[]): void {
+    const pendentes = recebimentos.filter((recebimento) => this.precisaDetalheParaResumo(recebimento));
+    if (!pendentes.length) return;
+    forkJoin(
+      pendentes.map((recebimento) => {
+        const id = this.recebimentoLocalId(recebimento);
+        return id ? this.service.detalhar(id).pipe(map((response) => response.recebimento)) : of(recebimento);
+      }),
+    ).subscribe({
+      next: (detalhes) => {
+        const porLocalId = new Map(detalhes.map((recebimento) => [recebimento.local_id, recebimento]));
+        this.recebimentos = this.ordenarRecebimentos(this.recebimentos.map((recebimento) => porLocalId.get(recebimento.local_id) || recebimento));
+        if (this.selecionado) {
+          const detalhe = porLocalId.get(this.selecionado.local_id);
+          if (detalhe) this.selecionado = { ...this.selecionado, ...detalhe };
+        }
+      },
+      error: () => undefined,
+    });
+  }
+
+  private precisaDetalheParaResumo(recebimento: RecebimentoLoja): boolean {
+    return recebimento.status_local !== 'PENDENTE' && this.numero(recebimento.resumo?.quantidade_recebida_total) === 0 && this.quantidadeEsperada(recebimento) > 0 && !recebimento.itens?.length;
+  }
+
   private recebimentoLocalId(recebimento: RecebimentoLoja | null): number | null {
     const id = recebimento?.id ?? recebimento?.local_id;
     return typeof id === 'number' && Number.isFinite(id) && id > 0 ? id : null;
@@ -300,6 +333,28 @@ export class RecebimentoLojaPageComponent implements OnInit {
 
   private quantidadePayload(valor: number | null): string {
     return String(this.numero(valor));
+  }
+
+  private nomeUnidadeOrigem(recebimento: RecebimentoLoja): string {
+    const origem = recebimento.unidade_origem || recebimento.loja_origem || this.objetoContrato(recebimento.contrato_retorno, 'unidade_origem') || this.objetoContrato(recebimento.contrato_retorno, 'loja_origem');
+    return this.nomePessoaContrato(origem);
+  }
+
+  private objetoContrato(contrato: unknown, chave: string): RecebimentoContrato | null {
+    if (!this.isContrato(contrato)) return null;
+    const valor = contrato[chave];
+    return this.isContrato(valor) ? valor : null;
+  }
+
+  private nomePessoaContrato(valor: RecebimentoPessoa | RecebimentoContrato | null | undefined): string {
+    if (!valor) return '';
+    const nome = 'nome' in valor ? valor.nome : undefined;
+    const apelido = 'apelido' in valor ? valor.apelido : undefined;
+    return String(apelido || nome || '').trim();
+  }
+
+  private isContrato(valor: unknown): valor is RecebimentoContrato {
+    return !!valor && typeof valor === 'object' && !Array.isArray(valor);
   }
 
   quantidadeEsperadaItem(item: RecebimentoItem): number {
