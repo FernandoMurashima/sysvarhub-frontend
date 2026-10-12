@@ -25,13 +25,16 @@ export interface RecebimentoDocumentoFiscal {
   quantidade_total_faturada?: string | number | null;
   valor_total?: string | number | null;
   dh_emissao?: string | null;
+  emitida_em?: string | null;
 }
 
 export interface RecebimentoResumo {
   quantidade_esperada_total?: string | number | null;
+  quantidade_enviada_total?: string | number | null;
   quantidade_recebida_total?: string | number | null;
   diferenca_total?: string | number | null;
   quantidade_skus?: number | null;
+  quantidade_itens?: number | null;
   quantidade_skus_com_divergencia?: number | null;
   estoque_efetivado?: boolean;
 }
@@ -48,6 +51,7 @@ export interface RecebimentoItem {
   cor?: RecebimentoPessoa | null;
   tamanho?: RecebimentoPessoa | null;
   quantidade_esperada: string | number;
+  quantidade_enviada?: string | number | null;
   quantidade_recebida: string | number;
   diferenca: string | number;
   situacao?: string;
@@ -56,6 +60,7 @@ export interface RecebimentoItem {
 export interface RecebimentoLoja {
   local_id: number;
   id?: number | null;
+  retaguarda_id?: number | null;
   recebimento_uuid: string;
   origem: string;
   status_retaguarda?: string;
@@ -63,7 +68,7 @@ export interface RecebimentoLoja {
   loja?: RecebimentoPessoa | null;
   fornecedor?: RecebimentoPessoa | null;
   documento_fiscal?: RecebimentoDocumentoFiscal | null;
-  pedidos?: number[];
+  pedidos?: Array<number | string | { id?: number | string | null; numero?: string | null; codigo?: string | null; documento?: string | null }>;
   resumo?: RecebimentoResumo | null;
   observacao_divergencia?: string;
   conferido_em?: string | null;

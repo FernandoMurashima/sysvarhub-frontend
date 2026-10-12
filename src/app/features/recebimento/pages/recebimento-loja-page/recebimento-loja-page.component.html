@@ -26,119 +26,178 @@
       <p class="message success">{{ sucesso }}</p>
     }
 
-    <section class="workspace">
-      <aside class="list-panel" aria-label="Recebimentos disponíveis">
+    @if (!selecionado) {
+      <section class="documents-panel" aria-label="Documentos de recebimento">
         <div class="panel-title">
-          <strong>Recebimentos</strong>
-          <span>{{ recebimentos.length }} registros</span>
-        </div>
-        @for (recebimento of recebimentos; track recebimento.local_id) {
-          <button type="button" class="receipt-row" [class.selected]="selecionado?.local_id === recebimento.local_id" (click)="selecionar(recebimento)">
-            <span class="badge" [class]="recebimento.status_local.toLowerCase()">{{ statusLabel(recebimento.status_local) }}</span>
-            <strong>{{ fornecedor(recebimento) }}</strong>
-            <small>Documento {{ documento(recebimento) }}</small>
-            <small>{{ statusHint(recebimento) }}</small>
-          </button>
-        } @empty {
-          <p class="empty">Nenhum recebimento disponível para esta loja.</p>
-        }
-      </aside>
-
-      <section class="detail-panel">
-        @if (selecionado) {
-          <header class="detail-head">
-            <div>
-              <span class="badge" [class]="selecionado.status_local.toLowerCase()">{{ statusLabel(selecionado.status_local) }}</span>
-              <h2>{{ fornecedor(selecionado) }}</h2>
-              <p>{{ statusHint(selecionado) }}</p>
-            </div>
-            <dl>
-              <div>
-                <dt>Documento</dt>
-                <dd>{{ documento(selecionado) }}</dd>
-              </div>
-              <div>
-                <dt>SKUs</dt>
-                <dd>{{ selecionado.resumo?.quantidade_skus || itens.length }}</dd>
-              </div>
-              <div>
-                <dt>Esperado</dt>
-                <dd>{{ formatarQuantidade(selecionado.resumo?.quantidade_esperada_total) }}</dd>
-              </div>
-              <div>
-                <dt>Recebido</dt>
-                <dd>{{ formatarQuantidade(selecionado.resumo?.quantidade_recebida_total) }}</dd>
-              </div>
-            </dl>
-          </header>
-
-          @if (selecionado.mensagem_sync) {
-            <p class="message warning">{{ selecionado.mensagem_sync }}</p>
-          }
-
-          <section class="actions">
-            <div>
-              <button type="button" (click)="tudoRecebido()" [disabled]="!podeConferir()">Tudo recebido</button>
-              <button type="button" class="secondary" (click)="zerar()" [disabled]="!podeConferir()">Zerar</button>
-            </div>
-            <button type="button" class="finalize" (click)="finalizar()" [disabled]="finalizarDesabilitado()">
-              Lançar no estoque
-            </button>
-          </section>
-
-          <div class="table-panel">
-            <div class="table-head">
-              <span>Produto</span><span>EAN</span><span>Cor</span><span>Tamanho</span><span>Esperado</span><span>Recebido</span><span>Diferença</span>
-            </div>
-            @for (form of itens; track form.item.conferencia_item_id) {
-              <div class="table-row" [class.has-diff]="diferenca(form) !== 0">
-                <span>
-                  <strong>{{ form.item.descricao }}</strong>
-                  <small>{{ form.item.referencia || '-' }}</small>
-                </span>
-                <span>{{ form.item.ean || '-' }}</span>
-                <span>{{ form.item.cor?.nome || '-' }}</span>
-                <span>{{ form.item.tamanho?.nome || '-' }}</span>
-                <span>{{ formatarQuantidade(form.item.quantidade_esperada) }}</span>
-                <span>
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.001"
-                    [(ngModel)]="form.quantidadeRecebida"
-                    [disabled]="!podeConferir()"
-                    aria-label="Quantidade recebida"
-                  />
-                </span>
-                <span class="diff">{{ formatarQuantidade(diferenca(form)) }}</span>
-              </div>
-            } @empty {
-              <p class="empty">Nenhum item retornado para este recebimento.</p>
-            }
+          <div>
+            <strong>Documentos disponíveis</strong>
+            <span>{{ recebimentos.length }} registros</span>
           </div>
+        </div>
 
-          <label class="observacao">
-            <span>Observação de divergência</span>
-            <textarea
-              [(ngModel)]="observacaoDivergencia"
-              [disabled]="!podeConferir()"
-              rows="4"
-              placeholder="Obrigatória quando a quantidade recebida divergir da esperada"
-            ></textarea>
-          </label>
+        <div class="documents-list">
+          @for (recebimento of recebimentos; track recebimento.local_id) {
+            <article class="document-card" [class]="statusVisual(recebimento)">
+              <div class="document-main">
+                <span class="badge" [class]="statusVisual(recebimento)">{{ statusLabel(recebimento) }}</span>
+                <h2>NF-e {{ documento(recebimento) }}</h2>
+                <p>{{ statusHint(recebimento) }}</p>
+              </div>
 
-          @if (temDivergencia() && !observacaoDivergencia.trim()) {
-            <p class="message warning">Informe a observação para finalizar com divergência.</p>
+              <dl class="document-meta">
+                <div>
+                  <dt>Pedido</dt>
+                  <dd>{{ pedido(recebimento) }}</dd>
+                </div>
+                <div>
+                  <dt>Origem</dt>
+                  <dd>{{ origem(recebimento) }}</dd>
+                </div>
+                <div>
+                  <dt>Destino</dt>
+                  <dd>{{ destino(recebimento) }}</dd>
+                </div>
+                <div>
+                  <dt>Data</dt>
+                  <dd>{{ dataDocumento(recebimento) }}</dd>
+                </div>
+                <div>
+                  <dt>SKUs</dt>
+                  <dd>{{ quantidadeSkus(recebimento) }}</dd>
+                </div>
+                <div>
+                  <dt>Esperado</dt>
+                  <dd>{{ formatarQuantidade(quantidadeEsperada(recebimento)) }}</dd>
+                </div>
+                <div>
+                  <dt>Recebido</dt>
+                  <dd>{{ formatarQuantidade(quantidadeRecebida(recebimento)) }}</dd>
+                </div>
+                <div>
+                  <dt>Central</dt>
+                  <dd>{{ recebimento.retaguarda_id || '-' }}</dd>
+                </div>
+              </dl>
+
+              <button type="button" class="document-action" (click)="selecionar(recebimento)" [disabled]="carregandoDetalhe || finalizando">
+                {{ acaoDocumento(recebimento) }}
+              </button>
+            </article>
+          } @empty {
+            <p class="empty">Nenhum recebimento disponível para esta loja.</p>
           }
-
-          <section class="sync-note">
-            <strong>Estoque</strong>
-            <span>Recebimentos conferidos no Hub ficam aguardando confirmação da Central antes de liberar saldo para venda.</span>
-          </section>
-        } @else {
-          <p class="empty">Selecione um recebimento para conferir os itens.</p>
-        }
+        </div>
       </section>
-    </section>
+    } @else {
+      <section class="detail-panel">
+        <header class="detail-head">
+          <button type="button" class="back" (click)="voltarDocumentos()" [disabled]="finalizando">Voltar aos documentos</button>
+          <div>
+            <span class="badge" [class]="statusVisual(selecionado)">{{ statusLabel(selecionado) }}</span>
+            <h2>NF-e {{ documento(selecionado) }}</h2>
+            <p>{{ statusHint(selecionado) }}</p>
+          </div>
+        </header>
+
+        <dl class="summary-grid">
+          <div>
+            <dt>Pedido</dt>
+            <dd>{{ pedido(selecionado) }}</dd>
+          </div>
+          <div>
+            <dt>Origem</dt>
+            <dd>{{ origem(selecionado) }}</dd>
+          </div>
+          <div>
+            <dt>Destino</dt>
+            <dd>{{ destino(selecionado) }}</dd>
+          </div>
+          <div>
+            <dt>Data</dt>
+            <dd>{{ dataDocumento(selecionado) }}</dd>
+          </div>
+          <div>
+            <dt>SKUs</dt>
+            <dd>{{ quantidadeSkus(selecionado) }}</dd>
+          </div>
+          <div>
+            <dt>Esperado</dt>
+            <dd>{{ formatarQuantidade(quantidadeEsperada(selecionado)) }}</dd>
+          </div>
+          <div>
+            <dt>Recebido</dt>
+            <dd>{{ formatarQuantidade(quantidadeRecebida(selecionado)) }}</dd>
+          </div>
+          <div>
+            <dt>Central</dt>
+            <dd>{{ selecionado.retaguarda_id || '-' }}</dd>
+          </div>
+        </dl>
+
+        @if (selecionado.mensagem_sync) {
+          <p class="message warning">{{ selecionado.mensagem_sync }}</p>
+        }
+
+        <section class="actions">
+          <div>
+            <button type="button" (click)="tudoRecebido()" [disabled]="!podeConferir()">Tudo recebido</button>
+            <button type="button" class="secondary" (click)="zerar()" [disabled]="!podeConferir()">Zerar</button>
+          </div>
+          <button type="button" class="finalize" (click)="finalizar()" [disabled]="finalizarDesabilitado()">
+            Lançar no estoque
+          </button>
+        </section>
+
+        <div class="table-panel">
+          <div class="table-head">
+            <span>Produto</span><span>EAN</span><span>Cor</span><span>Tamanho</span><span>Esperado</span><span>Recebido</span><span>Diferença</span>
+          </div>
+          @for (form of itens; track form.item.conferencia_item_id) {
+            <div class="table-row" [class.has-diff]="diferenca(form) !== 0">
+              <span>
+                <strong>{{ form.item.referencia || '-' }}</strong>
+                <small>{{ form.item.descricao }}</small>
+              </span>
+              <span>{{ form.item.ean || '-' }}</span>
+              <span>{{ form.item.cor?.nome || '-' }}</span>
+              <span>{{ form.item.tamanho?.nome || '-' }}</span>
+              <span>{{ formatarQuantidade(quantidadeEsperadaItem(form.item)) }}</span>
+              <span>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.001"
+                  [(ngModel)]="form.quantidadeRecebida"
+                  [disabled]="!podeConferir()"
+                  aria-label="Quantidade recebida"
+                />
+              </span>
+              <span class="diff">{{ formatarQuantidade(diferenca(form)) }}</span>
+            </div>
+          } @empty {
+            <p class="empty">Nenhum item retornado para este recebimento.</p>
+          }
+        </div>
+
+        <label class="observacao">
+          <span>Observação de divergência</span>
+          <textarea
+            [(ngModel)]="observacaoDivergencia"
+            [disabled]="!podeConferir()"
+            rows="4"
+            placeholder="Obrigatória quando a quantidade recebida divergir da esperada"
+          ></textarea>
+        </label>
+
+        @if (temDivergencia() && !observacaoDivergencia.trim()) {
+          <p class="message warning">Informe a observação para finalizar com divergência.</p>
+        }
+
+        <section class="sync-note">
+          <strong>Estoque</strong>
+          <span>O lançamento continua usando a operação do Backend. A liberação para venda depende da confirmação da Central.</span>
+        </section>
+      </section>
+    }
   </main>
 </section>

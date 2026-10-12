@@ -18,6 +18,8 @@ interface RecebimentoItemForm {
   quantidadeRecebida: number | null;
 }
 
+type StatusVisual = 'pendente' | 'conferido' | 'recebido' | 'divergente' | 'conflito';
+
 @Component({
   selector: 'app-recebimento-loja-page',
   standalone: true,
@@ -54,16 +56,15 @@ export class RecebimentoLojaPageComponent implements OnInit {
     this.mensagem = '';
     this.service.listar().subscribe({
       next: (response) => {
-        this.recebimentos = response.recebimentos || [];
+        this.recebimentos = this.ordenarRecebimentos(response.recebimentos || []);
         const atual = this.selecionado?.local_id;
-        const proximo = atual ? this.recebimentos.find((item) => item.local_id === atual) : this.recebimentos[0];
-        this.carregandoLista = false;
-        if (proximo) {
-          this.selecionar(proximo);
-        } else {
-          this.selecionado = null;
-          this.itens = [];
+        const atualizado = atual ? this.recebimentos.find((item) => item.local_id === atual) : null;
+        if (this.selecionado && atualizado) {
+          this.selecionado = { ...this.selecionado, ...atualizado };
+        } else if (this.selecionado && !atualizado) {
+          this.voltarDocumentos();
         }
+        this.carregandoLista = false;
       },
       error: (erro) => {
         this.mensagem = erro.error?.detail || 'Falha ao carregar recebimentos da loja.';
@@ -77,9 +78,9 @@ export class RecebimentoLojaPageComponent implements OnInit {
     this.carregandoDetalhe = true;
     this.mensagem = '';
     this.sucesso = '';
-    const recebimentoId = this.recebimentoCentralId(recebimento);
+    const recebimentoId = this.recebimentoLocalId(recebimento);
     if (!recebimentoId) {
-      this.mensagem = 'Recebimento sem identificador da Central. Não foi possível consultar detalhes.';
+      this.mensagem = 'Recebimento sem identificador local. Não foi possível consultar detalhes.';
       this.itens = [];
       this.carregandoDetalhe = false;
       return;
@@ -96,9 +97,18 @@ export class RecebimentoLojaPageComponent implements OnInit {
     });
   }
 
+  voltarDocumentos(): void {
+    this.selecionado = null;
+    this.itens = [];
+    this.observacaoDivergencia = '';
+    this.mensagem = '';
+    this.sucesso = '';
+    this.carregandoDetalhe = false;
+  }
+
   tudoRecebido(): void {
     if (!this.podeConferir()) return;
-    this.itens = this.itens.map((form) => ({ ...form, quantidadeRecebida: this.numero(form.item.quantidade_esperada) }));
+    this.itens = this.itens.map((form) => ({ ...form, quantidadeRecebida: this.quantidadeEsperadaItem(form.item) }));
   }
 
   zerar(): void {
@@ -108,9 +118,9 @@ export class RecebimentoLojaPageComponent implements OnInit {
 
   finalizar(): void {
     if (!this.selecionado || this.finalizarDesabilitado()) return;
-    const recebimentoId = this.recebimentoCentralId(this.selecionado);
+    const recebimentoId = this.recebimentoLocalId(this.selecionado);
     if (!recebimentoId) {
-      this.mensagem = 'Recebimento sem identificador da Central. Não foi possível finalizar a conferência.';
+      this.mensagem = 'Recebimento sem identificador local. Não foi possível finalizar a conferência.';
       return;
     }
     this.finalizando = true;
@@ -135,7 +145,7 @@ export class RecebimentoLojaPageComponent implements OnInit {
   }
 
   finalizarDesabilitado(): boolean {
-    return !this.podeConferir() || !this.recebimentoCentralId(this.selecionado) || this.itens.length === 0 || this.temQuantidadeInvalida() || this.observacaoObrigatoriaPendente();
+    return !this.podeConferir() || !this.recebimentoLocalId(this.selecionado) || this.itens.length === 0 || this.temQuantidadeInvalida() || this.observacaoObrigatoriaPendente();
   }
 
   temDivergencia(): boolean {
@@ -143,27 +153,38 @@ export class RecebimentoLojaPageComponent implements OnInit {
   }
 
   diferenca(form: RecebimentoItemForm): number {
-    return this.numero(form.quantidadeRecebida) - this.numero(form.item.quantidade_esperada);
+    return this.numero(form.quantidadeRecebida) - this.quantidadeEsperadaItem(form.item);
   }
 
-  statusLabel(status: string | undefined): string {
-    const labels: Record<string, string> = {
-      PENDENTE: 'Pendente',
-      CONFERIDO: 'Conferido localmente',
-      SINCRONIZADO: 'Confirmado pela Central',
-      CONFLITO: 'Conflito',
+  statusVisual(recebimento: RecebimentoLoja | null): StatusVisual {
+    const statusCentral = (recebimento?.status_retaguarda || '').toUpperCase();
+    if (recebimento?.status_local === 'CONFLITO') return 'conflito';
+    if (statusCentral.includes('DIVERG')) return 'divergente';
+    if (recebimento?.status_local === 'SINCRONIZADO') return 'recebido';
+    if (recebimento?.status_local === 'CONFERIDO') return 'conferido';
+    return 'pendente';
+  }
+
+  statusLabel(recebimento: RecebimentoLoja | null): string {
+    const labels: Record<StatusVisual, string> = {
+      pendente: 'Pendente',
+      conferido: 'Conferido',
+      recebido: 'Recebido',
+      divergente: 'Divergente',
+      conflito: 'Conflito',
     };
-    return labels[status || ''] || status || '-';
+    return labels[this.statusVisual(recebimento)];
   }
 
   statusHint(recebimento: RecebimentoLoja): string {
-    const hints: Record<RecebimentoStatusLocal, string> = {
-      PENDENTE: 'Aguardando conferência local.',
-      CONFERIDO: 'Conferido no Hub. Estoque ainda não liberado para venda.',
-      SINCRONIZADO: 'Confirmado pela Central. Estoque liberado conforme retorno central.',
-      CONFLITO: 'Rejeitado pela Central. Não liberar mercadoria para venda.',
+    const hints: Record<StatusVisual, string> = {
+      pendente: 'Documento aguardando conferência.',
+      conferido: 'Conferência encerrada localmente, aguardando confirmação da Central.',
+      recebido: 'Conferência confirmada pela Central e processamento local concluído.',
+      divergente: 'Documento com divergência confirmada no fluxo da Central.',
+      conflito: 'Processamento rejeitado pela Central.',
     };
-    return hints[recebimento.status_local] || '-';
+    return hints[this.statusVisual(recebimento)];
   }
 
   numero(valor: string | number | null | undefined): number {
@@ -183,8 +204,67 @@ export class RecebimentoLojaPageComponent implements OnInit {
     return fiscal.numero ? `${fiscal.numero}${serie}` : fiscal.chave_acesso || '-';
   }
 
+  origem(recebimento: RecebimentoLoja | null): string {
+    if (!recebimento) return '-';
+    return recebimento.fornecedor?.nome || recebimento.documento_fiscal?.emitente_nome || this.origemLabel(recebimento.origem);
+  }
+
+  origemLabel(origem: string | undefined): string {
+    const labels: Record<string, string> = {
+      DISTRIBUICAO: 'Distribuição',
+      FORNECEDOR: 'Fornecedor',
+    };
+    return labels[(origem || '').toUpperCase()] || origem || '-';
+  }
+
   fornecedor(recebimento: RecebimentoLoja | null): string {
     return recebimento?.fornecedor?.nome || recebimento?.documento_fiscal?.emitente_nome || '-';
+  }
+
+  destino(recebimento: RecebimentoLoja | null): string {
+    return recebimento?.loja?.nome || '-';
+  }
+
+  pedido(recebimento: RecebimentoLoja | null): string {
+    const pedido = recebimento?.pedidos?.[0];
+    if (pedido === undefined || pedido === null) return '-';
+    if (typeof pedido === 'number' || typeof pedido === 'string') return String(pedido);
+    return String(pedido.numero || pedido.codigo || pedido.documento || pedido.id || '-');
+  }
+
+  dataDocumento(recebimento: RecebimentoLoja | null): string {
+    return this.formatarData(recebimento?.documento_fiscal?.dh_emissao || recebimento?.documento_fiscal?.emitida_em || recebimento?.conferido_em || recebimento?.confirmado_central_em);
+  }
+
+  formatarData(valor: string | null | undefined): string {
+    if (!valor) return '-';
+    const data = new Date(valor);
+    if (Number.isNaN(data.getTime())) return valor;
+    return data.toLocaleDateString('pt-BR');
+  }
+
+  quantidadeSkus(recebimento: RecebimentoLoja | null): number {
+    const resumo = recebimento?.resumo?.quantidade_skus ?? recebimento?.resumo?.quantidade_itens;
+    if (typeof resumo === 'number' && resumo > 0) return resumo;
+    return recebimento?.itens?.length || this.itens.length || 0;
+  }
+
+  quantidadeEsperada(recebimento: RecebimentoLoja | null): number {
+    if (!recebimento) return 0;
+    const resumo = this.numero(recebimento.resumo?.quantidade_esperada_total ?? recebimento.resumo?.quantidade_enviada_total);
+    const itens = this.totalItens(recebimento, 'esperada');
+    return resumo > 0 || itens === 0 ? resumo : itens;
+  }
+
+  quantidadeRecebida(recebimento: RecebimentoLoja | null): number {
+    if (!recebimento) return 0;
+    const resumo = this.numero(recebimento.resumo?.quantidade_recebida_total);
+    const itens = this.totalItens(recebimento, 'recebida');
+    return resumo > 0 || itens === 0 ? resumo : itens;
+  }
+
+  acaoDocumento(recebimento: RecebimentoLoja): string {
+    return recebimento.status_local === 'PENDENTE' ? 'Conferir' : 'Consultar';
   }
 
   private aplicarDetalhe(recebimento: RecebimentoLoja): void {
@@ -196,13 +276,13 @@ export class RecebimentoLojaPageComponent implements OnInit {
     }));
   }
 
-  private recebimentoCentralId(recebimento: RecebimentoLoja | null): number | null {
-    const id = recebimento?.id;
+  private recebimentoLocalId(recebimento: RecebimentoLoja | null): number | null {
+    const id = recebimento?.id ?? recebimento?.local_id;
     return typeof id === 'number' && Number.isFinite(id) && id > 0 ? id : null;
   }
 
   private atualizarLista(recebimento: RecebimentoLoja): void {
-    this.recebimentos = this.recebimentos.map((item) => (item.local_id === recebimento.local_id ? { ...item, ...recebimento } : item));
+    this.recebimentos = this.ordenarRecebimentos(this.recebimentos.map((item) => (item.local_id === recebimento.local_id ? { ...item, ...recebimento } : item)));
   }
 
   private montarPayload(): { itens: RecebimentoFinalizarItemRequest[]; observacao_divergencia?: string } {
@@ -220,6 +300,34 @@ export class RecebimentoLojaPageComponent implements OnInit {
 
   private quantidadePayload(valor: number | null): string {
     return String(this.numero(valor));
+  }
+
+  quantidadeEsperadaItem(item: RecebimentoItem): number {
+    const esperada = this.numero(item.quantidade_esperada);
+    const enviada = this.numero(item.quantidade_enviada);
+    return esperada > 0 || enviada === 0 ? esperada : enviada;
+  }
+
+  private totalItens(recebimento: RecebimentoLoja, tipo: 'esperada' | 'recebida'): number {
+    if (this.selecionado?.local_id === recebimento.local_id && this.itens.length) {
+      return this.itens.reduce((total, form) => total + (tipo === 'esperada' ? this.quantidadeEsperadaItem(form.item) : this.numero(form.quantidadeRecebida)), 0);
+    }
+    return (recebimento.itens || []).reduce((total, item) => total + (tipo === 'esperada' ? this.quantidadeEsperadaItem(item) : this.numero(item.quantidade_recebida)), 0);
+  }
+
+  private ordenarRecebimentos(recebimentos: RecebimentoLoja[]): RecebimentoLoja[] {
+    const prioridade: Record<RecebimentoStatusLocal, number> = {
+      PENDENTE: 0,
+      CONFERIDO: 1,
+      SINCRONIZADO: 2,
+      CONFLITO: 3,
+    };
+    return [...recebimentos].sort((a, b) => {
+      const prioridadeA = prioridade[a.status_local] ?? 9;
+      const prioridadeB = prioridade[b.status_local] ?? 9;
+      if (prioridadeA !== prioridadeB) return prioridadeA - prioridadeB;
+      return this.documento(a).localeCompare(this.documento(b), 'pt-BR');
+    });
   }
 
   private temQuantidadeInvalida(): boolean {
