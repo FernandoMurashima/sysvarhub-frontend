@@ -15,11 +15,14 @@ import { DanfeNfce, DanfeNfceApi, DanfeVia, mapDanfeNfce } from '../../../core/m
 import {
   mapVendaAtual,
   BeneficiosClienteResponse,
+  CashbackOnlineSaldoApiResponse,
+  CashbackOnlineSaldoResponse,
   ConsultaVendasFiltros,
   ConsultaVendasPaginada,
   ConsultaVendasPaginadaApi,
   DevolucaoClientesResponse,
   DevolucaoClienteVendasResponse,
+  mapCashbackOnlineSaldoResponse,
   mapConsultaVendas,
   mapVendaConsultaDetalhe,
   VendaConsultaDetalhe,
@@ -114,6 +117,20 @@ export class HubVendaService {
 
   adicionarPagamentoCashback(vendaUuid: string, operacaoUuid: string, valor: string): Observable<VendaAtualResponse> {
     return this.http.post<VendaApiResponse>(`${this.baseUrl}/pagamento/cashback/`, {
+      venda_uuid: vendaUuid,
+      operacao_uuid: operacaoUuid,
+      valor,
+    }).pipe(map(mapVendaAtual));
+  }
+
+  consultarCashbackOnline(vendaUuid: string): Observable<CashbackOnlineSaldoResponse> {
+    return this.http
+      .get<CashbackOnlineSaldoApiResponse>(`${this.baseUrl}/cashback-online/saldo/?venda_uuid=${encodeURIComponent(vendaUuid)}`)
+      .pipe(map(mapCashbackOnlineSaldoResponse));
+  }
+
+  adicionarPagamentoCashbackOnline(vendaUuid: string, operacaoUuid: string, valor: string): Observable<VendaAtualResponse> {
+    return this.http.post<VendaApiResponse>(`${this.baseUrl}/pagamento/cashback-online/`, {
       venda_uuid: vendaUuid,
       operacao_uuid: operacaoUuid,
       valor,

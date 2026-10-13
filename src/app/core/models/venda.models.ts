@@ -5,6 +5,7 @@ export type VendaSessionStatus = 'inicializando' | 'sem-venda' | 'aberta' | 'err
 export type VendaFiscalStatus = 'GERADA' | 'CONTINGENCIA' | 'AUTORIZADA' | 'REJEITADA' | 'ERRO_GERACAO' | 'PENDENTE_TRANSMISSAO';
 export type VendaConsultaStatus = 'ABERTA' | 'FINALIZADA' | 'CANCELADA';
 export type VendaSincronizacaoStatus = 'PENDENTE' | 'PROCESSANDO' | 'SINCRONIZADO' | 'ERRO' | 'CONFLITO' | 'SEM_EVENTO';
+export type CashbackOrigem = 'LOCAL' | 'CENTRAL';
 
 export interface ConsultaVendasFiltros {
   dataIni: string;
@@ -421,6 +422,9 @@ export interface VendaPagamentoHubResumo {
   valor: string;
   autorizacao: string;
   valeTrocaDocumento?: string;
+  cashbackOrigem?: CashbackOrigem | null;
+  cashbackReservaId?: number | null;
+  cashbackValorReservado?: string;
   origemCaptura: string;
   criadoEm: string;
 }
@@ -518,6 +522,9 @@ export interface VendaPagamentoHubResumoApi {
   valor: string;
   autorizacao: string;
   vale_troca_documento?: string;
+  cashback_origem?: CashbackOrigem | null;
+  cashback_reserva_id?: number | null;
+  cashback_valor_reservado?: string;
   origem_captura: string;
   criado_em: string;
 }
@@ -537,6 +544,26 @@ export interface BeneficiosClienteResponse {
     valor_minimo_uso: string;
   };
   vales_troca: ValeTrocaDisponivel[];
+}
+
+export interface CashbackOnlineSaldoResponse {
+  cashback: CashbackOnlineSaldo;
+}
+
+export interface CashbackOnlineSaldo {
+  saldoOficial: string;
+  valorReservado: string;
+  saldoDisponivel: string;
+}
+
+export interface CashbackOnlineSaldoApiResponse {
+  cashback: CashbackOnlineSaldoApi;
+}
+
+export interface CashbackOnlineSaldoApi {
+  saldo_oficial: string;
+  valor_reservado: string;
+  saldo_disponivel: string;
 }
 
 export interface ValeTrocaDisponivel {
@@ -719,8 +746,21 @@ export function mapVendaPagamento(pagamento: VendaPagamentoHubResumoApi): VendaP
     valor: pagamento.valor,
     autorizacao: pagamento.autorizacao,
     valeTrocaDocumento: pagamento.vale_troca_documento ?? '',
+    cashbackOrigem: pagamento.cashback_origem ?? null,
+    cashbackReservaId: pagamento.cashback_reserva_id ?? null,
+    cashbackValorReservado: pagamento.cashback_valor_reservado ?? '0.00',
     origemCaptura: pagamento.origem_captura,
     criadoEm: pagamento.criado_em,
+  };
+}
+
+export function mapCashbackOnlineSaldoResponse(response: CashbackOnlineSaldoApiResponse): CashbackOnlineSaldoResponse {
+  return {
+    cashback: {
+      saldoOficial: response.cashback.saldo_oficial,
+      valorReservado: response.cashback.valor_reservado,
+      saldoDisponivel: response.cashback.saldo_disponivel,
+    },
   };
 }
 

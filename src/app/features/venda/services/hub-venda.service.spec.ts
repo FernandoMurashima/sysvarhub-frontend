@@ -184,6 +184,31 @@ describe('HubVendaService', () => {
     });
     cashback.flush({ venda: null });
 
+    service.consultarCashbackOnline('venda uuid').subscribe((response) => {
+      expect(response.cashback.saldoOficial).toBe('120.00');
+      expect(response.cashback.valorReservado).toBe('20.00');
+      expect(response.cashback.saldoDisponivel).toBe('100.00');
+    });
+    const saldoCentral = httpMock.expectOne('/api/terminal/venda/cashback-online/saldo/?venda_uuid=venda%20uuid');
+    expect(saldoCentral.request.method).toBe('GET');
+    saldoCentral.flush({
+      cashback: {
+        saldo_oficial: '120.00',
+        valor_reservado: '20.00',
+        saldo_disponivel: '100.00',
+      },
+    });
+
+    service.adicionarPagamentoCashbackOnline('venda', 'op-cbk-central', '40.00').subscribe();
+    const cashbackCentral = httpMock.expectOne('/api/terminal/venda/pagamento/cashback-online/');
+    expect(cashbackCentral.request.method).toBe('POST');
+    expect(cashbackCentral.request.body).toEqual({
+      venda_uuid: 'venda',
+      operacao_uuid: 'op-cbk-central',
+      valor: '40.00',
+    });
+    cashbackCentral.flush({ venda: null });
+
     service.removerPagamento('pag').subscribe();
     const removerPagamento = httpMock.expectOne('/api/terminal/venda/pagamento/pag/');
     expect(removerPagamento.request.method).toBe('DELETE');

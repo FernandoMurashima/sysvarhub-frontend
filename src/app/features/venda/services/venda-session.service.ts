@@ -17,6 +17,7 @@ export interface VendaOperacaoResultado {
 }
 
 export interface PagamentoIntencao {
+  identidade: string;
   operacaoUuid: string;
   formaPagamentoId: number;
   prazoPagamentoId: number | null;
@@ -116,7 +117,7 @@ export class VendaSessionService {
   }
 
   adicionarPagamento(vendaUuid: string, formaPagamentoId: number, valor: string, autorizacao = '', prazoPagamentoId: number | null = null): Observable<VendaOperacaoResultado> {
-    const intencao = this.obterIntencaoPagamento(formaPagamentoId, valor, autorizacao, prazoPagamentoId);
+    const intencao = this.obterIntencaoPagamento(`FORMA:${formaPagamentoId}`, formaPagamentoId, valor, autorizacao, prazoPagamentoId);
     const request: AdicionarPagamentoRequest = {
       vendaUuid,
       operacaoUuid: intencao.operacaoUuid,
@@ -138,7 +139,7 @@ export class VendaSessionService {
   }
 
   adicionarPagamentoValeTroca(vendaUuid: string, documento: string, valor: string): Observable<VendaOperacaoResultado> {
-    const intencao = this.obterIntencaoPagamento(0, valor, documento, null);
+    const intencao = this.obterIntencaoPagamento('VALE_TROCA', 0, valor, documento, null);
     this.loadingOperacaoSignal.set(true);
     return this.hubVendaService.adicionarPagamentoValeTroca(vendaUuid, intencao.operacaoUuid, documento, valor).pipe(
       tap((response) => {
@@ -152,9 +153,23 @@ export class VendaSessionService {
   }
 
   adicionarPagamentoCashback(vendaUuid: string, valor: string): Observable<VendaOperacaoResultado> {
-    const intencao = this.obterIntencaoPagamento(-1, valor, 'CASHBACK', null);
+    const intencao = this.obterIntencaoPagamento('CASHBACK_LOCAL', -1, valor, 'CASHBACK_LOCAL', null);
     this.loadingOperacaoSignal.set(true);
     return this.hubVendaService.adicionarPagamentoCashback(vendaUuid, intencao.operacaoUuid, valor).pipe(
+      tap((response) => {
+        this.intencaoPagamentoPendente = null;
+        this.definirEstado(response);
+      }),
+      map(() => ({ ok: true })),
+      catchError((error: unknown) => this.tratarErroPagamento(error)),
+      tap(() => this.loadingOperacaoSignal.set(false)),
+    );
+  }
+
+  adicionarPagamentoCashbackOnline(vendaUuid: string, valor: string): Observable<VendaOperacaoResultado> {
+    const intencao = this.obterIntencaoPagamento('CASHBACK_CENTRAL', -2, valor, 'CASHBACK_CENTRAL', null);
+    this.loadingOperacaoSignal.set(true);
+    return this.hubVendaService.adicionarPagamentoCashbackOnline(vendaUuid, intencao.operacaoUuid, valor).pipe(
       tap((response) => {
         this.intencaoPagamentoPendente = null;
         this.definirEstado(response);
@@ -199,12 +214,12 @@ export class VendaSessionService {
     this.intencaoPagamentoPendente = null;
   }
 
-  private obterIntencaoPagamento(formaPagamentoId: number, valor: string, autorizacao: string, prazoPagamentoId: number | null): PagamentoIntencao {
+  private obterIntencaoPagamento(identidade: string, formaPagamentoId: number, valor: string, autorizacao: string, prazoPagamentoId: number | null): PagamentoIntencao {
     const atual = this.intencaoPagamentoPendente;
-    if (atual && atual.formaPagamentoId === formaPagamentoId && atual.prazoPagamentoId === prazoPagamentoId && atual.valor === valor && atual.autorizacao === autorizacao) {
+    if (atual && atual.identidade === identidade && atual.formaPagamentoId === formaPagamentoId && atual.prazoPagamentoId === prazoPagamentoId && atual.valor === valor && atual.autorizacao === autorizacao) {
       return atual;
     }
-    const nova = { operacaoUuid: crypto.randomUUID(), formaPagamentoId, prazoPagamentoId, valor, autorizacao };
+    const nova = { identidade, operacaoUuid: crypto.randomUUID(), formaPagamentoId, prazoPagamentoId, valor, autorizacao };
     this.intencaoPagamentoPendente = nova;
     return nova;
   }
