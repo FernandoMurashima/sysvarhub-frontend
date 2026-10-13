@@ -1110,16 +1110,23 @@
                   <strong>VT · Vale-Troca</strong>
                   <span>Crédito Loja · online</span>
                 </button>
+                <button type="button" [class.selected]="pagamentoCashbackSelecionado" (click)="selecionarPagamentoCashback()">
+                  <strong>CB · Cashback</strong>
+                  <span>Benefício offline</span>
+                </button>
               </div>
 
               <form class="payment-form" (submit)="$event.preventDefault(); adicionarPagamento()">
                 @if (beneficiosCliente && !pagamentoValeTrocaSelecionado) {
                   <section class="payment-panel cashback-panel">
                     <div class="payment-panel-title">
-                      <strong>Cashback offline</strong>
+                      <strong>{{ pagamentoCashbackSelecionado ? 'Cashback selecionado' : 'Cashback offline' }}</strong>
                       <span>{{ formatarMoeda(beneficiosCliente.cashback.saldo_offline_utilizavel || beneficiosCliente.cashback.saldo) }}</span>
                     </div>
-                    <small>Retaguarda {{ formatarMoeda(beneficiosCliente.cashback.saldo_retaguarda) }} · Limite {{ beneficiosCliente.cashback.limite_uso_percentual }}%</small>
+                    <small>Retaguarda {{ formatarMoeda(beneficiosCliente.cashback.saldo_retaguarda) }} · Limite {{ beneficiosCliente.cashback.limite_uso_percentual }}% · Já usado {{ formatarMoeda(cashbackJaAdicionado()) }}</small>
+                    @if (pagamentoCashbackSelecionado) {
+                      <small>Sugestão {{ formatarMoeda(sugestaoCashback().toFixed(2)) }}</small>
+                    }
                   </section>
                 }
                 @if (pagamentoValeTrocaSelecionado) {
@@ -1171,15 +1178,15 @@
                       </div>
                     </div>
                   }
-                  <label>{{ pagamentoValeTrocaSelecionado ? 'Valor a utilizar' : 'Valor' }}<input name="valorPagamento" [(ngModel)]="valorPagamento" inputmode="decimal" autocomplete="off" /></label>
-                  @if (!pagamentoValeTrocaSelecionado) {
+                  <label>{{ pagamentoValeTrocaSelecionado || pagamentoCashbackSelecionado ? 'Valor a utilizar' : 'Valor' }}<input name="valorPagamento" [(ngModel)]="valorPagamento" inputmode="decimal" autocomplete="off" /></label>
+                  @if (!pagamentoValeTrocaSelecionado && !pagamentoCashbackSelecionado) {
                     <label>Autorização<input name="autorizacaoPagamento" [(ngModel)]="autorizacaoPagamento" maxlength="120" autocomplete="off" /></label>
                   }
                   @if (formaPagamentoSelecionada?.tefHabilitado) {
                     <p>Esta forma exige integração TEF.</p>
                   }
-                  <button type="submit" [disabled]="(!formaPagamentoSelecionada && !pagamentoValeTrocaSelecionado) || !!formaPagamentoSelecionada?.tefHabilitado || (!!formaPagamentoSelecionada?.permiteParcelamento && !condicaoPagamentoSelecionada) || vendaLoading()">
-                    {{ pagamentoValeTrocaSelecionado ? 'Adicionar Vale-Troca' : 'Adicionar' }}
+                  <button type="submit" [disabled]="(!formaPagamentoSelecionada && !pagamentoValeTrocaSelecionado && !pagamentoCashbackSelecionado) || !!formaPagamentoSelecionada?.tefHabilitado || (!!formaPagamentoSelecionada?.permiteParcelamento && !condicaoPagamentoSelecionada) || vendaLoading()">
+                    {{ pagamentoValeTrocaSelecionado ? 'Adicionar Vale-Troca' : pagamentoCashbackSelecionado ? 'Adicionar Cashback' : 'Adicionar' }}
                   </button>
                 </section>
               </form>

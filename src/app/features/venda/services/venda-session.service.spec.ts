@@ -29,6 +29,7 @@ describe('VendaSessionService', () => {
       'removerCliente',
       'selecionarVendedor',
       'removerVendedor',
+      'adicionarPagamentoCashback',
       'finalizarVenda',
     ]);
     operatorSession = jasmine.createSpyObj<OperatorSessionService>('OperatorSessionService', ['invalidarSessao']);
@@ -142,6 +143,26 @@ describe('VendaSessionService', () => {
       expect(service.venda()?.pagamentos[0].uuid).toBe('pagamento-uuid');
       expect(hubVendaService.iniciarVenda).not.toHaveBeenCalled();
       done();
+    });
+  });
+
+  it('adiciona cashback com operacao_uuid estavel em retry', (done) => {
+    const operacaoUuid = '00000000-0000-4000-8000-000000000001';
+    const cryptoSpy = spyOn(crypto, 'randomUUID').and.returnValue(operacaoUuid);
+    hubVendaService.adicionarPagamentoCashback.and.returnValues(
+      throwError(() => new HttpErrorResponse({ status: 409, error: { detail: 'Saldo insuficiente.' } })),
+      of(vendaAbertaStub),
+    );
+
+    service.adicionarPagamentoCashback('venda-hub-uuid', '30.00').subscribe((primeiro) => {
+      expect(primeiro.ok).toBeFalse();
+      service.adicionarPagamentoCashback('venda-hub-uuid', '30.00').subscribe((segundo) => {
+        expect(segundo.ok).toBeTrue();
+        expect(hubVendaService.adicionarPagamentoCashback).toHaveBeenCalledTimes(2);
+        expect(hubVendaService.adicionarPagamentoCashback).toHaveBeenCalledWith('venda-hub-uuid', operacaoUuid, '30.00');
+        expect(cryptoSpy).toHaveBeenCalledTimes(1);
+        done();
+      });
     });
   });
 

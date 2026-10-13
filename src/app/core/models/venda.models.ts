@@ -412,8 +412,8 @@ export interface VendaClienteResumo {
 
 export interface VendaPagamentoHubResumo {
   uuid: string;
-  formaPagamentoId: number;
-  formaRetaguardaId: number;
+  formaPagamentoId: number | null;
+  formaRetaguardaId: number | null;
   codigo: string;
   descricao: string;
   tipo: string;
@@ -509,8 +509,8 @@ export interface VendaClienteResumoApi {
 
 export interface VendaPagamentoHubResumoApi {
   uuid: string;
-  forma_pagamento_id: number;
-  forma_retaguarda_id: number;
+  forma_pagamento_id: number | null;
+  forma_retaguarda_id: number | null;
   codigo: string;
   descricao: string;
   tipo: string;

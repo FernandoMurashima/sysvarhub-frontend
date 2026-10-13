@@ -459,7 +459,7 @@ describe('PdvPageComponent', () => {
     vendaStatusSignal = signal<'inicializando' | 'sem-venda' | 'aberta' | 'erro'>('aberta');
     vendaLoadingSignal = signal(false);
     centralStatusSignal = signal<'VERIFICANDO' | 'ONLINE' | 'OFFLINE'>('VERIFICANDO');
-    vendaSession = jasmine.createSpyObj<VendaSessionService>('VendaSessionService', ['bootstrap', 'iniciarVenda', 'adicionarItem', 'alterarQuantidade', 'removerItem', 'cancelarVenda', 'limparEstado', 'listarFormasPagamento', 'adicionarPagamento', 'adicionarPagamentoValeTroca', 'removerPagamento', 'finalizarVenda', 'selecionarCliente', 'removerCliente', 'selecionarVendedor', 'removerVendedor'], {
+    vendaSession = jasmine.createSpyObj<VendaSessionService>('VendaSessionService', ['bootstrap', 'iniciarVenda', 'adicionarItem', 'alterarQuantidade', 'removerItem', 'cancelarVenda', 'limparEstado', 'listarFormasPagamento', 'adicionarPagamento', 'adicionarPagamentoValeTroca', 'adicionarPagamentoCashback', 'removerPagamento', 'finalizarVenda', 'selecionarCliente', 'removerCliente', 'selecionarVendedor', 'removerVendedor'], {
       venda: vendaSignal.asReadonly(),
       clientePreselecionado: clientePreselecionadoSignal.asReadonly(),
       vendedorPreselecionado: vendedorPreselecionadoSignal.asReadonly(),
@@ -475,6 +475,7 @@ describe('PdvPageComponent', () => {
     vendaSession.listarFormasPagamento.and.returnValue(of({ versao: 1, sincronizadoEm: null, prazos: [], formas: [] }));
     vendaSession.adicionarPagamento.and.returnValue(of({ ok: true }));
     vendaSession.adicionarPagamentoValeTroca.and.returnValue(of({ ok: true }));
+    vendaSession.adicionarPagamentoCashback.and.returnValue(of({ ok: true }));
     vendaSession.removerPagamento.and.returnValue(of({ ok: true }));
     vendaSession.finalizarVenda.and.returnValue(of({ ok: true }));
     vendaSession.selecionarCliente.and.returnValue(of({ ok: true }));
@@ -2626,6 +2627,79 @@ describe('PdvPageComponent', () => {
     expect(fixture.nativeElement.textContent).not.toContain('VT-HUB-DEV');
     expect(fixture.nativeElement.textContent).not.toContain('retaguarda');
     expect(fixture.nativeElement.textContent).toContain('Adicionar Vale-Troca');
+  });
+
+  it('seleciona cashback sem forma comercial e sugere valor descontando cashback ja usado', () => {
+    const component = fixture.componentInstance;
+    vendaSignal.set({
+      ...vendaAbertaStub.venda!,
+      vendedor: vendedorStub,
+      cliente: clienteAtivo,
+      total: '200.00',
+      pendente: '120.00',
+      pagamentos: [{
+        uuid: 'cbk-pag',
+        formaPagamentoId: 0,
+        formaRetaguardaId: 0,
+        codigo: 'CASHBACK',
+        descricao: 'Cashback',
+        tipo: 'CASHBACK',
+        numParcelas: 1,
+        valor: '20.00',
+        autorizacao: '',
+        origemCaptura: 'MANUAL',
+        criadoEm: '2026-09-30',
+      }],
+    });
+    hubVendaService.consultarBeneficiosCliente.and.returnValue(of({
+      cashback: {
+        saldo: '90.00',
+        saldo_retaguarda: '150.00',
+        saldo_offline_utilizavel: '90.00',
+        limite_uso_percentual: '50.00',
+        valor_minimo_uso: '1.00',
+      },
+      vales_troca: [],
+    }));
+
+    component.abrirPagamentos('TODAS');
+    component.selecionarPagamentoCashback();
+    fixture.detectChanges();
+
+    expect(component.pagamentoCashbackSelecionado).toBeTrue();
+    expect(component.formaPagamentoSelecionada).toBeNull();
+    expect(component.valorPagamento).toBe('70.00');
+    expect(fixture.nativeElement.textContent).toContain('Cashback selecionado');
+    expect(fixture.nativeElement.textContent).toContain('Retaguarda R$ 150,00');
+    expect(fixture.nativeElement.textContent).toContain('Adicionar Cashback');
+  });
+
+  it('envia cashback pelo fluxo proprio e atualiza beneficios', () => {
+    const component = fixture.componentInstance;
+    vendaSignal.set({ ...vendaAbertaStub.venda!, vendedor: vendedorStub, cliente: clienteAtivo, pendente: '80.00' });
+    component.abrirPagamentos('TODAS');
+    component.selecionarPagamentoCashback();
+    component.valorPagamento = '20,00';
+
+    component.adicionarPagamento();
+
+    expect(vendaSession.adicionarPagamentoCashback).toHaveBeenCalledWith(vendaAbertaStub.venda!.uuid, '20.00');
+    expect(vendaSession.adicionarPagamento).not.toHaveBeenCalled();
+    expect(component.mensagem).toBe('Cashback adicionado.');
+    expect(hubVendaService.consultarBeneficiosCliente).toHaveBeenCalled();
+  });
+
+  it('exibe erro retornado pelo backend ao adicionar cashback', () => {
+    const component = fixture.componentInstance;
+    vendaSession.adicionarPagamentoCashback.and.returnValue(of({ ok: false, detail: 'O cashback usado ultrapassa o limite permitido para a venda.' }));
+    vendaSignal.set({ ...vendaAbertaStub.venda!, vendedor: vendedorStub, cliente: clienteAtivo, pendente: '80.00' });
+    component.abrirPagamentos('TODAS');
+    component.selecionarPagamentoCashback();
+    component.valorPagamento = '20.00';
+
+    component.adicionarPagamento();
+
+    expect(component.mensagem).toBe('O cashback usado ultrapassa o limite permitido para a venda.');
   });
 
   it('selecao de vale online usa documento canonico e sugere menor valor entre saldo e pendente', () => {

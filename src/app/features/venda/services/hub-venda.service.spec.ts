@@ -174,6 +174,16 @@ describe('HubVendaService', () => {
     });
     pagamento.flush({ venda: null });
 
+    service.adicionarPagamentoCashback('venda', 'op-cbk', '30.00').subscribe();
+    const cashback = httpMock.expectOne('/api/terminal/venda/pagamento/cashback/');
+    expect(cashback.request.method).toBe('POST');
+    expect(cashback.request.body).toEqual({
+      venda_uuid: 'venda',
+      operacao_uuid: 'op-cbk',
+      valor: '30.00',
+    });
+    cashback.flush({ venda: null });
+
     service.removerPagamento('pag').subscribe();
     const removerPagamento = httpMock.expectOne('/api/terminal/venda/pagamento/pag/');
     expect(removerPagamento.request.method).toBe('DELETE');

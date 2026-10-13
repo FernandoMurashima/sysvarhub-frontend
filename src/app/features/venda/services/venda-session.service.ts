@@ -151,6 +151,20 @@ export class VendaSessionService {
     );
   }
 
+  adicionarPagamentoCashback(vendaUuid: string, valor: string): Observable<VendaOperacaoResultado> {
+    const intencao = this.obterIntencaoPagamento(-1, valor, 'CASHBACK', null);
+    this.loadingOperacaoSignal.set(true);
+    return this.hubVendaService.adicionarPagamentoCashback(vendaUuid, intencao.operacaoUuid, valor).pipe(
+      tap((response) => {
+        this.intencaoPagamentoPendente = null;
+        this.definirEstado(response);
+      }),
+      map(() => ({ ok: true })),
+      catchError((error: unknown) => this.tratarErroPagamento(error)),
+      tap(() => this.loadingOperacaoSignal.set(false)),
+    );
+  }
+
   removerPagamento(pagamentoUuid: string): Observable<VendaOperacaoResultado> {
     return this.executarOperacao(this.hubVendaService.removerPagamento(pagamentoUuid));
   }

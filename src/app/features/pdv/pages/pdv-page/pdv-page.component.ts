@@ -122,6 +122,7 @@ export class PdvPageComponent implements OnInit, OnDestroy {
   formaPagamentoSelecionada: FormaPagamento | null = null;
   condicaoPagamentoSelecionada: FormaPagamentoCondicao | null = null;
   pagamentoValeTrocaSelecionado = false;
+  pagamentoCashbackSelecionado = false;
   filtroPagamento: 'TODAS' | 'DINHEIRO' | 'CARTAO' | 'PIX' | 'OUTRAS' = 'TODAS';
   beneficiosCliente: BeneficiosClienteResponse | null = null;
   valeTrocaConsulta: ValeTrocaOnline | null = null;
@@ -1179,6 +1180,27 @@ export class PdvPageComponent implements OnInit, OnDestroy {
     return somarMoedasString(venda.descontoItens, venda.descontoGeral);
   }
 
+  cashbackJaAdicionado(): string {
+    const total = (this.venda()?.pagamentos || [])
+      .filter((pagamento) => pagamento.tipo === 'CASHBACK')
+      .reduce((soma, pagamento) => soma + Number(pagamento.valor || 0), 0);
+    return total.toFixed(2);
+  }
+
+  sugestaoCashback(): number {
+    const venda = this.venda();
+    const cashback = this.beneficiosCliente?.cashback;
+    if (!venda || !cashback) return 0;
+    const saldoOffline = Number(cashback.saldo_offline_utilizavel || cashback.saldo || 0);
+    const limitePercentual = Number(cashback.limite_uso_percentual || 0);
+    const limiteVenda = Number(venda.total || 0) * limitePercentual / 100;
+    const jaAdicionado = Number(this.cashbackJaAdicionado());
+    const disponivelPorSaldo = Math.max(0, saldoOffline - jaAdicionado);
+    const disponivelPorLimite = Math.max(0, limiteVenda - jaAdicionado);
+    const pendente = Number(venda.pendente || 0);
+    return Math.max(0, Math.min(pendente, disponivelPorSaldo, disponivelPorLimite));
+  }
+
   motivos(produto: PdvProdutoConsulta): string {
     return produto.motivosBloqueio.length ? produto.motivosBloqueio.join(', ') : '-';
   }
@@ -1281,27 +1303,49 @@ export class PdvPageComponent implements OnInit, OnDestroy {
     this.formaPagamentoSelecionada = forma;
     this.condicaoPagamentoSelecionada = this.condicaoPadraoForma(forma);
     this.pagamentoValeTrocaSelecionado = false;
+    this.pagamentoCashbackSelecionado = false;
     this.valeTrocaConsulta = null;
     this.valesTrocaOnlineDisponiveis = [];
     this.valorPagamento = this.venda()?.pendente || '';
-    if (forma.tipo === 'CASHBACK' && this.beneficiosCliente) {
-      const pendente = Number(this.venda()?.pendente || 0);
-      const saldo = Number(this.beneficiosCliente.cashback.saldo_offline_utilizavel || this.beneficiosCliente.cashback.saldo || 0);
-      const limitePercentual = Number(this.beneficiosCliente.cashback.limite_uso_percentual || 0);
-      const limiteVenda = Number(this.venda()?.total || 0) * limitePercentual / 100;
-      this.valorPagamento = Math.max(0, Math.min(pendente, saldo, limiteVenda)).toFixed(2);
-    }
   }
 
   selecionarPagamentoValeTroca(): void {
     this.formaPagamentoSelecionada = null;
     this.condicaoPagamentoSelecionada = null;
     this.pagamentoValeTrocaSelecionado = true;
+    this.pagamentoCashbackSelecionado = false;
     this.valeTrocaConsulta = null;
     this.valesTrocaOnlineDisponiveis = [];
     this.valorPagamento = '';
     this.autorizacaoPagamento = '';
     this.carregarValesTrocaOnlineDisponiveis();
+  }
+
+  selecionarPagamentoCashback(): void {
+    const venda = this.venda();
+    this.formaPagamentoSelecionada = null;
+    this.condicaoPagamentoSelecionada = null;
+    this.pagamentoValeTrocaSelecionado = false;
+    this.pagamentoCashbackSelecionado = true;
+    this.valeTrocaConsulta = null;
+    this.valesTrocaOnlineDisponiveis = [];
+    this.autorizacaoPagamento = '';
+    if (!venda?.cliente || venda.cliente.clientePadrao) {
+      this.valorPagamento = '';
+      this.mensagem = 'Cashback exige cliente identificado.';
+      return;
+    }
+    if (!this.beneficiosCliente) {
+      this.valorPagamento = '';
+      this.mensagem = 'Consulte os benefícios do cliente antes de usar Cashback.';
+      this.carregarBeneficiosCliente();
+      return;
+    }
+    const sugestao = this.sugestaoCashback();
+    this.valorPagamento = sugestao > 0 ? sugestao.toFixed(2) : '';
+    if (sugestao <= 0) {
+      this.mensagem = 'Cashback indisponível para esta venda.';
+    }
   }
 
   consultarValeTrocaOnline(): void {
@@ -1406,7 +1450,13 @@ export class PdvPageComponent implements OnInit, OnDestroy {
     this.beneficiosCliente = null;
     if (!clienteUuid) return;
     this.hubVendaService.consultarBeneficiosCliente(clienteUuid).subscribe({
-      next: (beneficios) => this.beneficiosCliente = beneficios,
+      next: (beneficios) => {
+        this.beneficiosCliente = beneficios;
+        if (this.pagamentoCashbackSelecionado) {
+          const sugestao = this.sugestaoCashback();
+          this.valorPagamento = sugestao > 0 ? sugestao.toFixed(2) : '';
+        }
+      },
       error: () => this.beneficiosCliente = null,
     });
   }
@@ -1471,6 +1521,10 @@ export class PdvPageComponent implements OnInit, OnDestroy {
     const venda = this.venda();
     const forma = this.formaPagamentoSelecionada;
     if (!venda) return;
+    if (this.pagamentoCashbackSelecionado) {
+      this.adicionarPagamentoCashback(venda);
+      return;
+    }
     if (this.pagamentoValeTrocaSelecionado) {
       this.adicionarPagamentoValeTroca(venda);
       return;
@@ -1541,6 +1595,37 @@ export class PdvPageComponent implements OnInit, OnDestroy {
     });
   }
 
+  private adicionarPagamentoCashback(venda: VendaHubResumo): void {
+    const valor = normalizarValorPagamento(this.valorPagamento);
+    if (!venda.cliente || venda.cliente.clientePadrao) {
+      this.mensagem = 'Cashback exige cliente identificado.';
+      return;
+    }
+    if (!this.beneficiosCliente) {
+      this.mensagem = 'Consulte os benefícios do cliente antes de usar Cashback.';
+      return;
+    }
+    if (!valor) {
+      this.mensagem = 'Valor de pagamento inválido.';
+      return;
+    }
+    const sugestao = this.sugestaoCashback();
+    if (Number(valor) > sugestao && sugestao >= 0) {
+      this.mensagem = 'Valor maior que o Cashback disponível para esta venda.';
+      return;
+    }
+    this.vendaSession.adicionarPagamentoCashback(venda.uuid, valor).subscribe((resultado) => {
+      if (resultado.ok) {
+        this.valorPagamento = this.venda()?.pendente || '';
+        this.pagamentoCashbackSelecionado = false;
+        this.carregarBeneficiosCliente();
+        this.mensagem = 'Cashback adicionado.';
+        return;
+      }
+      this.mensagem = resultado.detail || 'Falha ao adicionar Cashback.';
+    });
+  }
+
   private normalizarDocumentoValeTroca(documento: string): string {
     return documento.trim().toUpperCase();
   }
@@ -1559,6 +1644,9 @@ export class PdvPageComponent implements OnInit, OnDestroy {
       this.mensagem = resultado.ok ? 'Pagamento removido.' : resultado.detail || 'Falha ao remover pagamento.';
       if (resultado.ok && this.pagamentoValeTrocaSelecionado) {
         this.carregarValesTrocaOnlineDisponiveis();
+      }
+      if (resultado.ok) {
+        this.carregarBeneficiosCliente();
       }
     });
   }

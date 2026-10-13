@@ -112,6 +112,14 @@ export class HubVendaService {
     }).pipe(map(mapVendaAtual));
   }
 
+  adicionarPagamentoCashback(vendaUuid: string, operacaoUuid: string, valor: string): Observable<VendaAtualResponse> {
+    return this.http.post<VendaApiResponse>(`${this.baseUrl}/pagamento/cashback/`, {
+      venda_uuid: vendaUuid,
+      operacao_uuid: operacaoUuid,
+      valor,
+    }).pipe(map(mapVendaAtual));
+  }
+
   removerPagamento(pagamentoUuid: string): Observable<VendaAtualResponse> {
     return this.http.delete<VendaApiResponse>(`${this.baseUrl}/pagamento/${pagamentoUuid}/`).pipe(map(mapVendaAtual));
   }
