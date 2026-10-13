@@ -2793,6 +2793,88 @@ describe('PdvPageComponent', () => {
     expect(component.mensagem).toBe('Central offline. Cashback Central indisponível.');
   });
 
+  it('ignora resposta antiga de cashback central quando cliente muda', () => {
+    const component = fixture.componentInstance;
+    const consulta = new Subject<{ cashback: { saldoOficial: string; valorReservado: string; saldoDisponivel: string } }>();
+    const outroCliente = { ...clienteAtivo, clienteUuid: 'cliente-2', retaguardaId: 456, nomeCliente: 'Outra Cliente' };
+    vendaSignal.set({ ...vendaAbertaStub.venda!, vendedor: vendedorStub, cliente: clienteAtivo, total: '200.00', pendente: '100.00' });
+    centralStatusSignal.set('ONLINE');
+    hubVendaService.consultarCashbackOnline.and.returnValue(consulta.asObservable());
+
+    component.selecionarPagamentoCashbackCentral();
+    vendaSignal.set({ ...vendaAbertaStub.venda!, vendedor: vendedorStub, cliente: outroCliente, total: '200.00', pendente: '100.00' });
+    consulta.next({ cashback: { saldoOficial: '150.00', valorReservado: '0.00', saldoDisponivel: '150.00' } });
+
+    expect(component.cashbackCentralConsulta).toBeNull();
+    expect(component.valorPagamento).toBe('');
+  });
+
+  it('ignora resposta antiga de cashback central quando venda muda', () => {
+    const component = fixture.componentInstance;
+    const consulta = new Subject<{ cashback: { saldoOficial: string; valorReservado: string; saldoDisponivel: string } }>();
+    vendaSignal.set({ ...vendaAbertaStub.venda!, uuid: 'venda-1', vendedor: vendedorStub, cliente: clienteAtivo, total: '200.00', pendente: '100.00' });
+    centralStatusSignal.set('ONLINE');
+    hubVendaService.consultarCashbackOnline.and.returnValue(consulta.asObservable());
+
+    component.selecionarPagamentoCashbackCentral();
+    vendaSignal.set({ ...vendaAbertaStub.venda!, uuid: 'venda-2', vendedor: vendedorStub, cliente: clienteAtivo, total: '200.00', pendente: '100.00' });
+    consulta.next({ cashback: { saldoOficial: '150.00', valorReservado: '0.00', saldoDisponivel: '150.00' } });
+
+    expect(component.cashbackCentralConsulta).toBeNull();
+    expect(component.valorPagamento).toBe('');
+  });
+
+  it('mantem apenas a consulta mais recente de cashback central para a mesma venda', () => {
+    const component = fixture.componentInstance;
+    const primeira = new Subject<{ cashback: { saldoOficial: string; valorReservado: string; saldoDisponivel: string } }>();
+    const segunda = new Subject<{ cashback: { saldoOficial: string; valorReservado: string; saldoDisponivel: string } }>();
+    vendaSignal.set({ ...vendaAbertaStub.venda!, vendedor: vendedorStub, cliente: clienteAtivo, total: '200.00', pendente: '100.00' });
+    centralStatusSignal.set('ONLINE');
+    hubVendaService.consultarCashbackOnline.and.returnValues(primeira.asObservable(), segunda.asObservable());
+
+    component.abrirPagamentos('TODAS');
+    component.selecionarPagamentoCashbackCentral();
+    component.consultarCashbackCentral();
+    primeira.next({ cashback: { saldoOficial: '150.00', valorReservado: '0.00', saldoDisponivel: '150.00' } });
+    segunda.next({ cashback: { saldoOficial: '40.00', valorReservado: '0.00', saldoDisponivel: '40.00' } });
+
+    expect(component.cashbackCentralConsulta?.saldoDisponivel).toBe('40.00');
+    expect(component.valorPagamento).toBe('40.00');
+  });
+
+  it('consulta incompatível nao autoriza pagamento central', () => {
+    const component = fixture.componentInstance;
+    const outroCliente = { ...clienteAtivo, clienteUuid: 'cliente-2', retaguardaId: 456, nomeCliente: 'Outra Cliente' };
+    vendaSignal.set({ ...vendaAbertaStub.venda!, vendedor: vendedorStub, cliente: clienteAtivo, total: '200.00', pendente: '100.00' });
+    centralStatusSignal.set('ONLINE');
+    component.selecionarPagamentoCashbackCentral();
+    vendaSignal.set({ ...vendaAbertaStub.venda!, vendedor: vendedorStub, cliente: outroCliente, total: '200.00', pendente: '100.00' });
+    component.valorPagamento = '20.00';
+
+    component.adicionarPagamento();
+
+    expect(vendaSession.adicionarPagamentoCashbackOnline).not.toHaveBeenCalled();
+    expect(component.mensagem).toBe('Consulte o Cashback Central antes de adicionar.');
+  });
+
+  it('cashback local permanece independente de consulta central antiga', () => {
+    const component = fixture.componentInstance;
+    const consulta = new Subject<{ cashback: { saldoOficial: string; valorReservado: string; saldoDisponivel: string } }>();
+    vendaSignal.set({ ...vendaAbertaStub.venda!, vendedor: vendedorStub, cliente: clienteAtivo, total: '200.00', pendente: '100.00' });
+    centralStatusSignal.set('ONLINE');
+    hubVendaService.consultarCashbackOnline.and.returnValue(consulta.asObservable());
+    component.selecionarPagamentoCashbackCentral();
+    vendaSignal.set({ ...vendaAbertaStub.venda!, uuid: 'venda-2', vendedor: vendedorStub, cliente: clienteAtivo, total: '200.00', pendente: '100.00' });
+    consulta.next({ cashback: { saldoOficial: '150.00', valorReservado: '0.00', saldoDisponivel: '150.00' } });
+
+    component.selecionarPagamentoCashback();
+    component.valorPagamento = '20.00';
+    component.adicionarPagamento();
+
+    expect(vendaSession.adicionarPagamentoCashback).toHaveBeenCalledWith('venda-2', '20.00');
+    expect(vendaSession.adicionarPagamentoCashbackOnline).not.toHaveBeenCalled();
+  });
+
   it('selecao de vale online usa documento canonico e sugere menor valor entre saldo e pendente', () => {
     const component = fixture.componentInstance;
     vendaSignal.set({ ...vendaAbertaStub.venda!, vendedor: vendedorStub, cliente: clienteAtivo, pendente: '119.90' });
