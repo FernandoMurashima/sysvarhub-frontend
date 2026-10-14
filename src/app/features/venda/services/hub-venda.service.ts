@@ -180,13 +180,13 @@ export class HubVendaService {
   }
 
   finalizarDevolucao(vendaUuid: string, itens: { item_uuid?: string; venda_item?: number; quantidade: number }[], motivo: string, devolucaoUuid?: string, vendaId?: number): Observable<VendaDevolucaoResultadoResponse> {
-    const body: { venda_uuid: string; itens: { item_uuid?: string; venda_item?: number; quantidade: number }[]; motivo: string; devolucao_uuid?: string; venda_id?: number } = {
-      venda_uuid: vendaUuid,
+    const body: { venda_uuid?: string; itens: { item_uuid?: string; venda_item?: number; quantidade: number }[]; motivo: string; devolucao_uuid?: string; venda_id?: number } = {
       itens,
       motivo,
     };
     if (devolucaoUuid) body.devolucao_uuid = devolucaoUuid;
     if (vendaId) body.venda_id = vendaId;
+    else body.venda_uuid = vendaUuid;
     return this.http.post<VendaDevolucaoResultadoResponse>(`${this.terminalUrl}/devolucoes/finalizar/`, body);
   }
 

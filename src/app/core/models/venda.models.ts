@@ -580,7 +580,7 @@ export interface VendaDevolucaoConsultaResponse {
 export interface VendaDevolucaoConsulta {
   id?: number;
   uuid: string;
-  documento?: string;
+  documento?: string | null;
   data_venda?: string;
   loja_nome?: string;
   loja_origem?: { id: number; nome: string };

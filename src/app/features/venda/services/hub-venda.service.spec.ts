@@ -380,6 +380,33 @@ describe('HubVendaService', () => {
       },
     });
   });
+
+  it('consulta documento VE com espacos sem alterar o endpoint', () => {
+    service.consultarDevolucao('VE 011 0000001').subscribe();
+    const request = httpMock.expectOne('/api/terminal/devolucoes/vendas/?documento=VE%20011%200000001');
+    expect(request.request.method).toBe('GET');
+    request.flush({ venda: { uuid: 'local', documento: 'VE0110000001', itens: [] } });
+  });
+
+  it('finaliza devolucao local com UUID idempotente e sem IDs da Central', () => {
+    service.finalizarDevolucao('local', [{ item_uuid: 'item-local', quantidade: 2 }], 'Tamanho', 'operacao-uuid').subscribe();
+    const request = httpMock.expectOne('/api/terminal/devolucoes/finalizar/');
+    expect(request.request.method).toBe('POST');
+    expect(request.request.body).toEqual({
+      venda_uuid: 'local', devolucao_uuid: 'operacao-uuid', itens: [{ item_uuid: 'item-local', quantidade: 2 }], motivo: 'Tamanho',
+    });
+    request.flush({ devolucao: {} });
+  });
+
+  it('finaliza devolucao online com IDs da Central sem UUID local', () => {
+    service.finalizarDevolucao('', [{ venda_item: 91, quantidade: 1 }], 'Tamanho', 'operacao-uuid', 51).subscribe();
+    const request = httpMock.expectOne('/api/terminal/devolucoes/finalizar/');
+    expect(request.request.body).toEqual({
+      venda_id: 51, devolucao_uuid: 'operacao-uuid', itens: [{ venda_item: 91, quantidade: 1 }], motivo: 'Tamanho',
+    });
+    request.flush({ devolucao: {} });
+  });
+
 });
 
 function vendaConsultaResumoApi() {

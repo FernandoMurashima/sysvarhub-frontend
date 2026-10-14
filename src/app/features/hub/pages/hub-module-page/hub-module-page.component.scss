@@ -296,6 +296,16 @@ input:disabled {
   min-height: 34px;
 }
 
+.operation-notice {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 14px;
+  padding: 12px;
+  background: #fffbeb;
+  border-left: 3px solid #d97706;
+  color: #92400e;
+}
+
 .motivo {
   margin-top: 14px;
 }

@@ -30,7 +30,7 @@
       </article>
       <article>
         <strong>Estado</strong>
-        <small>Estrutura pronta para próxima etapa</small>
+        <small>{{ moduleKey === 'devolucao-troca' ? 'Consulta de venda e devolução' : 'Estrutura pronta para próxima etapa' }}</small>
       </article>
       @if (moduleKey === 'devolucao-troca') {
         <article class="central-state" [class.online]="centralStatus() === 'ONLINE'" [class.offline]="centralStatus() === 'OFFLINE'">
@@ -45,22 +45,22 @@
         @if (centralStatus() !== 'ONLINE') {
           <div class="offline-box">
             <strong>Central OFFLINE</strong>
-            <span>Consulta e finalização online ficam indisponíveis. A contingência offline será tratada posteriormente.</span>
+            <span>Localize a venda original pelo cupom/documento. Offline, somente vendas finalizadas registradas neste Hub podem ser devolvidas. Pesquisa por cliente disponível somente online.</span>
           </div>
         }
 
         <div class="mode-tabs" role="tablist" aria-label="Modo de pesquisa">
-          <button type="button" [class.active]="modoBusca === 'cupom'" (click)="modoBusca = 'cupom'">Venda / Cupom</button>
-          <button type="button" [class.active]="modoBusca === 'cliente'" (click)="modoBusca = 'cliente'">Pesquisar cliente</button>
+          <button type="button" [class.active]="modoBusca === 'cupom'" (click)="modoBusca = 'cupom'" [disabled]="carregando">Venda / Cupom</button>
+          <button type="button" [class.active]="modoBusca === 'cliente'" (click)="modoBusca = 'cliente'" [disabled]="carregando || centralStatus() !== 'ONLINE'">Pesquisar cliente</button>
         </div>
 
-        @if (modoBusca === 'cupom') {
+        @if (modoBusca === 'cupom' || centralStatus() !== 'ONLINE') {
           <div class="search-row">
             <label>
               <span>Venda / Cupom</span>
-              <input [(ngModel)]="documentoBusca" placeholder="Documento, NFC-e, chave ou protocolo" [disabled]="centralStatus() !== 'ONLINE'" />
+              <input [(ngModel)]="documentoBusca" placeholder="Documento VE, UUID, número da NFC-e, chave ou protocolo" [disabled]="carregando" />
             </label>
-            <button type="button" (click)="buscarCupom()" [disabled]="carregando || centralStatus() !== 'ONLINE'">Localizar</button>
+            <button type="button" (click)="buscarCupom()" [disabled]="carregando">Localizar</button>
           </div>
         } @else {
           <div class="search-row">
@@ -73,7 +73,7 @@
           @if (clientes.length) {
             <div class="list-panel">
               @for (cliente of clientes; track cliente.id) {
-                <button type="button" (click)="selecionarCliente(cliente)">
+                <button type="button" (click)="selecionarCliente(cliente)" [disabled]="carregando || centralStatus() !== 'ONLINE'">
                   <strong>{{ cliente.nome }}</strong>
                   <span>{{ cliente.documento || 'Documento não informado' }}</span>
                 </button>
@@ -83,7 +83,7 @@
           @if (vendasCliente.length) {
             <div class="sales-panel">
               @for (vendaCliente of vendasCliente; track vendaCliente.id) {
-                <button type="button" (click)="selecionarVendaCliente(vendaCliente)">
+                <button type="button" (click)="selecionarVendaCliente(vendaCliente)" [disabled]="carregando || centralStatus() !== 'ONLINE'">
                   <strong>{{ vendaCliente.documento }}</strong>
                   <span>{{ vendaCliente.loja.nome }} · {{ vendaCliente.data_venda | date:'short' }} · {{ formatarMoeda(vendaCliente.total) }}</span>
                   <small>{{ vendaCliente.quantidade_itens }} itens @if (vendaCliente.nfce?.numero) { · NFC-e {{ vendaCliente.nfce?.numero }} }</small>
@@ -100,15 +100,21 @@
         @if (venda && !resultado) {
           <section class="sale-detail">
             <div class="sale-summary">
-              <strong>{{ venda.documento }}</strong>
-              <span>{{ venda.loja_origem?.nome || venda.loja_nome }} → {{ loja() }}</span>
+              <strong>{{ venda.documento || venda.uuid }}</strong>
+              <span>{{ venda.loja_origem?.nome || venda.loja_nome || loja() }} → {{ loja() }}</span>
               <span>{{ venda.cliente.nome }} · {{ venda.cliente.documento || 'sem documento' }}</span>
               <span>{{ formatarMoeda(venda.total) }} · {{ venda.situacao || 'FINALIZADA' }}</span>
             </div>
 
+            @if (vendaLocal()) {
+              <p class="operation-notice">Venda registrada neste Hub. A devolução local gera crédito provisório técnico e fica pendente de sincronização com a Central.</p>
+            } @else if (centralStatus() !== 'ONLINE') {
+              <p class="operation-notice">Venda consultada na Central. Aguarde a conexão para finalizar esta devolução.</p>
+            }
+
             <div class="items-table">
               <div class="items-head">
-                <span>Produto</span><span>Vendido</span><span>Já devolvido</span><span>Disponível</span><span>Qtd.</span><span>Crédito</span>
+                <span>Produto</span><span>Vendido</span><span>Já devolvido</span><span>Disponível</span><span>Qtd.</span><span>Crédito previsto</span>
               </div>
               @for (item of venda.itens; track itemKey(item)) {
                 <div class="items-line">
@@ -116,20 +122,20 @@
                   <span>{{ item.quantidade }}</span>
                   <span>{{ item.quantidade_devolvida || 0 }}</span>
                   <span>{{ item.quantidade_disponivel ?? item.quantidade }}</span>
-                  <input type="number" min="0" [max]="item.quantidade_disponivel ?? item.quantidade" [(ngModel)]="quantidades[itemKey(item)]" (ngModelChange)="ajustarQuantidade(itemKey(item), item.quantidade_disponivel ?? item.quantidade)" />
-                  <span>{{ formatarMoeda(item.valor_liquido_disponivel || item.total_item) }}</span>
+                  <input type="number" min="0" step="1" [disabled]="carregando || confirmando" [attr.aria-label]="'Quantidade a devolver de ' + item.descricao" [max]="item.quantidade_disponivel ?? item.quantidade" [(ngModel)]="quantidades[itemKey(item)]" (ngModelChange)="ajustarQuantidade(itemKey(item), item.quantidade_disponivel ?? item.quantidade)" />
+                  <span>{{ formatarMoeda(creditoItem(item)) }}</span>
                 </div>
               }
             </div>
 
             <label class="motivo">
               <span>Motivo</span>
-              <input [(ngModel)]="motivo" placeholder="Opcional" />
+              <input [(ngModel)]="motivo" [disabled]="carregando || confirmando" placeholder="Opcional" />
             </label>
 
             <div class="finish-bar">
-              <strong>Total do crédito: {{ formatarMoeda(totalCredito()) }}</strong>
-              <button type="button" (click)="confirmando = true" [disabled]="totalCredito() <= 0 || carregando">Finalizar devolução</button>
+              <strong>Crédito previsto: {{ formatarMoeda(totalCredito()) }}</strong>
+              <button type="button" (click)="abrirConfirmacao()" [disabled]="!podeFinalizar()">Finalizar devolução</button>
             </div>
           </section>
         }
@@ -137,11 +143,20 @@
         @if (confirmando && venda) {
           <section class="confirm-box">
             <h2>Confirmar devolução</h2>
-            <p>{{ venda.documento }} · {{ venda.loja_origem?.nome || venda.loja_nome }} → {{ loja() }}</p>
-            <strong>{{ venda.cliente.nome }} · {{ formatarMoeda(totalCredito()) }}</strong>
+            <p>{{ venda.documento || venda.uuid }} · {{ venda.loja_origem?.nome || venda.loja_nome || loja() }} → {{ loja() }}</p>
+            <strong>{{ venda.cliente.nome }} · Crédito previsto {{ formatarMoeda(totalCredito()) }}</strong>
+            <ul>
+              @for (item of itensSelecionados(); track itemKey(item)) {
+                <li>{{ item.descricao }} · {{ quantidades[itemKey(item)] }} unidade(s) · {{ formatarMoeda(creditoItem(item)) }}</li>
+              }
+            </ul>
+            @if (vendaLocal()) {
+              <p>Operação local no Hub{{ centralStatus() !== 'ONLINE' ? ' · OFFLINE' : '' }}. Sincronização pendente após a confirmação.</p>
+            }
+            <p>O valor definitivo será confirmado pelo Hub.</p>
             <div>
-              <button type="button" (click)="confirmando = false">Voltar</button>
-              <button type="button" (click)="finalizar()" [disabled]="carregando">Confirmar</button>
+              <button type="button" (click)="confirmando = false" [disabled]="carregando">Voltar</button>
+              <button type="button" (click)="finalizar()" [disabled]="!podeFinalizar()">Confirmar</button>
             </div>
           </section>
         }
@@ -149,9 +164,17 @@
         @if (resultado) {
           <section class="result-box">
             <h2>Devolução concluída</h2>
-            <p>{{ resultado.documento }} · {{ resultado.venda_documento }}</p>
+            <p>{{ resultado.documento }} · {{ venda?.documento || resultado.venda_documento }}</p>
             <strong>{{ formatarMoeda(resultado.valor_total) }}</strong>
-            <span>{{ resultado.vale_troca?.provisorio ? 'Crédito provisório' : ('Vale-Troca ' + (resultado.vale_troca?.documento || '')) }} · saldo {{ formatarMoeda(resultado.vale_troca?.saldo) }}</span>
+            @if (resultadoProvisorio()) {
+              <div class="operation-notice">
+                <strong>Devolução registrada no Hub · sincronização pendente com a Central</strong>
+                <p>Crédito provisório técnico: {{ formatarMoeda(resultado.vale_troca?.saldo) }}. Não está disponível como saldo livre para outras vendas offline.</p>
+                <p>O documento oficial do Vale-Troca será apresentado após a confirmação pela Central.</p>
+              </div>
+            } @else if (resultado.vale_troca?.documento) {
+              <span>Vale-Troca {{ resultado.vale_troca?.documento }} · saldo {{ formatarMoeda(resultado.vale_troca?.saldo) }}</span>
+            }
             @if (resultado.fiscal?.status) {
               <span>
                 Documento fiscal de entrada
@@ -170,7 +193,7 @@
             <div class="actions">
               <a routerLink="/">Home</a>
               <a routerLink="/pdv">PDV</a>
-              <button type="button" (click)="resultado = null; venda = null; quantidades = {}; documentoBusca = ''">Outra devolução</button>
+              <button type="button" (click)="novaDevolucao()">Outra devolução</button>
             </div>
           </section>
         }
