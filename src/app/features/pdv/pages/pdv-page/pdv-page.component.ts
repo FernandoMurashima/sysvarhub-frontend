@@ -121,6 +121,8 @@ export class PdvPageComponent implements OnInit, OnDestroy {
   prazosPagamento: PrazoPagamento[] = [];
   formaPagamentoSelecionada: FormaPagamento | null = null;
   condicaoPagamentoSelecionada: FormaPagamentoCondicao | null = null;
+  private creditoTrocaSelecionado = false;
+  enviandoCreditoTroca = false;
   pagamentoValeTrocaSelecionado = false;
   pagamentoCashbackSelecionado = false;
   pagamentoCashbackCentralSelecionado = false;
@@ -226,6 +228,7 @@ export class PdvPageComponent implements OnInit, OnDestroy {
   readonly clientePreselecionado = this.vendaSession.clientePreselecionado;
   readonly vendedorPreselecionado = this.vendaSession.vendedorPreselecionado;
   readonly vendaLoading = this.vendaSession.loadingOperacao;
+  readonly troca = this.vendaSession.troca;
   readonly centralStatus = this.centralConnectivity.status;
 
   get cashbackCentralConsulta(): CashbackOnlineSaldo | null {
@@ -1247,12 +1250,14 @@ export class PdvPageComponent implements OnInit, OnDestroy {
   }
 
   rotuloPagamento(pagamento: VendaPagamentoHubResumo): string {
+    if (/^VT-HUB-/i.test(pagamento.valeTrocaDocumento || pagamento.autorizacao)) return 'Crédito desta troca';
     if (pagamento.tipo !== 'CASHBACK') return `${pagamento.codigo} · ${pagamento.descricao}`;
     const origem = this.origemCashbackPagamento(pagamento) === 'CENTRAL' ? 'CENTRAL' : 'LOCAL';
     return `CB · Cashback ${origem}`;
   }
 
   detalhePagamento(pagamento: VendaPagamentoHubResumo): string {
+    if (/^VT-HUB-/i.test(pagamento.valeTrocaDocumento || pagamento.autorizacao)) return `Devolução vinculada · ${this.formatarMoeda(pagamento.valor)}`;
     if (pagamento.tipo !== 'CASHBACK') return `${pagamento.tipo} · ${this.formatarMoeda(pagamento.valor)}`;
     const origem = this.origemCashbackPagamento(pagamento) === 'CENTRAL' ? 'CENTRAL' : 'LOCAL';
     return `${origem} · ${this.formatarMoeda(pagamento.valor)}`;
@@ -1366,6 +1371,54 @@ export class PdvPageComponent implements OnInit, OnDestroy {
     this.valeTrocaConsulta = null;
     this.valesTrocaOnlineDisponiveis = [];
     this.valorPagamento = this.venda()?.pendente || '';
+  }
+
+  get pagamentoCreditoTrocaSelecionado(): boolean {
+    return this.creditoTrocaSelecionado && !this.formaPagamentoSelecionada && !this.pagamentoValeTrocaSelecionado
+      && !this.pagamentoCashbackSelecionado && !this.pagamentoCashbackCentralSelecionado;
+  }
+
+  erroCreditoTroca(): string {
+    if (this.caixaStatus() !== 'aberto') return 'Abra o caixa para realizar a troca.';
+    if (!this.operador()) return 'Autentique o operador para realizar a troca.';
+    return this.vendaSession.erroCreditoTroca();
+  }
+
+  selecionarCreditoTroca(): void {
+    const erro = this.erroCreditoTroca();
+    if (erro || this.enviandoCreditoTroca || this.vendaLoading()) {
+      this.mensagem = erro || 'Aguarde o pagamento em andamento.';
+      return;
+    }
+    this.creditoTrocaSelecionado = true;
+    this.formaPagamentoSelecionada = null;
+    this.condicaoPagamentoSelecionada = null;
+    this.pagamentoValeTrocaSelecionado = false;
+    this.pagamentoCashbackSelecionado = false;
+    this.pagamentoCashbackCentralSelecionado = false;
+    this.valeTrocaConsulta = null;
+    this.valesTrocaOnlineDisponiveis = [];
+    this.autorizacaoPagamento = '';
+    this.valorPagamento = this.vendaSession.sugestaoCreditoTroca();
+  }
+
+  private adicionarPagamentoCreditoTroca(): void {
+    const erro = this.erroCreditoTroca();
+    if (erro || this.enviandoCreditoTroca || this.vendaLoading()) {
+      this.mensagem = erro || 'Aguarde o pagamento em andamento.';
+      return;
+    }
+    this.enviandoCreditoTroca = true;
+    this.vendaSession.adicionarCreditoTroca(this.valorPagamento).subscribe((resultado) => {
+      this.enviandoCreditoTroca = false;
+      if (!resultado.ok) {
+        this.mensagem = resultado.detail || 'Falha ao adicionar crédito desta troca. Repita a mesma tentativa.';
+        return;
+      }
+      this.creditoTrocaSelecionado = false;
+      this.valorPagamento = this.venda()?.pendente || '';
+      this.mensagem = 'Crédito desta troca adicionado. Pague eventual diferença pelas formas normais. O restante do crédito não é saldo livre para outras vendas offline.';
+    });
   }
 
   selecionarPagamentoValeTroca(): void {
@@ -1652,6 +1705,10 @@ export class PdvPageComponent implements OnInit, OnDestroy {
   }
 
   adicionarPagamento(): void {
+    if (this.pagamentoCreditoTrocaSelecionado) {
+      this.adicionarPagamentoCreditoTroca();
+      return;
+    }
     const venda = this.venda();
     const forma = this.formaPagamentoSelecionada;
     if (!venda) return;
@@ -2121,6 +2178,7 @@ export class PdvPageComponent implements OnInit, OnDestroy {
         this.formasPagamento = response.formas;
         this.prazosPagamento = response.prazos;
         this.carregandoFormasPagamento = false;
+        if (this.pagamentoCreditoTrocaSelecionado) return;
         const formas = filtro === 'TODAS' ? response.formas : this.formasPorCategoria(filtro);
         this.formaPagamentoSelecionada = formas[0] || response.formas[0] || null;
         this.condicaoPagamentoSelecionada = this.condicaoPadraoForma(this.formaPagamentoSelecionada);

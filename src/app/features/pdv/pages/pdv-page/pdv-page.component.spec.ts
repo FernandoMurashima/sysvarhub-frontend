@@ -6,6 +6,7 @@ import { Router } from '@angular/router';
 import { RouterTestingModule } from '@angular/router/testing';
 import { Subject, of, throwError } from 'rxjs';
 
+import { ContextoTrocaProvisoria, FormasPagamentoResponse } from '../../../../core/models/pagamento.models';
 import { CaixaFechamentoResumoSnapshot, SessaoCaixaHubResumo } from '../../../../core/models/caixa.models';
 import { ClienteHubResumo } from '../../../../core/models/cliente.models';
 import { DanfeNfce } from '../../../../core/models/danfe-nfce.models';
@@ -307,6 +308,7 @@ class EmptyRouteComponent {}
 
 describe('PdvPageComponent', () => {
   let fixture: ComponentFixture<PdvPageComponent>;
+  let component: PdvPageComponent;
   let facade: jasmine.SpyObj<PdvHubFacade>;
   let operatorSession: jasmine.SpyObj<OperatorSessionService>;
   let clienteSession: jasmine.SpyObj<ClienteSessionService>;
@@ -326,6 +328,7 @@ describe('PdvPageComponent', () => {
   let vendedorPreselecionadoSignal = signal(null as VendedorHubResumo | null);
   let vendaStatusSignal = signal<'inicializando' | 'sem-venda' | 'aberta' | 'erro'>('aberta');
   let vendaLoadingSignal = signal(false);
+  const trocaSignal = signal<ContextoTrocaProvisoria | null>(null);
   let centralStatusSignal = signal<'VERIFICANDO' | 'ONLINE' | 'OFFLINE'>('VERIFICANDO');
   let router: Router;
 
@@ -454,18 +457,23 @@ describe('PdvPageComponent', () => {
     fechamentoDiaService.obterPrevia.and.returnValue(of(previaFechamentoDiaStub));
     fechamentoDiaService.fechar.and.returnValue(of(fechamentoDiaRegistroStub));
     vendaSignal = signal(vendaAbertaStub.venda);
+    trocaSignal.set(null);
     clientePreselecionadoSignal = signal(null as typeof clientePreselecionadoStub | null);
     vendedorPreselecionadoSignal = signal(null as VendedorHubResumo | null);
     vendaStatusSignal = signal<'inicializando' | 'sem-venda' | 'aberta' | 'erro'>('aberta');
     vendaLoadingSignal = signal(false);
     centralStatusSignal = signal<'VERIFICANDO' | 'ONLINE' | 'OFFLINE'>('VERIFICANDO');
-    vendaSession = jasmine.createSpyObj<VendaSessionService>('VendaSessionService', ['bootstrap', 'iniciarVenda', 'adicionarItem', 'alterarQuantidade', 'removerItem', 'cancelarVenda', 'limparEstado', 'listarFormasPagamento', 'adicionarPagamento', 'adicionarPagamentoValeTroca', 'adicionarPagamentoCashback', 'adicionarPagamentoCashbackOnline', 'removerPagamento', 'finalizarVenda', 'selecionarCliente', 'removerCliente', 'selecionarVendedor', 'removerVendedor'], {
+    vendaSession = jasmine.createSpyObj<VendaSessionService>('VendaSessionService', ['bootstrap', 'iniciarVenda', 'adicionarItem', 'alterarQuantidade', 'removerItem', 'cancelarVenda', 'limparEstado', 'listarFormasPagamento', 'adicionarPagamento', 'adicionarPagamentoValeTroca', 'adicionarCreditoTroca', 'erroCreditoTroca', 'sugestaoCreditoTroca', 'adicionarPagamentoCashback', 'adicionarPagamentoCashbackOnline', 'removerPagamento', 'finalizarVenda', 'selecionarCliente', 'removerCliente', 'selecionarVendedor', 'removerVendedor'], {
       venda: vendaSignal.asReadonly(),
       clientePreselecionado: clientePreselecionadoSignal.asReadonly(),
       vendedorPreselecionado: vendedorPreselecionadoSignal.asReadonly(),
       status: vendaStatusSignal.asReadonly(),
       loadingOperacao: vendaLoadingSignal.asReadonly(),
+      troca: trocaSignal.asReadonly(),
     });
+    vendaSession.erroCreditoTroca.and.returnValue('');
+    vendaSession.sugestaoCreditoTroca.and.returnValue('95.00');
+    vendaSession.adicionarCreditoTroca.and.returnValue(of({ ok: true }));
     vendaSession.bootstrap.and.returnValue(of(true));
     vendaSession.iniciarVenda.and.returnValue(of({ ok: true }));
     vendaSession.adicionarItem.and.returnValue(of({ ok: true }));
@@ -573,6 +581,7 @@ describe('PdvPageComponent', () => {
     spyOn(router, 'navigateByUrl').and.resolveTo(true);
     simularElementoTelaCheia(null);
     fixture = TestBed.createComponent(PdvPageComponent);
+    component = fixture.componentInstance;
     fixture.detectChanges();
   });
 
@@ -3066,4 +3075,119 @@ describe('PdvPageComponent', () => {
     tick(500);
     expect(document.body.classList).not.toContain('danfe-print-mode');
   }));
+
+  function prepararTrocaPdv(): void {
+    centralStatusSignal.set('OFFLINE');
+    vendaSignal.set({ ...vendaAbertaStub.venda!, total: '95.00', pendente: '95.00', cliente: clientePreselecionadoStub, vendedor: vendedorStub });
+    trocaSignal.set({ devolucaoUuid: 'devolucao-local', documentoDevolucao: 'DEV01100001', documentoVendaOrigem: 'VE0110000001',
+      vendaOrigemUuid: 'origem', documentoTecnico: 'VT-HUB-0123456789abcdef0123', credito: '100.00',
+      cliente: { id: 123, uuid: 'cliente-uuid', nome: 'Maria Silva' }, vendaAnteriorUuid: null, vendaUuid: vendaAbertaStub.venda!.uuid });
+  }
+
+  it('troca vinculada fica identificada no PDV e oferece credito especifico offline', () => {
+    prepararTrocaPdv();
+    component.modalAtalho = 'pagamentos';
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('.troca-context').textContent).toContain('DEV01100001');
+    expect(fixture.nativeElement.querySelector('.troca-context').textContent).toContain('Maria Silva');
+    expect(fixture.nativeElement.querySelector('.troca-payment-option').textContent).toContain('Crédito desta troca');
+    component.selecionarCreditoTroca();
+    expect(component.valorPagamento).toBe('95.00');
+    expect(component.pagamentoCreditoTrocaSelecionado).toBeTrue();
+    expect(hubVendaService.consultarValeTroca).not.toHaveBeenCalled();
+    expect(hubVendaService.listarValesTrocaDisponiveis).not.toHaveBeenCalled();
+  });
+
+  it('nao oferece credito de troca em venda normal sem contexto vinculado', () => {
+    component.modalAtalho = 'pagamentos';
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('.troca-context')).toBeNull();
+    expect(fixture.nativeElement.querySelector('.troca-payment-option')).toBeNull();
+  });
+
+  it('envia credito pela sessao e exibe o pendente atualizado pelo Hub', () => {
+    prepararTrocaPdv();
+    vendaSession.adicionarCreditoTroca.and.callFake(() => {
+      vendaSignal.set({ ...vendaSignal()!, totalPago: '95.00', pendente: '5.00' });
+      return of({ ok: true });
+    });
+    component.selecionarCreditoTroca();
+    component.adicionarPagamento();
+    expect(vendaSession.adicionarCreditoTroca).toHaveBeenCalledOnceWith('95.00');
+    expect(component.valorPagamento).toBe('5.00');
+    expect(component.mensagem).toContain('Pague eventual diferença');
+    expect(component.pagamentoCreditoTrocaSelecionado).toBeFalse();
+  });
+
+  it('bloqueia credito com caixa fechado ou cliente incompativel', () => {
+    prepararTrocaPdv();
+    caixaStatusSignal.set('fechado');
+    component.selecionarCreditoTroca();
+    expect(component.mensagem).toContain('Abra o caixa');
+    caixaStatusSignal.set('aberto');
+    vendaSession.erroCreditoTroca.and.returnValue('Selecione o mesmo cliente da devolução original.');
+    component.selecionarCreditoTroca();
+    expect(component.mensagem).toContain('mesmo cliente');
+    expect(vendaSession.adicionarCreditoTroca).not.toHaveBeenCalled();
+  });
+
+  it('duplo clique de credito desta troca nao duplica chamada antes da resposta', () => {
+    prepararTrocaPdv();
+    const request = new Subject<{ ok: boolean }>();
+    vendaSession.adicionarCreditoTroca.and.returnValue(request);
+    component.selecionarCreditoTroca();
+    component.adicionarPagamento();
+    component.adicionarPagamento();
+    expect(vendaSession.adicionarCreditoTroca).toHaveBeenCalledTimes(1);
+    request.next({ ok: true });
+    request.complete();
+    expect(component.enviandoCreditoTroca).toBeFalse();
+  });
+
+  it('mantem selecao e valor para retry e apresenta orientacao da Central', () => {
+    prepararTrocaPdv();
+    const detail = 'Devolução já enviada à Central. Aguarde o Vale-Troca oficial para realizar a troca online.';
+    vendaSession.adicionarCreditoTroca.and.returnValue(of({ ok: false, detail }));
+    component.selecionarCreditoTroca();
+    component.adicionarPagamento();
+    expect(component.mensagem).toBe(detail);
+    expect(component.valorPagamento).toBe('95.00');
+    expect(component.pagamentoCreditoTrocaSelecionado).toBeTrue();
+    expect(component.troca()?.devolucaoUuid).toBe('devolucao-local');
+  });
+
+  it('rotula pagamento tecnico como credito desta troca sem documento oficial', () => {
+    const pagamento = { uuid: 'pag', formaPagamentoId: null, formaRetaguardaId: null, codigo: 'VT', descricao: 'Vale-Troca', tipo: 'VALE_TROCA',
+      numParcelas: 1, valor: '95.00', autorizacao: 'VT-HUB-0123456789abcdef0123', devolucaoUuid: 'devolucao-local', origemCaptura: 'MANUAL', criadoEm: '' };
+    expect(component.rotuloPagamento(pagamento)).toBe('Crédito desta troca');
+    expect(component.detalhePagamento(pagamento)).not.toContain('VT-HUB');
+  });
+
+
+  it('mantem o aviso de troca no painel lateral sem criar outra linha no grid principal', () => {
+    prepararTrocaPdv();
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('.left-panel .troca-context')).not.toBeNull();
+    expect(fixture.nativeElement.querySelector('.pdv-desktop > .troca-context')).toBeNull();
+  });
+
+  it('preserva rotulo do Vale oficial mesmo com vinculo de devolucao retornado pelo Hub', () => {
+    const pagamento = { uuid: 'pag', formaPagamentoId: null, formaRetaguardaId: null, codigo: 'VT', descricao: 'Vale-Troca', tipo: 'VALE_TROCA',
+      numParcelas: 1, valor: '95.00', autorizacao: 'VT0000001', valeTrocaDocumento: 'VT0000001', devolucaoUuid: 'devolucao-local', origemCaptura: 'MANUAL', criadoEm: '' };
+    expect(component.rotuloPagamento(pagamento)).toBe('VT · Vale-Troca');
+    expect(component.detalhePagamento(pagamento)).toContain('VALE_TROCA');
+  });
+
+  it('resposta tardia das formas normais nao desfaz a selecao do credito da troca', () => {
+    prepararTrocaPdv();
+    const formas = new Subject<FormasPagamentoResponse>();
+    vendaSession.listarFormasPagamento.and.returnValue(formas);
+    component.abrirPagamentos('TODAS');
+    component.selecionarCreditoTroca();
+    formas.next({ versao: 1, sincronizadoEm: null, formas: [], prazos: [] });
+    formas.complete();
+    expect(component.pagamentoCreditoTrocaSelecionado).toBeTrue();
+    expect(component.valorPagamento).toBe('95.00');
+  });
+
 });

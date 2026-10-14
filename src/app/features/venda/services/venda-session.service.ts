@@ -3,11 +3,12 @@ import { inject, Injectable, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { catchError, map, Observable, of, switchMap, tap, throwError } from 'rxjs';
 
-import { VendaAtualResponse, VendaClienteResumo, VendaHubResumo, VendaSessionStatus } from '../../../core/models/venda.models';
-import { AdicionarPagamentoRequest, FormasPagamentoResponse } from '../../../core/models/pagamento.models';
+import { VendaAtualResponse, VendaClienteResumo, VendaDevolucaoConsulta, VendaDevolucaoResultado, VendaHubResumo, VendaSessionStatus } from '../../../core/models/venda.models';
+import { AdicionarPagamentoRequest, ContextoTrocaProvisoria, FormasPagamentoResponse } from '../../../core/models/pagamento.models';
 import { VendedorHubResumo } from '../../../core/models/vendedor.models';
 import { OperatorSessionService } from '../../operador/services/operator-session.service';
 import { HubVendaService } from './hub-venda.service';
+import { normalizarValorPagamento } from './pagamento-valor.parser';
 
 export interface VendaOperacaoResultado {
   ok: boolean;
@@ -36,6 +37,9 @@ export class VendaSessionService {
   private readonly clientePreselecionadoSignal = signal<VendaClienteResumo | null>(null);
   private readonly vendedorPreselecionadoSignal = signal<VendedorHubResumo | null>(null);
   private readonly loadingOperacaoSignal = signal(false);
+  private readonly trocaSignal = signal<ContextoTrocaProvisoria | null>(null);
+  private intencaoTrocaPendente: { vendaUuid: string; devolucaoUuid: string; documento: string; valor: string; operacaoUuid: string } | null = null;
+  readonly troca = this.trocaSignal.asReadonly();
   private intencaoPagamentoPendente: PagamentoIntencao | null = null;
 
   readonly status = this.statusSignal.asReadonly();
@@ -98,7 +102,10 @@ export class VendaSessionService {
   cancelarVenda(): Observable<VendaOperacaoResultado> {
     this.loadingOperacaoSignal.set(true);
     return this.hubVendaService.cancelar().pipe(
-      tap(() => this.limparEstado()),
+      tap(() => {
+        if (this.trocaSignal()?.vendaUuid) this.limparTroca();
+        this.limparEstado();
+      }),
       map(() => ({ ok: true })),
       catchError((error: unknown) => this.tratarErroOperacao(error)),
       tap(() => this.loadingOperacaoSignal.set(false)),
@@ -152,6 +159,151 @@ export class VendaSessionService {
     );
   }
 
+  prepararTroca(devolucao: VendaDevolucaoResultado, origem: VendaDevolucaoConsulta): Observable<VendaOperacaoResultado> {
+    const vale = devolucao.vale_troca;
+    if (!vale?.provisorio || !/^VT-HUB-[0-9a-f]{20}$/i.test(vale.documento_tecnico || '')
+      || !devolucao.uuid || !origem.uuid || devolucao.venda_uuid !== origem.uuid
+      || !(origem.cliente.uuid || origem.cliente.id) || !normalizarValorPagamento(vale.saldo)) {
+      return of({ ok: false, detail: 'Crédito provisório ou identidade da devolução inválidos. Utilize somente o retorno do Hub.' });
+    }
+    const atual = this.trocaSignal();
+    if (atual) {
+      return of(atual.devolucaoUuid === devolucao.uuid
+        ? { ok: true } : { ok: false, detail: 'Conclua a troca vinculada antes de iniciar outra devolução no PDV.' });
+    }
+    if (devolucao.venda_troca_uuid || Number(vale.valor_consumido || 0) > 0) {
+      return of({ ok: false, detail: 'Crédito provisório já vinculado ou consumido em outra operação.' });
+    }
+    return this.hubVendaService.atual().pipe(
+      tap((response) => {
+        this.definirEstado(response);
+        this.trocaSignal.set({
+          devolucaoUuid: devolucao.uuid, documentoDevolucao: devolucao.documento || devolucao.uuid,
+          documentoVendaOrigem: origem.documento || origem.uuid, vendaOrigemUuid: origem.uuid,
+          documentoTecnico: vale.documento_tecnico!, credito: vale.saldo, cliente: { ...origem.cliente },
+          vendaAnteriorUuid: response.venda?.uuid || null, vendaUuid: null,
+        });
+      }),
+      map(() => ({ ok: true })),
+      catchError(() => of({ ok: false, detail: 'Não foi possível consultar a venda atual no Hub. Tente novamente antes de iniciar a troca.' })),
+    );
+  }
+
+  erroCreditoTroca(valor?: string): string {
+    const troca = this.trocaSignal();
+    const venda = this.vendaSignal();
+    if (!troca) return 'Não há devolução vinculada a esta troca.';
+    if (troca.bloqueio) return troca.bloqueio;
+    if (!/^VT-HUB-[0-9a-f]{20}$/i.test(troca.documentoTecnico)) return 'Documento técnico do crédito inválido.';
+    if (!venda || venda.status !== 'ABERTA') return 'Inicie uma nova venda para esta troca.';
+    if (!troca.vendaUuid || troca.vendaUuid !== venda.uuid || venda.uuid === troca.vendaOrigemUuid || venda.uuid === troca.vendaAnteriorUuid) {
+      return 'Conclua ou cancele a venda anterior e inicie uma nova venda para esta troca. O crédito não pode ser reutilizado em outra venda.';
+    }
+    const cliente = venda.cliente;
+    if (!cliente || cliente.clientePadrao || (troca.cliente.uuid && troca.cliente.uuid !== cliente.clienteUuid)
+      || (troca.cliente.id && troca.cliente.id !== cliente.retaguardaId)) return 'Selecione o mesmo cliente da devolução original.';
+    if (!venda.itens.length) return 'Inclua produtos na nova venda de troca.';
+    if (!venda.vendedor) return 'Selecione um vendedor antes de registrar pagamentos.';
+    if (venda.pagamentos.some((pagamento) => pagamento.devolucaoUuid || /^VT-HUB-/i.test(pagamento.valeTrocaDocumento || pagamento.autorizacao))) {
+      return 'Já existe crédito provisório aplicado ou consumo incompatível nesta venda.';
+    }
+    if (valor !== undefined) {
+      const normalizado = normalizarValorPagamento(valor);
+      if (!normalizado) return 'Valor do crédito da troca inválido.';
+      if (this.centavosTroca(normalizado) > this.centavosTroca(troca.credito)) return 'Crédito desta troca insuficiente para o valor informado.';
+      if (this.centavosTroca(normalizado) > this.centavosTroca(venda.pendente)) return 'Valor do crédito excede o saldo pendente da venda.';
+    }
+    return '';
+  }
+
+  sugestaoCreditoTroca(): string {
+    if (this.intencaoTrocaPendente) return this.intencaoTrocaPendente.valor;
+    const credito = normalizarValorPagamento(this.trocaSignal()?.credito) || '0.00';
+    const pendente = normalizarValorPagamento(this.vendaSignal()?.pendente) || '0.00';
+    return this.centavosTroca(credito) < this.centavosTroca(pendente) ? credito : pendente;
+  }
+
+  adicionarCreditoTroca(valor: string): Observable<VendaOperacaoResultado> {
+    if (this.loadingOperacaoSignal()) return of({ ok: false, detail: 'Aguarde o pagamento em andamento.' });
+    const troca = this.trocaSignal();
+    const venda = this.vendaSignal();
+    const normalizado = normalizarValorPagamento(valor);
+    const pendente = this.intencaoTrocaPendente;
+    if (pendente && pendente.valor !== normalizado) {
+      return of({ ok: false, detail: `Confirme a tentativa anterior repetindo o valor ${pendente.valor}, sem alterar os dados.` });
+    }
+    const erro = this.erroCreditoTroca(valor);
+    if (erro || !troca || !venda || !normalizado) return of({ ok: false, detail: erro });
+    const intencao = pendente || {
+      vendaUuid: venda.uuid, devolucaoUuid: troca.devolucaoUuid, documento: troca.documentoTecnico,
+      valor: normalizado, operacaoUuid: this.uuidTroca(),
+    };
+    this.intencaoTrocaPendente = intencao;
+    this.loadingOperacaoSignal.set(true);
+    return this.hubVendaService.adicionarPagamentoValeTroca(venda.uuid, intencao.operacaoUuid, intencao.documento, intencao.valor, intencao.devolucaoUuid).pipe(
+      tap((response) => {
+        if (!this.pagamentoTrocaConfirmado(response.venda, intencao)) throw new Error('Resposta do pagamento da troca inválida.');
+        this.intencaoTrocaPendente = null;
+        this.definirEstado(response);
+      }),
+      map(() => ({ ok: true })),
+      catchError((error: unknown) => {
+        if (error instanceof HttpErrorResponse && [400, 401, 403, 409].includes(error.status)) {
+          const detail = String(error.error?.detail || '');
+          if (/devolução já enviada à central/i.test(detail)) this.trocaSignal.update((atual) => atual ? { ...atual, bloqueio: detail } : null);
+          return this.tratarErroPagamento(error);
+        }
+        return this.hubVendaService.atual().pipe(
+          tap((response) => this.definirEstado(response)),
+          map((response) => {
+            if (this.pagamentoTrocaConfirmado(response.venda, intencao)) {
+              this.intencaoTrocaPendente = null;
+              return { ok: true };
+            }
+            return { ok: false, detail: 'Não foi possível confirmar o crédito da troca. Repita a tentativa sem alterar o valor.' };
+          }),
+          catchError(() => of({ ok: false, detail: 'Falha de comunicação com o Hub. O contexto da troca foi preservado; repita a mesma tentativa.' })),
+        );
+      }),
+      tap(() => this.loadingOperacaoSignal.set(false)),
+    );
+  }
+
+  private centavosTroca(valor: string): bigint {
+    const normalizado = normalizarValorPagamento(valor);
+    return normalizado ? BigInt(normalizado.replace('.', '')) : 0n;
+  }
+
+  private pagamentoTrocaConfirmado(venda: VendaHubResumo | null, intencao: { vendaUuid: string; devolucaoUuid: string; documento: string; valor: string }): boolean {
+    return !!venda && venda.uuid === intencao.vendaUuid && venda.pagamentos.some((pagamento) =>
+      pagamento.devolucaoUuid === intencao.devolucaoUuid
+      && (pagamento.valeTrocaDocumento || pagamento.autorizacao).toUpperCase() === intencao.documento.toUpperCase()
+      && pagamento.valor === intencao.valor);
+  }
+
+  private reconciliarTroca(venda: VendaHubResumo | null): void {
+    const troca = this.trocaSignal();
+    if (!troca) return;
+    if (troca.vendaUuid) {
+      if (!venda || venda.uuid !== troca.vendaUuid || venda.status !== 'ABERTA') this.limparTroca();
+    } else if (venda?.status === 'ABERTA' && venda.uuid !== troca.vendaAnteriorUuid && venda.uuid !== troca.vendaOrigemUuid) {
+      this.trocaSignal.set({ ...troca, vendaUuid: venda.uuid });
+    }
+  }
+
+  private limparTroca(): void {
+    this.trocaSignal.set(null);
+    this.intencaoTrocaPendente = null;
+  }
+
+  private uuidTroca(): string {
+    if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (letra) => {
+      const valor = Math.floor(Math.random() * 16);
+      return (letra === 'x' ? valor : (valor & 3) | 8).toString(16);
+    });
+  }
+
   adicionarPagamentoCashback(vendaUuid: string, valor: string): Observable<VendaOperacaoResultado> {
     const intencao = this.obterIntencaoPagamento('CASHBACK_LOCAL', -1, valor, 'CASHBACK_LOCAL', null);
     this.loadingOperacaoSignal.set(true);
@@ -189,6 +341,7 @@ export class VendaSessionService {
     return this.hubVendaService.finalizarVenda(vendaUuid).pipe(
       tap((response) => {
         if (response.venda?.status === 'FINALIZADA') {
+          this.reconciliarTroca(response.venda);
           this.vendaSignal.set(null);
           this.clientePreselecionadoSignal.set(null);
           this.vendedorPreselecionadoSignal.set(null);
@@ -235,6 +388,7 @@ export class VendaSessionService {
   }
 
   private definirEstado(response: VendaAtualResponse): void {
+    this.reconciliarTroca(response.venda);
     this.vendaSignal.set(response.venda);
     this.clientePreselecionadoSignal.set(response.venda ? null : response.clientePreselecionado);
     this.vendedorPreselecionadoSignal.set(response.venda ? null : response.vendedorPreselecionado);
@@ -389,6 +543,7 @@ export class VendaSessionService {
   }
 
   private tratarSessaoOperadorExpirada(): void {
+    this.limparTroca();
     this.operatorSession.invalidarSessao();
     this.limparEstado();
     void this.router.navigateByUrl('/operador');

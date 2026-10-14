@@ -111,6 +111,19 @@ export interface AdicionarPagamentoRequest {
   autorizacao: string;
 }
 
+export interface ContextoTrocaProvisoria {
+  devolucaoUuid: string;
+  documentoDevolucao: string;
+  documentoVendaOrigem: string;
+  vendaOrigemUuid: string;
+  documentoTecnico: string;
+  credito: DecimalString;
+  cliente: { id: number | null; uuid?: string | null; nome: string };
+  vendaAnteriorUuid: string | null;
+  vendaUuid: string | null;
+  bloqueio?: string;
+}
+
 export interface ValeTrocaOnline {
   id: number;
   documento: string;

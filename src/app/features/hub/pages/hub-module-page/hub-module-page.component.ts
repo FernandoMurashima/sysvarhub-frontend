@@ -1,12 +1,13 @@
 import { Component, Injector, computed, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { ActivatedRoute, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 
 import { DevolucaoCliente, DevolucaoClienteVenda, VendaDevolucaoConsulta, VendaDevolucaoItem, VendaDevolucaoResultado } from '../../../../core/models/venda.models';
 import { OperatorSessionService } from '../../../operador/services/operator-session.service';
 import { CentralConnectivityService } from '../../../terminal/services/central-connectivity.service';
 import { TerminalSessionService } from '../../../terminal/services/terminal-session.service';
+import { VendaSessionService } from '../../../venda/services/venda-session.service';
 import { HubVendaService } from '../../../venda/services/hub-venda.service';
 
 type HubModuleKey = 'devolucao-troca' | 'consulta-vendas' | 'pendencias-sincronizacao';
@@ -42,6 +43,7 @@ export class HubModulePageComponent {
   private readonly operatorSession = inject(OperatorSessionService);
   private readonly centralConnectivity = inject(CentralConnectivityService);
   private readonly injector = inject(Injector);
+  private readonly router = inject(Router);
 
   readonly contexto = this.terminalSession.contexto;
   readonly operador = this.operatorSession.operador;
@@ -221,6 +223,19 @@ export class HubModulePageComponent {
   resultadoProvisorio(): boolean {
     const vale = this.resultado?.vale_troca;
     return !!this.resultado && (this.resultadoLocal || !!vale?.provisorio || /^VT-HUB(?:-|$)/i.test(vale?.documento || ''));
+  }
+
+  realizarTrocaNoPdv(): void {
+    if (this.carregando || !this.resultado?.vale_troca?.provisorio || !this.venda) return;
+    this.carregando = true;
+    this.injector.get(VendaSessionService).prepararTroca(this.resultado, this.venda).subscribe((resposta) => {
+      this.carregando = false;
+      if (!resposta.ok) {
+        this.mensagem = resposta.detail || 'Não foi possível preparar a troca no PDV.';
+        return;
+      }
+      void this.router.navigateByUrl('/pdv');
+    });
   }
 
   itemKey(item: { id?: number; item_uuid?: string }): string {

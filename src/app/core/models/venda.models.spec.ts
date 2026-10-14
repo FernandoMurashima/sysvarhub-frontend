@@ -1,4 +1,4 @@
-import { mapVendaAtual, VendaApiResponse } from './venda.models';
+import { mapVendaPagamento, mapVendaAtual, VendaApiResponse } from './venda.models';
 
 describe('venda models', () => {
   it('mapeia snake_case para camelCase preservando monetarios como string', () => {
@@ -176,4 +176,14 @@ describe('venda models', () => {
     expect(response.clientePreselecionado).toBeNull();
     expect(response.vendedorPreselecionado).toBeNull();
   });
+
+  it('preserva UUID da devolucao retornado no pagamento do Hub', () => {
+    const pagamento = mapVendaPagamento({ uuid: 'pagamento', forma_pagamento_id: null, forma_retaguarda_id: null,
+      codigo: 'VT', descricao: 'Vale-Troca', tipo: 'VALE_TROCA', num_parcelas: 1, valor: '95.00',
+      autorizacao: 'VT-HUB-0123456789abcdef0123', vale_troca_documento: 'VT-HUB-0123456789abcdef0123',
+      devolucao_uuid: 'devolucao-local', origem_captura: 'MANUAL', criado_em: '' });
+    expect(pagamento.devolucaoUuid).toBe('devolucao-local');
+    expect(pagamento.valor).toBe('95.00');
+  });
+
 });

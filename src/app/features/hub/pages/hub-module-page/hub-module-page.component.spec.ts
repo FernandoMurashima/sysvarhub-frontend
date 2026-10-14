@@ -1,11 +1,12 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { ActivatedRoute } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { provideRouter } from '@angular/router';
 import { signal } from '@angular/core';
 import { HttpErrorResponse } from '@angular/common/http';
 import { of, Subject, throwError } from 'rxjs';
 
 import { VendaDevolucaoConsulta, VendaDevolucaoResultadoResponse } from '../../../../core/models/venda.models';
+import { VendaSessionService } from '../../../venda/services/venda-session.service';
 import { HubVendaService } from '../../../venda/services/hub-venda.service';
 
 import { operadorLoginResponseStub, terminalContextoStub } from '../../../../testing/terminal-test-data';
@@ -17,12 +18,15 @@ import { HubModulePageComponent } from './hub-module-page.component';
 describe('HubModulePageComponent', () => {
   let fixture: ComponentFixture<HubModulePageComponent>;
   let component: HubModulePageComponent;
+  let vendaSession: jasmine.SpyObj<VendaSessionService>;
   let vendaService: jasmine.SpyObj<HubVendaService>;
   let centralConnectivity: jasmine.SpyObj<CentralConnectivityService>;
   const centralStatusSignal = signal<'VERIFICANDO' | 'ONLINE' | 'OFFLINE'>('OFFLINE');
   const centralUltimoContatoSignal = signal('');
 
   beforeEach(async () => {
+    vendaSession = jasmine.createSpyObj<VendaSessionService>('VendaSessionService', ['prepararTroca']);
+    vendaSession.prepararTroca.and.returnValue(of({ ok: true }));
     vendaService = jasmine.createSpyObj<HubVendaService>('HubVendaService', [
       'consultarDevolucao', 'consultarDevolucaoPorVendaId', 'pesquisarClientesDevolucao',
       'listarVendasClienteDevolucao', 'finalizarDevolucao',
@@ -40,6 +44,7 @@ describe('HubModulePageComponent', () => {
       imports: [HubModulePageComponent],
       providers: [
         provideRouter([]),
+        { provide: VendaSessionService, useValue: vendaSession },
         { provide: HubVendaService, useValue: vendaService },
         { provide: ActivatedRoute, useValue: { snapshot: { data: { moduleKey: 'devolucao-troca' } } } },
         { provide: TerminalSessionService, useValue: { contexto: signal(terminalContextoStub).asReadonly() } },
@@ -304,6 +309,40 @@ describe('HubModulePageComponent', () => {
     fixture.detectChanges();
     expect(fixture.nativeElement.querySelector('.result-box').textContent).not.toContain('VT-HUB-');
     expect(component.resultadoProvisorio()).toBeTrue();
+  });
+
+
+  it('oferece realizar troca no PDV com resultado e cliente retornados pelo Hub', () => {
+    const navigate = spyOn(TestBed.inject(Router), 'navigateByUrl').and.resolveTo(true);
+    localizarLocal();
+    component.finalizar();
+    fixture.detectChanges();
+    const botoes = Array.from(fixture.nativeElement.querySelectorAll('.result-box button') as NodeListOf<HTMLButtonElement>);
+    const botao = botoes.find((item) => item.textContent?.includes('Realizar troca no PDV'));
+    expect(botao).toBeDefined();
+    botao!.click();
+    expect(vendaSession.prepararTroca).toHaveBeenCalledOnceWith(component.resultado!, component.venda!);
+    expect(navigate).toHaveBeenCalledOnceWith('/pdv');
+  });
+
+  it('nao transfere resultado oficial como credito provisorio', () => {
+    localizarLocal();
+    const resposta = resultadoStub();
+    resposta.devolucao.vale_troca!.provisorio = false;
+    component.resultado = resposta.devolucao;
+    component.realizarTrocaNoPdv();
+    expect(vendaSession.prepararTroca).not.toHaveBeenCalled();
+  });
+
+  it('preserva resultado se o Hub nao consegue preparar a troca', () => {
+    const navigate = spyOn(TestBed.inject(Router), 'navigateByUrl').and.resolveTo(true);
+    localizarLocal();
+    component.finalizar();
+    vendaSession.prepararTroca.and.returnValue(of({ ok: false, detail: 'Venda atual indisponível. Tente novamente.' }));
+    component.realizarTrocaNoPdv();
+    expect(component.resultado?.uuid).toBe('devolucao-local');
+    expect(component.mensagem).toContain('Tente novamente');
+    expect(navigate).not.toHaveBeenCalled();
   });
 
 });

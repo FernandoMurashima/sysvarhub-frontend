@@ -407,6 +407,15 @@ describe('HubVendaService', () => {
     request.flush({ devolucao: {} });
   });
 
+
+  it('envia credito provisorio com UUID da devolucao vinculada', () => {
+    service.adicionarPagamentoValeTroca('venda-troca', 'operacao', 'VT-HUB-0123456789abcdef0123', '95.00', 'devolucao').subscribe();
+    const request = httpMock.expectOne('/api/terminal/venda/pagamento/vale-troca/');
+    expect(request.request.method).toBe('POST');
+    expect(request.request.body).toEqual({ venda_uuid: 'venda-troca', operacao_uuid: 'operacao', documento: 'VT-HUB-0123456789abcdef0123', devolucao_uuid: 'devolucao', valor: '95.00' });
+    request.flush({ venda: null });
+  });
+
 });
 
 function vendaConsultaResumoApi() {

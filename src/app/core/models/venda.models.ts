@@ -422,6 +422,7 @@ export interface VendaPagamentoHubResumo {
   valor: string;
   autorizacao: string;
   valeTrocaDocumento?: string;
+  devolucaoUuid?: string | null;
   cashbackOrigem?: CashbackOrigem | null;
   cashbackReservaId?: number | null;
   cashbackValorReservado?: string;
@@ -522,6 +523,7 @@ export interface VendaPagamentoHubResumoApi {
   valor: string;
   autorizacao: string;
   vale_troca_documento?: string;
+  devolucao_uuid?: string | null;
   cashback_origem?: CashbackOrigem | null;
   cashback_reserva_id?: number | null;
   cashback_valor_reservado?: string;
@@ -644,11 +646,12 @@ export interface VendaDevolucaoResultado {
   venda_uuid: string;
   documento?: string;
   venda_documento?: string;
+  venda_troca_uuid?: string | null;
   loja_origem?: string;
   loja_recebimento?: string;
   valor_total: string;
   finalizada_em: string;
-  vale_troca: { documento: string; documento_tecnico?: string; saldo: string; valor_original?: string; status?: string; provisorio?: boolean; rotulo?: string } | null;
+  vale_troca: { documento: string; documento_tecnico?: string; saldo: string; valor_original?: string; status?: string; provisorio?: boolean; rotulo?: string; devolucao_uuid?: string; valor_consumido?: string } | null;
   fiscal?: { status: string; modelo?: string; numero?: number; serie?: number; chave_acesso?: string; mensagem?: string } | null;
 }
 
@@ -746,6 +749,7 @@ export function mapVendaPagamento(pagamento: VendaPagamentoHubResumoApi): VendaP
     valor: pagamento.valor,
     autorizacao: pagamento.autorizacao,
     valeTrocaDocumento: pagamento.vale_troca_documento ?? '',
+    devolucaoUuid: pagamento.devolucao_uuid ?? null,
     cashbackOrigem: pagamento.cashback_origem ?? null,
     cashbackReservaId: pagamento.cashback_reserva_id ?? null,
     cashbackValorReservado: pagamento.cashback_valor_reservado ?? '0.00',

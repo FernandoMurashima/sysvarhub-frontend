@@ -193,6 +193,9 @@
             <div class="actions">
               <a routerLink="/">Home</a>
               <a routerLink="/pdv">PDV</a>
+              @if (resultado.vale_troca?.provisorio) {
+                <button type="button" (click)="realizarTrocaNoPdv()" [disabled]="carregando">Realizar troca no PDV</button>
+              }
               <button type="button" (click)="novaDevolucao()">Outra devolução</button>
             </div>
           </section>

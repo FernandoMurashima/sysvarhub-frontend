@@ -106,12 +106,13 @@ export class HubVendaService {
     return this.http.get<ValesTrocaDisponiveisResponse>(`${this.terminalUrl}/vale-troca/disponiveis/?venda_uuid=${encodeURIComponent(vendaUuid)}`);
   }
 
-  adicionarPagamentoValeTroca(vendaUuid: string, operacaoUuid: string, documento: string, valor: string): Observable<VendaAtualResponse> {
+  adicionarPagamentoValeTroca(vendaUuid: string, operacaoUuid: string, documento: string, valor: string, devolucaoUuid?: string): Observable<VendaAtualResponse> {
     return this.http.post<VendaApiResponse>(`${this.baseUrl}/pagamento/vale-troca/`, {
       venda_uuid: vendaUuid,
       operacao_uuid: operacaoUuid,
       documento,
       valor,
+      ...(devolucaoUuid ? { devolucao_uuid: devolucaoUuid } : {}),
     }).pipe(map(mapVendaAtual));
   }
 

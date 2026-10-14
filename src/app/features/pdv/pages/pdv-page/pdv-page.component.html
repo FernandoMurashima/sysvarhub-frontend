@@ -72,8 +72,17 @@
     </div>
   </header>
 
+
   <main class="pdv-body">
-    <aside class="left-panel">
+    <aside class="left-panel" [class.troca-active]="!!troca()">
+      @if (troca(); as contextoTroca) {
+        <section class="troca-context" aria-label="Troca vinculada">
+          <strong>Troca vinculada à devolução {{ contextoTroca.documentoDevolucao }}</strong>
+          <span>Venda original {{ contextoTroca.documentoVendaOrigem }} · Cliente {{ contextoTroca.cliente.nome }}</span>
+          <span>Crédito provisório de {{ formatarMoeda(contextoTroca.credito) }}, exclusivo desta nova venda. O restante não fica livre para outras vendas offline.</span>
+          <small>{{ erroCreditoTroca() || 'Utilize Crédito desta troca no modal de pagamentos.' }}</small>
+        </section>
+      }
       <div class="panel">
         <h3>INFORMAÇÕES DA VENDA</h3>
         <label>
@@ -1106,6 +1115,12 @@
                     }
                   </button>
                 }
+                @if (troca()) {
+                  <button type="button" class="troca-payment-option" [class.selected]="pagamentoCreditoTrocaSelecionado" [disabled]="!!erroCreditoTroca() || vendaLoading() || enviandoCreditoTroca" (click)="selecionarCreditoTroca()">
+                    <strong>Crédito desta troca</strong>
+                    <span>Exclusivo da devolução vinculada · disponível offline</span>
+                  </button>
+                }
                 <button type="button" [class.selected]="pagamentoValeTrocaSelecionado" (click)="selecionarPagamentoValeTroca()">
                   <strong>VT · Vale-Troca</strong>
                   <span>Crédito Loja · online</span>
@@ -1121,6 +1136,14 @@
               </div>
 
               <form class="payment-form" (submit)="$event.preventDefault(); adicionarPagamento()">
+                @if (pagamentoCreditoTrocaSelecionado) {
+                  <section class="payment-panel troca-credit-panel">
+                    <strong>Crédito desta troca · {{ troca()?.documentoDevolucao }}</strong>
+                    <p>Cliente: {{ troca()?.cliente?.nome }} · Crédito provisório {{ formatarMoeda(troca()?.credito) }}</p>
+                    <small>Use somente o necessário para esta venda, sem troco. O restante não é saldo livre para outras vendas offline.</small>
+                    @if (erroCreditoTroca()) { <p>{{ erroCreditoTroca() }}</p> }
+                  </section>
+                }
                 @if (beneficiosCliente && !pagamentoValeTrocaSelecionado && !pagamentoCashbackCentralSelecionado) {
                   <section class="payment-panel cashback-panel">
                     <div class="payment-panel-title">
@@ -1201,15 +1224,15 @@
                       </div>
                     </div>
                   }
-                  <label>{{ pagamentoValeTrocaSelecionado || pagamentoCashbackSelecionado || pagamentoCashbackCentralSelecionado ? 'Valor a utilizar' : 'Valor' }}<input name="valorPagamento" [(ngModel)]="valorPagamento" inputmode="decimal" autocomplete="off" /></label>
-                  @if (!pagamentoValeTrocaSelecionado && !pagamentoCashbackSelecionado && !pagamentoCashbackCentralSelecionado) {
+                  <label>{{ pagamentoCreditoTrocaSelecionado || pagamentoValeTrocaSelecionado || pagamentoCashbackSelecionado || pagamentoCashbackCentralSelecionado ? 'Valor a utilizar' : 'Valor' }}<input name="valorPagamento" [(ngModel)]="valorPagamento" inputmode="decimal" autocomplete="off" /></label>
+                  @if (!pagamentoCreditoTrocaSelecionado && !pagamentoValeTrocaSelecionado && !pagamentoCashbackSelecionado && !pagamentoCashbackCentralSelecionado) {
                     <label>Autorização<input name="autorizacaoPagamento" [(ngModel)]="autorizacaoPagamento" maxlength="120" autocomplete="off" /></label>
                   }
                   @if (formaPagamentoSelecionada?.tefHabilitado) {
                     <p>Esta forma exige integração TEF.</p>
                   }
-                  <button type="submit" [disabled]="(!formaPagamentoSelecionada && !pagamentoValeTrocaSelecionado && !pagamentoCashbackSelecionado && !pagamentoCashbackCentralSelecionado) || !!formaPagamentoSelecionada?.tefHabilitado || (!!formaPagamentoSelecionada?.permiteParcelamento && !condicaoPagamentoSelecionada) || vendaLoading()">
-                    {{ pagamentoValeTrocaSelecionado ? 'Adicionar Vale-Troca' : pagamentoCashbackSelecionado ? 'Adicionar Cashback LOCAL' : pagamentoCashbackCentralSelecionado ? 'Adicionar Cashback CENTRAL' : 'Adicionar' }}
+                  <button type="submit" [disabled]="(pagamentoCreditoTrocaSelecionado && !!erroCreditoTroca()) || enviandoCreditoTroca || (!formaPagamentoSelecionada && !pagamentoCreditoTrocaSelecionado && !pagamentoValeTrocaSelecionado && !pagamentoCashbackSelecionado && !pagamentoCashbackCentralSelecionado) || !!formaPagamentoSelecionada?.tefHabilitado || (!!formaPagamentoSelecionada?.permiteParcelamento && !condicaoPagamentoSelecionada) || vendaLoading()">
+                    {{ pagamentoCreditoTrocaSelecionado ? 'Adicionar crédito desta troca' : pagamentoValeTrocaSelecionado ? 'Adicionar Vale-Troca' : pagamentoCashbackSelecionado ? 'Adicionar Cashback LOCAL' : pagamentoCashbackCentralSelecionado ? 'Adicionar Cashback CENTRAL' : 'Adicionar' }}
                   </button>
                 </section>
               </form>
