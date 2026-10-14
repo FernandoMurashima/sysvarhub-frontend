@@ -1125,12 +1125,8 @@
                   <strong>VT · Vale-Troca</strong>
                   <span>Crédito Loja · online</span>
                 </button>
-                <button type="button" [class.selected]="pagamentoCashbackSelecionado" (click)="selecionarPagamentoCashback()">
-                  <strong>CB · Cashback LOCAL</strong>
-                  <span>Benefício offline</span>
-                </button>
                 <button type="button" [class.selected]="pagamentoCashbackCentralSelecionado" (click)="selecionarPagamentoCashbackCentral()">
-                  <strong>CB · Cashback CENTRAL</strong>
+                  <strong>CB · Cashback</strong>
                   <span>Saldo oficial online</span>
                 </button>
               </div>
@@ -1144,22 +1140,10 @@
                     @if (erroCreditoTroca()) { <p>{{ erroCreditoTroca() }}</p> }
                   </section>
                 }
-                @if (beneficiosCliente && !pagamentoValeTrocaSelecionado && !pagamentoCashbackCentralSelecionado) {
-                  <section class="payment-panel cashback-panel">
-                    <div class="payment-panel-title">
-                      <strong>{{ pagamentoCashbackSelecionado ? 'Cashback LOCAL selecionado' : 'Cashback LOCAL' }}</strong>
-                      <span>{{ formatarMoeda(beneficiosCliente.cashback.saldo_offline_utilizavel || beneficiosCliente.cashback.saldo) }}</span>
-                    </div>
-                    <small>Central informativo {{ formatarMoeda(beneficiosCliente.cashback.saldo_retaguarda) }} · Limite {{ beneficiosCliente.cashback.limite_uso_percentual }}% · LOCAL usado {{ formatarMoeda(cashbackLocalJaAdicionado()) }} · Total Cashback {{ formatarMoeda(cashbackTotalJaAdicionado()) }}</small>
-                    @if (pagamentoCashbackSelecionado) {
-                      <small>Sugestão {{ formatarMoeda(sugestaoCashbackLocal().toFixed(2)) }}</small>
-                    }
-                  </section>
-                }
                 @if (pagamentoCashbackCentralSelecionado) {
                   <section class="payment-panel cashback-panel">
                     <div class="payment-panel-title">
-                      <strong>Cashback CENTRAL selecionado</strong>
+                      <strong>Cashback selecionado</strong>
                       <span>{{ centralStatus() }}</span>
                     </div>
                     @if (cashbackCentralEstado === 'carregando') {
@@ -1170,7 +1154,7 @@
                     }
                     @if (cashbackCentralConsulta) {
                       <small>Oficial {{ formatarMoeda(cashbackCentralConsulta.saldoOficial) }} · Reservado {{ formatarMoeda(cashbackCentralConsulta.valorReservado) }} · Disponível {{ formatarMoeda(cashbackCentralConsulta.saldoDisponivel) }}</small>
-                      <small>Limite {{ beneficiosCliente?.cashback?.limite_uso_percentual || '0' }}% · Total Cashback {{ formatarMoeda(cashbackTotalJaAdicionado()) }} · Sugestão {{ formatarMoeda(sugestaoCashbackCentral().toFixed(2)) }}</small>
+                      <small>Mínimo {{ formatarMoeda(beneficiosCliente?.cashback?.valor_minimo_uso) }} · Limite {{ beneficiosCliente?.cashback?.limite_uso_percentual || '0' }}% · Total Cashback {{ formatarMoeda(cashbackTotalJaAdicionado()) }} · Sugestão {{ formatarMoeda(sugestaoCashbackCentral().toFixed(2)) }}</small>
                     }
                     <button type="button" class="secondary-action" (click)="consultarCashbackCentral()" [disabled]="cashbackCentralEstado === 'carregando' || centralStatus() !== 'ONLINE'">Atualizar saldo</button>
                   </section>
@@ -1231,8 +1215,8 @@
                   @if (formaPagamentoSelecionada?.tefHabilitado) {
                     <p>Esta forma exige integração TEF.</p>
                   }
-                  <button type="submit" [disabled]="(pagamentoCreditoTrocaSelecionado && !!erroCreditoTroca()) || enviandoCreditoTroca || (!formaPagamentoSelecionada && !pagamentoCreditoTrocaSelecionado && !pagamentoValeTrocaSelecionado && !pagamentoCashbackSelecionado && !pagamentoCashbackCentralSelecionado) || !!formaPagamentoSelecionada?.tefHabilitado || (!!formaPagamentoSelecionada?.permiteParcelamento && !condicaoPagamentoSelecionada) || vendaLoading()">
-                    {{ pagamentoCreditoTrocaSelecionado ? 'Adicionar crédito desta troca' : pagamentoValeTrocaSelecionado ? 'Adicionar Vale-Troca' : pagamentoCashbackSelecionado ? 'Adicionar Cashback LOCAL' : pagamentoCashbackCentralSelecionado ? 'Adicionar Cashback CENTRAL' : 'Adicionar' }}
+                  <button type="submit" [disabled]="((pagamentoCashbackCentralSelecionado || pagamentoCashbackSelecionado) && (centralStatus() !== 'ONLINE' || !cashbackCentralConsulta)) || (pagamentoCreditoTrocaSelecionado && !!erroCreditoTroca()) || enviandoCreditoTroca || (!formaPagamentoSelecionada && !pagamentoCreditoTrocaSelecionado && !pagamentoValeTrocaSelecionado && !pagamentoCashbackSelecionado && !pagamentoCashbackCentralSelecionado) || !!formaPagamentoSelecionada?.tefHabilitado || (!!formaPagamentoSelecionada?.permiteParcelamento && !condicaoPagamentoSelecionada) || vendaLoading()">
+                    {{ pagamentoCreditoTrocaSelecionado ? 'Adicionar crédito desta troca' : pagamentoValeTrocaSelecionado ? 'Adicionar Vale-Troca' : pagamentoCashbackCentralSelecionado ? 'Adicionar Cashback' : 'Adicionar' }}
                   </button>
                 </section>
               </form>

@@ -1,6 +1,6 @@
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
-import { map, Observable } from 'rxjs';
+import { map, Observable, throwError } from 'rxjs';
 
 import { HUB_TERMINAL_API_PATH } from '../../../core/api/api.config';
 import {
@@ -117,11 +117,7 @@ export class HubVendaService {
   }
 
   adicionarPagamentoCashback(vendaUuid: string, operacaoUuid: string, valor: string): Observable<VendaAtualResponse> {
-    return this.http.post<VendaApiResponse>(`${this.baseUrl}/pagamento/cashback/`, {
-      venda_uuid: vendaUuid,
-      operacao_uuid: operacaoUuid,
-      valor,
-    }).pipe(map(mapVendaAtual));
+    return throwError(() => new Error('Cashback exige autorização online da Central. Utilize a opção Cashback.'));
   }
 
   consultarCashbackOnline(vendaUuid: string): Observable<CashbackOnlineSaldoResponse> {

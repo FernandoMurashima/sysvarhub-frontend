@@ -2626,6 +2626,7 @@ describe('PdvPageComponent', () => {
     }));
 
     component.abrirPagamentos('TODAS');
+    component.selecionarPagamentoCashback();
     fixture.detectChanges();
 
     expect(fixture.nativeElement.querySelector('.cashback-panel')).not.toBeNull();
@@ -2680,27 +2681,30 @@ describe('PdvPageComponent', () => {
     }));
 
     component.abrirPagamentos('TODAS');
+    centralStatusSignal.set('ONLINE');
     component.selecionarPagamentoCashback();
     fixture.detectChanges();
 
-    expect(component.pagamentoCashbackSelecionado).toBeTrue();
+    expect(component.pagamentoCashbackCentralSelecionado).toBeTrue();
+    expect(component.pagamentoCashbackSelecionado).toBeFalse();
     expect(component.formaPagamentoSelecionada).toBeNull();
-    expect(component.valorPagamento).toBe('70.00');
-    expect(fixture.nativeElement.textContent).toContain('Cashback LOCAL selecionado');
-    expect(fixture.nativeElement.textContent).toContain('Central informativo R$ 150,00');
-    expect(fixture.nativeElement.textContent).toContain('Adicionar Cashback LOCAL');
+    expect(component.valorPagamento).toBe('80.00');
+    expect(fixture.nativeElement.textContent).toContain('Cashback selecionado');
+    expect(fixture.nativeElement.textContent).toContain('Oficial R$ 100,00');
+    expect(fixture.nativeElement.textContent).toContain('Adicionar Cashback');
   });
 
   it('envia cashback pelo fluxo proprio e atualiza beneficios', () => {
     const component = fixture.componentInstance;
     vendaSignal.set({ ...vendaAbertaStub.venda!, vendedor: vendedorStub, cliente: clienteAtivo, pendente: '80.00' });
     component.abrirPagamentos('TODAS');
+    centralStatusSignal.set('ONLINE');
     component.selecionarPagamentoCashback();
     component.valorPagamento = '20,00';
 
     component.adicionarPagamento();
 
-    expect(vendaSession.adicionarPagamentoCashback).toHaveBeenCalledWith(vendaAbertaStub.venda!.uuid, '20.00');
+    expect(vendaSession.adicionarPagamentoCashbackOnline).toHaveBeenCalledWith(vendaAbertaStub.venda!.uuid, '20.00');
     expect(vendaSession.adicionarPagamento).not.toHaveBeenCalled();
     expect(component.mensagem).toBe('Cashback adicionado.');
     expect(hubVendaService.consultarBeneficiosCliente).toHaveBeenCalled();
@@ -2708,9 +2712,10 @@ describe('PdvPageComponent', () => {
 
   it('exibe erro retornado pelo backend ao adicionar cashback', () => {
     const component = fixture.componentInstance;
-    vendaSession.adicionarPagamentoCashback.and.returnValue(of({ ok: false, detail: 'O cashback usado ultrapassa o limite permitido para a venda.' }));
+    vendaSession.adicionarPagamentoCashbackOnline.and.returnValue(of({ ok: false, detail: 'O cashback usado ultrapassa o limite permitido para a venda.' }));
     vendaSignal.set({ ...vendaAbertaStub.venda!, vendedor: vendedorStub, cliente: clienteAtivo, pendente: '80.00' });
     component.abrirPagamentos('TODAS');
+    centralStatusSignal.set('ONLINE');
     component.selecionarPagamentoCashback();
     component.valorPagamento = '20.00';
 
@@ -2770,9 +2775,9 @@ describe('PdvPageComponent', () => {
     expect(component.formaPagamentoSelecionada).toBeNull();
     expect(hubVendaService.consultarCashbackOnline).toHaveBeenCalledWith(vendaAbertaStub.venda!.uuid);
     expect(component.valorPagamento).toBe('80.00');
-    expect(fixture.nativeElement.textContent).toContain('Cashback CENTRAL selecionado');
+    expect(fixture.nativeElement.textContent).toContain('Cashback selecionado');
     expect(fixture.nativeElement.textContent).toContain('Disponível R$ 90,00');
-    expect(fixture.nativeElement.textContent).toContain('Adicionar Cashback CENTRAL');
+    expect(fixture.nativeElement.textContent).toContain('Adicionar Cashback');
   });
 
   it('envia cashback central pelo fluxo online sem reutilizar forma comercial', () => {
@@ -2787,7 +2792,7 @@ describe('PdvPageComponent', () => {
 
     expect(vendaSession.adicionarPagamentoCashbackOnline).toHaveBeenCalledWith(vendaAbertaStub.venda!.uuid, '20.00');
     expect(vendaSession.adicionarPagamento).not.toHaveBeenCalled();
-    expect(component.mensagem).toBe('Cashback Central adicionado.');
+    expect(component.mensagem).toBe('Cashback adicionado.');
     expect(hubVendaService.consultarBeneficiosCliente).toHaveBeenCalled();
   });
 
@@ -2799,7 +2804,7 @@ describe('PdvPageComponent', () => {
     component.selecionarPagamentoCashbackCentral();
 
     expect(hubVendaService.consultarCashbackOnline).not.toHaveBeenCalled();
-    expect(component.mensagem).toBe('Central offline. Cashback Central indisponível.');
+    expect(component.mensagem).toBe('Central offline. Cashback indisponível.');
   });
 
   it('ignora resposta antiga de cashback central quando cliente muda', () => {
@@ -2863,10 +2868,10 @@ describe('PdvPageComponent', () => {
     component.adicionarPagamento();
 
     expect(vendaSession.adicionarPagamentoCashbackOnline).not.toHaveBeenCalled();
-    expect(component.mensagem).toBe('Consulte o Cashback Central antes de adicionar.');
+    expect(component.mensagem).toBe('Consulte o saldo oficial do Cashback antes de adicionar.');
   });
 
-  it('cashback local permanece independente de consulta central antiga', () => {
+  it('acao antiga de cashback nao permite fallback local apos troca de venda', () => {
     const component = fixture.componentInstance;
     const consulta = new Subject<{ cashback: { saldoOficial: string; valorReservado: string; saldoDisponivel: string } }>();
     vendaSignal.set({ ...vendaAbertaStub.venda!, vendedor: vendedorStub, cliente: clienteAtivo, total: '200.00', pendente: '100.00' });
@@ -2880,8 +2885,127 @@ describe('PdvPageComponent', () => {
     component.valorPagamento = '20.00';
     component.adicionarPagamento();
 
-    expect(vendaSession.adicionarPagamentoCashback).toHaveBeenCalledWith('venda-2', '20.00');
+    expect(vendaSession.adicionarPagamentoCashback).not.toHaveBeenCalled();
     expect(vendaSession.adicionarPagamentoCashbackOnline).not.toHaveBeenCalled();
+    expect(hubVendaService.consultarCashbackOnline).toHaveBeenCalledTimes(2);
+  });
+
+  it('mostra uma unica opcao Cashback mesmo com forma comercial antiga', () => {
+    const component = fixture.componentInstance;
+    vendaSignal.set({ ...vendaAbertaStub.venda!, vendedor: vendedorStub, cliente: clienteAtivo });
+    const resposta = { versao: 1, sincronizadoEm: null, prazos: [], formas: [{
+      id: 99, retaguardaId: 99, codigo: 'CBK', descricao: 'Cashback LOCAL', tipo: 'CASHBACK',
+      numParcelas: 1, permiteParcelamento: false, tefHabilitado: false, condicoesParcelamento: [], parcelas: [],
+    }] };
+    vendaSession.listarFormasPagamento.and.returnValue(of(resposta));
+    component.abrirPagamentos('TODAS');
+    fixture.detectChanges();
+    const opcoes = Array.from<HTMLElement>(fixture.nativeElement.querySelectorAll('.payment-forms button'));
+    expect(opcoes.filter((botao) => botao.textContent?.includes('Cashback')).length).toBe(1);
+    expect(fixture.nativeElement.textContent).not.toContain('Cashback LOCAL');
+    expect(component.formasPagamentoFiltradas()).toEqual([]);
+    expect(component.formaPagamentoSelecionada).toBeNull();
+  });
+
+  it('cashback sem Central bloqueia utilizacao e permite outra forma', () => {
+    const component = fixture.componentInstance;
+    vendaSignal.set({ ...vendaAbertaStub.venda!, vendedor: vendedorStub, cliente: clienteAtivo });
+    centralStatusSignal.set('OFFLINE');
+    component.abrirPagamentos('TODAS');
+    const forma = {
+      id: 1, retaguardaId: 1, codigo: 'DIN', descricao: 'Dinheiro', tipo: 'DINHEIRO',
+      numParcelas: 1, permiteParcelamento: false, tefHabilitado: false, condicoesParcelamento: [], parcelas: [],
+    };
+    component.selecionarPagamentoCashback();
+    component.valorPagamento = '20.00';
+    component.adicionarPagamento();
+    expect(vendaSession.adicionarPagamentoCashback).not.toHaveBeenCalled();
+    expect(vendaSession.adicionarPagamentoCashbackOnline).not.toHaveBeenCalled();
+    component.selecionarFormaPagamento(forma);
+    component.valorPagamento = '20.00';
+    component.adicionarPagamento();
+    expect(vendaSession.adicionarPagamento).toHaveBeenCalled();
+  });
+
+  it('cashback nao usa saldo local quando consulta oficial falha', () => {
+    const component = fixture.componentInstance;
+    vendaSignal.set({ ...vendaAbertaStub.venda!, vendedor: vendedorStub, cliente: clienteAtivo });
+    centralStatusSignal.set('ONLINE');
+    hubVendaService.consultarCashbackOnline.and.returnValue(throwError(() => new HttpErrorResponse({ status: 409, error: { detail: 'Central indisponível.' } })));
+    component.abrirPagamentos('TODAS');
+    component.selecionarPagamentoCashback();
+    component.valorPagamento = '20.00';
+    component.adicionarPagamento();
+    expect(component.cashbackCentralConsulta).toBeNull();
+    expect(component.cashbackCentralErro).toBe('Central indisponível.');
+    expect(vendaSession.adicionarPagamentoCashback).not.toHaveBeenCalled();
+    expect(vendaSession.adicionarPagamentoCashbackOnline).not.toHaveBeenCalled();
+  });
+
+  it('estado antigo e forma comercial restaurada nao contornam consulta de cashback', () => {
+    const component = fixture.componentInstance;
+    vendaSignal.set({ ...vendaAbertaStub.venda!, vendedor: vendedorStub, cliente: clienteAtivo });
+    centralStatusSignal.set('ONLINE');
+    component.abrirPagamentos('TODAS');
+    component.pagamentoCashbackSelecionado = true;
+    component.valorPagamento = '20.00';
+    component.adicionarPagamento();
+    component.pagamentoCashbackSelecionado = false;
+    component.formaPagamentoSelecionada = { ...component.formaPagamentoSelecionada!, tipo: 'CASHBACK' };
+    component.adicionarPagamento();
+    expect(vendaSession.adicionarPagamentoCashback).not.toHaveBeenCalled();
+    expect(vendaSession.adicionarPagamentoCashbackOnline).not.toHaveBeenCalled();
+    expect(vendaSession.adicionarPagamento).not.toHaveBeenCalled();
+    component.selecionarFormaPagamento(component.formaPagamentoSelecionada);
+    expect(hubVendaService.consultarCashbackOnline).toHaveBeenCalled();
+    expect(component.pagamentoCashbackCentralSelecionado).toBeTrue();
+  });
+
+  it('cashback preserva minimo e nao envia pagamento simultaneo', () => {
+    const component = fixture.componentInstance;
+    vendaSignal.set({ ...vendaAbertaStub.venda!, vendedor: vendedorStub, cliente: clienteAtivo });
+    centralStatusSignal.set('ONLINE');
+    component.abrirPagamentos('TODAS');
+    component.selecionarPagamentoCashback();
+    component.valorPagamento = '0.50';
+    component.adicionarPagamento();
+    expect(component.mensagem).toContain('mínimo configurado');
+    component.valorPagamento = '20.00';
+    vendaLoadingSignal.set(true);
+    component.adicionarPagamento();
+    expect(vendaSession.adicionarPagamentoCashbackOnline).not.toHaveBeenCalled();
+  });
+
+  it('fechar recebimento invalida consulta antiga de cashback e exige nova consulta', () => {
+    const component = fixture.componentInstance;
+    const consulta = new Subject<{ cashback: { saldoOficial: string; valorReservado: string; saldoDisponivel: string } }>();
+    vendaSignal.set({ ...vendaAbertaStub.venda!, vendedor: vendedorStub, cliente: clienteAtivo });
+    centralStatusSignal.set('ONLINE');
+    hubVendaService.consultarCashbackOnline.and.returnValue(consulta);
+    component.abrirPagamentos('TODAS');
+    component.selecionarPagamentoCashback();
+    component.fecharAtalho();
+    consulta.next({ cashback: { saldoOficial: '100.00', valorReservado: '0.00', saldoDisponivel: '100.00' } });
+    expect(component.cashbackCentralConsulta).toBeNull();
+    component.abrirPagamentos('TODAS');
+    component.valorPagamento = '20.00';
+    component.adicionarPagamento();
+    expect(vendaSession.adicionarPagamentoCashbackOnline).not.toHaveBeenCalled();
+  });
+
+  it('cashback LOCAL historico preserva rotulo valor e remocao', () => {
+    const component = fixture.componentInstance;
+    const historico = {
+      uuid: 'local-antigo', formaPagamentoId: null, formaRetaguardaId: null, codigo: 'CASHBACK',
+      descricao: 'Cashback', tipo: 'CASHBACK', numParcelas: 1, valor: '20.00', autorizacao: '',
+      origemCaptura: 'MANUAL', criadoEm: '2026-09-30', cashbackOrigem: 'LOCAL' as const,
+    };
+    vendaSignal.set({ ...vendaAbertaStub.venda!, vendedor: vendedorStub, cliente: clienteAtivo, pagamentos: [historico] });
+    expect(component.rotuloPagamento(historico)).toBe('CB · Cashback LOCAL');
+    expect(component.cashbackLocalJaAdicionado()).toBe('20.00');
+    component.removerPagamento(historico.uuid);
+    expect(vendaSession.removerPagamento).toHaveBeenCalledWith('local-antigo');
+    expect(vendaSession.adicionarPagamentoCashback).not.toHaveBeenCalled();
   });
 
   it('selecao de vale online usa documento canonico e sugere menor valor entre saldo e pendente', () => {

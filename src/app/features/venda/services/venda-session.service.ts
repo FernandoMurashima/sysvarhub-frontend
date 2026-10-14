@@ -305,21 +305,11 @@ export class VendaSessionService {
   }
 
   adicionarPagamentoCashback(vendaUuid: string, valor: string): Observable<VendaOperacaoResultado> {
-    const intencao = this.obterIntencaoPagamento('CASHBACK_LOCAL', -1, valor, 'CASHBACK_LOCAL', null);
-    this.loadingOperacaoSignal.set(true);
-    return this.hubVendaService.adicionarPagamentoCashback(vendaUuid, intencao.operacaoUuid, valor).pipe(
-      tap((response) => {
-        this.intencaoPagamentoPendente = null;
-        this.definirEstado(response);
-      }),
-      map(() => ({ ok: true })),
-      catchError((error: unknown) => this.tratarErroPagamento(error)),
-      tap(() => this.loadingOperacaoSignal.set(false)),
-    );
+    return of({ ok: false, detail: 'Cashback exige autorização online da Central. Utilize a opção Cashback.' });
   }
 
   adicionarPagamentoCashbackOnline(vendaUuid: string, valor: string): Observable<VendaOperacaoResultado> {
-    const intencao = this.obterIntencaoPagamento('CASHBACK_CENTRAL', -2, valor, 'CASHBACK_CENTRAL', null);
+    const intencao = this.obterIntencaoPagamento(`CASHBACK_CENTRAL:${vendaUuid}:${this.venda()?.cliente?.clienteUuid || ''}:${this.venda()?.cliente?.retaguardaId || ''}`, -2, valor, 'CASHBACK_CENTRAL', null);
     this.loadingOperacaoSignal.set(true);
     return this.hubVendaService.adicionarPagamentoCashbackOnline(vendaUuid, intencao.operacaoUuid, valor).pipe(
       tap((response) => {

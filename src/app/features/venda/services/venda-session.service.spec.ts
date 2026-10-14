@@ -147,23 +147,15 @@ describe('VendaSessionService', () => {
     });
   });
 
-  it('adiciona cashback com operacao_uuid estavel em retry', (done) => {
-    const operacaoUuid = '00000000-0000-4000-8000-000000000001';
-    const cryptoSpy = spyOn(crypto, 'randomUUID').and.returnValue(operacaoUuid);
-    hubVendaService.adicionarPagamentoCashback.and.returnValues(
-      throwError(() => new HttpErrorResponse({ status: 409, error: { detail: 'Saldo insuficiente.' } })),
-      of(vendaAbertaStub),
-    );
-
-    service.adicionarPagamentoCashback('venda-hub-uuid', '30.00').subscribe((primeiro) => {
-      expect(primeiro.ok).toBeFalse();
-      service.adicionarPagamentoCashback('venda-hub-uuid', '30.00').subscribe((segundo) => {
-        expect(segundo.ok).toBeTrue();
-        expect(hubVendaService.adicionarPagamentoCashback).toHaveBeenCalledTimes(2);
-        expect(hubVendaService.adicionarPagamentoCashback).toHaveBeenCalledWith('venda-hub-uuid', operacaoUuid, '30.00');
-        expect(cryptoSpy).toHaveBeenCalledTimes(1);
-        done();
-      });
+  it('bloqueia metodo antigo de cashback local sem HTTP ou operacao_uuid', (done) => {
+    const cryptoSpy = spyOn(crypto, 'randomUUID');
+    service.adicionarPagamentoCashback('venda-hub-uuid', '30.00').subscribe((resultado) => {
+      expect(resultado.ok).toBeFalse();
+      expect(resultado.detail).toContain('autorização online da Central');
+      expect(hubVendaService.adicionarPagamentoCashback).not.toHaveBeenCalled();
+      expect(hubVendaService.adicionarPagamentoCashbackOnline).not.toHaveBeenCalled();
+      expect(cryptoSpy).not.toHaveBeenCalled();
+      done();
     });
   });
 
@@ -187,23 +179,39 @@ describe('VendaSessionService', () => {
     });
   });
 
-  it('nao compartilha operacao_uuid entre cashback local e central', (done) => {
-    const cryptoSpy = spyOn(crypto, 'randomUUID').and.returnValues(
-      '00000000-0000-4000-8000-000000000003',
-      '00000000-0000-4000-8000-000000000004',
+  it('acao local antiga nao altera operacao_uuid pendente do cashback central', () => {
+    const operacaoUuid = '00000000-0000-4000-8000-000000000003';
+    const cryptoSpy = spyOn(crypto, 'randomUUID').and.returnValue(operacaoUuid);
+    hubVendaService.adicionarPagamentoCashbackOnline.and.returnValues(
+      throwError(() => new HttpErrorResponse({ status: 409, error: { detail: 'Central indisponível.' } })),
+      of(vendaAbertaStub),
     );
-    hubVendaService.adicionarPagamentoCashback.and.returnValue(throwError(() => new HttpErrorResponse({ status: 409, error: { detail: 'Saldo insuficiente.' } })));
-    hubVendaService.adicionarPagamentoCashbackOnline.and.returnValue(of(vendaAbertaStub));
+    service.adicionarPagamentoCashbackOnline('venda-hub-uuid', '30.00').subscribe();
+    service.adicionarPagamentoCashback('venda-hub-uuid', '30.00').subscribe((resultado) => expect(resultado.ok).toBeFalse());
+    service.adicionarPagamentoCashbackOnline('venda-hub-uuid', '30.00').subscribe((resultado) => expect(resultado.ok).toBeTrue());
+    expect(hubVendaService.adicionarPagamentoCashback).not.toHaveBeenCalled();
+    expect(hubVendaService.adicionarPagamentoCashbackOnline.calls.allArgs()).toEqual([
+      ['venda-hub-uuid', operacaoUuid, '30.00'], ['venda-hub-uuid', operacaoUuid, '30.00'],
+    ]);
+    expect(cryptoSpy).toHaveBeenCalledTimes(1);
+  });
 
-    service.adicionarPagamentoCashback('venda-hub-uuid', '30.00').subscribe(() => {
-      service.adicionarPagamentoCashbackOnline('venda-hub-uuid', '30.00').subscribe((resultado) => {
-        expect(resultado.ok).toBeTrue();
-        expect(hubVendaService.adicionarPagamentoCashback).toHaveBeenCalledWith('venda-hub-uuid', '00000000-0000-4000-8000-000000000003', '30.00');
-        expect(hubVendaService.adicionarPagamentoCashbackOnline).toHaveBeenCalledWith('venda-hub-uuid', '00000000-0000-4000-8000-000000000004', '30.00');
-        expect(cryptoSpy).toHaveBeenCalledTimes(2);
-        done();
-      });
-    });
+  it('cashback central nao reutiliza intencao de outra venda ou cliente', () => {
+    const cryptoSpy = spyOn(crypto, 'randomUUID').and.returnValues(
+      '00000000-0000-4000-8000-000000000004',
+      '00000000-0000-4000-8000-000000000005',
+      '00000000-0000-4000-8000-000000000006',
+    );
+    hubVendaService.adicionarPagamentoCashbackOnline.and.returnValue(
+      throwError(() => new HttpErrorResponse({ status: 409, error: { detail: 'Central indisponível.' } })),
+    );
+    service.adicionarPagamentoCashbackOnline('venda-1', '30.00').subscribe();
+    service.adicionarPagamentoCashbackOnline('venda-2', '30.00').subscribe();
+    hubVendaService.atual.and.returnValue(of({ ...vendaAbertaStub, venda: { ...vendaAbertaStub.venda!, cliente: vendaAtualComClientePreselecionadoStub.clientePreselecionado } }));
+    service.bootstrap().subscribe();
+    service.adicionarPagamentoCashbackOnline('venda-2', '30.00').subscribe();
+    expect(cryptoSpy).toHaveBeenCalledTimes(3);
+    expect(new Set(hubVendaService.adicionarPagamentoCashbackOnline.calls.allArgs().map((args) => args[1])).size).toBe(3);
   });
 
   it('cancelar limpa venda', (done) => {

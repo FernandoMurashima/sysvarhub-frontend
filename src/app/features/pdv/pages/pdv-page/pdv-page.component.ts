@@ -517,6 +517,7 @@ export class PdvPageComponent implements OnInit, OnDestroy {
 
   fecharAtalho(): void {
     if (this.modalAtalho === 'fechamento' && (this.fechandoCaixa || this.resultadoFechamentoCaixa)) return;
+    if (this.modalAtalho === 'pagamentos') this.invalidarCashbackCentralConsulta();
     this.modalAtalho = '';
     this.buscaModal = '';
     this.produtosPreco = [];
@@ -1217,22 +1218,7 @@ export class PdvPageComponent implements OnInit, OnDestroy {
   }
 
   sugestaoCashback(): number {
-    return this.sugestaoCashbackLocal();
-  }
-
-  sugestaoCashbackLocal(): number {
-    const venda = this.venda();
-    const cashback = this.beneficiosCliente?.cashback;
-    if (!venda || !cashback) return 0;
-    const saldoOffline = Number(cashback.saldo_offline_utilizavel || cashback.saldo || 0);
-    const limitePercentual = Number(cashback.limite_uso_percentual || 0);
-    const limiteVenda = Number(venda.total || 0) * limitePercentual / 100;
-    const localJaAdicionado = Number(this.cashbackLocalJaAdicionado());
-    const totalJaAdicionado = Number(this.cashbackTotalJaAdicionado());
-    const disponivelPorSaldo = Math.max(0, saldoOffline - localJaAdicionado);
-    const disponivelPorLimite = Math.max(0, limiteVenda - totalJaAdicionado);
-    const pendente = Number(venda.pendente || 0);
-    return Math.max(0, Math.min(pendente, disponivelPorSaldo, disponivelPorLimite));
+    return this.sugestaoCashbackCentral();
   }
 
   sugestaoCashbackCentral(): number {
@@ -1353,16 +1339,21 @@ export class PdvPageComponent implements OnInit, OnDestroy {
   }
 
   formasPagamentoFiltradas(): FormaPagamento[] {
-    if (this.filtroPagamento === 'TODAS') return this.formasPagamento;
-    if (this.filtroPagamento === 'DINHEIRO') return this.formasPagamento.filter((forma) => forma.tipo === 'DINHEIRO');
-    if (this.filtroPagamento === 'PIX') return this.formasPagamento.filter((forma) => forma.tipo === 'PIX');
+    const formas = this.formasPagamento.filter((forma) => forma.tipo.toUpperCase() !== 'CASHBACK');
+    if (this.filtroPagamento === 'TODAS') return formas;
+    if (this.filtroPagamento === 'DINHEIRO') return formas.filter((forma) => forma.tipo === 'DINHEIRO');
+    if (this.filtroPagamento === 'PIX') return formas.filter((forma) => forma.tipo === 'PIX');
     if (this.filtroPagamento === 'CARTAO') {
-      return this.formasPagamento.filter((forma) => ['DEBITO', 'CREDITO'].includes(forma.tipo));
+      return formas.filter((forma) => ['DEBITO', 'CREDITO'].includes(forma.tipo));
     }
-    return this.formasPagamento.filter((forma) => !['DINHEIRO', 'PIX', 'DEBITO', 'CREDITO'].includes(forma.tipo));
+    return formas.filter((forma) => !['DINHEIRO', 'PIX', 'DEBITO', 'CREDITO'].includes(forma.tipo));
   }
 
   selecionarFormaPagamento(forma: FormaPagamento): void {
+    if (forma.tipo.toUpperCase() === 'CASHBACK') {
+      this.selecionarPagamentoCashbackCentral();
+      return;
+    }
     this.formaPagamentoSelecionada = forma;
     this.condicaoPagamentoSelecionada = this.condicaoPadraoForma(forma);
     this.pagamentoValeTrocaSelecionado = false;
@@ -1435,34 +1426,11 @@ export class PdvPageComponent implements OnInit, OnDestroy {
   }
 
   selecionarPagamentoCashback(): void {
-    const venda = this.venda();
-    this.formaPagamentoSelecionada = null;
-    this.condicaoPagamentoSelecionada = null;
-    this.pagamentoValeTrocaSelecionado = false;
-    this.pagamentoCashbackSelecionado = true;
-    this.pagamentoCashbackCentralSelecionado = false;
-    this.valeTrocaConsulta = null;
-    this.valesTrocaOnlineDisponiveis = [];
-    this.autorizacaoPagamento = '';
-    if (!venda?.cliente || venda.cliente.clientePadrao) {
-      this.valorPagamento = '';
-      this.mensagem = 'Cashback exige cliente identificado.';
-      return;
-    }
-    if (!this.beneficiosCliente) {
-      this.valorPagamento = '';
-      this.mensagem = 'Consulte os benefícios do cliente antes de usar Cashback.';
-      this.carregarBeneficiosCliente();
-      return;
-    }
-    const sugestao = this.sugestaoCashbackLocal();
-    this.valorPagamento = sugestao > 0 ? sugestao.toFixed(2) : '';
-    if (sugestao <= 0) {
-      this.mensagem = 'Cashback indisponível para esta venda.';
-    }
+    this.selecionarPagamentoCashbackCentral();
   }
 
   selecionarPagamentoCashbackCentral(): void {
+    this.invalidarCashbackCentralConsulta();
     const venda = this.venda();
     this.formaPagamentoSelecionada = null;
     this.condicaoPagamentoSelecionada = null;
@@ -1474,13 +1442,13 @@ export class PdvPageComponent implements OnInit, OnDestroy {
     this.autorizacaoPagamento = '';
     this.valorPagamento = '';
     if (!venda?.cliente || venda.cliente.clientePadrao || !venda.cliente.retaguardaId) {
-      this.mensagem = 'Cashback Central exige cliente identificado na Central.';
+      this.mensagem = 'Cashback exige cliente identificado na Central.';
       this.cashbackCentralEstado = 'erro';
       this.cashbackCentralErro = this.mensagem;
       return;
     }
     if (this.centralStatus() !== 'ONLINE') {
-      this.mensagem = 'Central offline. Cashback Central indisponível.';
+      this.mensagem = 'Central offline. Cashback indisponível.';
       this.cashbackCentralEstado = 'erro';
       this.cashbackCentralErro = this.mensagem;
       return;
@@ -1586,22 +1554,22 @@ export class PdvPageComponent implements OnInit, OnDestroy {
   }
 
   carregarBeneficiosCliente(): void {
+    const vendaUuid = this.venda()?.uuid;
     const clienteUuid = this.venda()?.cliente?.clienteUuid;
     this.beneficiosCliente = null;
     if (!clienteUuid) return;
     this.hubVendaService.consultarBeneficiosCliente(clienteUuid).subscribe({
       next: (beneficios) => {
+        if (this.venda()?.uuid !== vendaUuid || this.venda()?.cliente?.clienteUuid !== clienteUuid) return;
         this.beneficiosCliente = beneficios;
-        if (this.pagamentoCashbackSelecionado) {
-          const sugestao = this.sugestaoCashbackLocal();
-          this.valorPagamento = sugestao > 0 ? sugestao.toFixed(2) : '';
-        }
         if (this.pagamentoCashbackCentralSelecionado && this.cashbackCentralConsulta) {
           const sugestao = this.sugestaoCashbackCentral();
           this.valorPagamento = sugestao > 0 ? sugestao.toFixed(2) : '';
         }
       },
-      error: () => this.beneficiosCliente = null,
+      error: () => {
+        if (this.venda()?.uuid === vendaUuid && this.venda()?.cliente?.clienteUuid === clienteUuid) this.beneficiosCliente = null;
+      },
     });
   }
 
@@ -1610,14 +1578,14 @@ export class PdvPageComponent implements OnInit, OnDestroy {
     if (!venda?.cliente || venda.cliente.clientePadrao || !venda.cliente.retaguardaId) {
       this.invalidarCashbackCentralConsulta();
       this.cashbackCentralEstado = 'erro';
-      this.cashbackCentralErro = 'Cashback Central exige cliente identificado na Central.';
+      this.cashbackCentralErro = 'Cashback exige cliente identificado na Central.';
       this.mensagem = this.cashbackCentralErro;
       return;
     }
     if (this.centralStatus() !== 'ONLINE') {
       this.invalidarCashbackCentralConsulta();
       this.cashbackCentralEstado = 'erro';
-      this.cashbackCentralErro = 'Central offline. Cashback Central indisponível.';
+      this.cashbackCentralErro = 'Central offline. Cashback indisponível.';
       this.mensagem = this.cashbackCentralErro;
       return;
     }
@@ -1635,14 +1603,14 @@ export class PdvPageComponent implements OnInit, OnDestroy {
         if (this.pagamentoCashbackCentralSelecionado) {
           const sugestao = this.sugestaoCashbackCentral();
           this.valorPagamento = sugestao > 0 ? sugestao.toFixed(2) : '';
-          if (sugestao <= 0) this.mensagem = 'Cashback Central indisponível para esta venda.';
+          if (sugestao <= 0) this.mensagem = 'Cashback indisponível para esta venda.';
         }
       },
       error: (erro: HttpErrorResponse) => {
         if (!this.cashbackCentralContextoAtual(contexto)) return;
         this.cashbackCentralConsultaValor = null;
         this.cashbackCentralEstado = 'erro';
-        this.cashbackCentralErro = erro.error?.detail || 'Falha ao consultar Cashback Central.';
+        this.cashbackCentralErro = erro.error?.detail || 'Falha ao consultar Cashback.';
         this.mensagem = this.cashbackCentralErro;
       },
     });
@@ -1712,12 +1680,8 @@ export class PdvPageComponent implements OnInit, OnDestroy {
     const venda = this.venda();
     const forma = this.formaPagamentoSelecionada;
     if (!venda) return;
-    if (this.pagamentoCashbackCentralSelecionado) {
+    if (this.pagamentoCashbackCentralSelecionado || this.pagamentoCashbackSelecionado || forma?.tipo.toUpperCase() === 'CASHBACK') {
       this.adicionarPagamentoCashbackCentral(venda);
-      return;
-    }
-    if (this.pagamentoCashbackSelecionado) {
-      this.adicionarPagamentoCashback(venda);
       return;
     }
     if (this.pagamentoValeTrocaSelecionado) {
@@ -1790,63 +1754,38 @@ export class PdvPageComponent implements OnInit, OnDestroy {
     });
   }
 
-  private adicionarPagamentoCashback(venda: VendaHubResumo): void {
-    const valor = normalizarValorPagamento(this.valorPagamento);
-    if (!venda.cliente || venda.cliente.clientePadrao) {
-      this.mensagem = 'Cashback exige cliente identificado.';
-      return;
-    }
-    if (!this.beneficiosCliente) {
-      this.mensagem = 'Consulte os benefícios do cliente antes de usar Cashback.';
-      return;
-    }
-    if (!valor) {
-      this.mensagem = 'Valor de pagamento inválido.';
-      return;
-    }
-    const sugestao = this.sugestaoCashback();
-    if (Number(valor) > sugestao && sugestao >= 0) {
-      this.mensagem = 'Valor maior que o Cashback disponível para esta venda.';
-      return;
-    }
-    this.vendaSession.adicionarPagamentoCashback(venda.uuid, valor).subscribe((resultado) => {
-      if (resultado.ok) {
-        this.valorPagamento = this.venda()?.pendente || '';
-        this.pagamentoCashbackSelecionado = false;
-        this.carregarBeneficiosCliente();
-        this.mensagem = 'Cashback adicionado.';
-        return;
-      }
-      this.mensagem = resultado.detail || 'Falha ao adicionar Cashback.';
-    });
-  }
-
   private adicionarPagamentoCashbackCentral(venda: VendaHubResumo): void {
+    if (this.vendaLoading()) return;
     const valor = normalizarValorPagamento(this.valorPagamento);
     if (!venda.cliente || venda.cliente.clientePadrao || !venda.cliente.retaguardaId) {
-      this.mensagem = 'Cashback Central exige cliente identificado na Central.';
+      this.mensagem = 'Cashback exige cliente identificado na Central.';
       return;
     }
     if (this.centralStatus() !== 'ONLINE') {
-      this.mensagem = 'Central offline. Cashback Central indisponível.';
+      this.mensagem = 'Central offline. Cashback indisponível.';
       return;
     }
     if (!this.cashbackCentralConsulta) {
-      this.mensagem = 'Consulte o Cashback Central antes de adicionar.';
+      this.mensagem = 'Consulte o saldo oficial do Cashback antes de adicionar.';
       return;
     }
     if (!this.cashbackCentralConsultaCompativel(venda)) {
       this.invalidarCashbackCentralConsulta();
-      this.mensagem = 'Consulte novamente o Cashback Central para esta venda e cliente.';
+      this.mensagem = 'Consulte novamente o Cashback para esta venda e cliente.';
       return;
     }
     if (!valor) {
       this.mensagem = 'Valor de pagamento inválido.';
       return;
     }
+    const minimo = Number(this.beneficiosCliente?.cashback.valor_minimo_uso || 0);
+    if (Number(valor) < minimo) {
+      this.mensagem = 'O valor de Cashback usado é menor que o mínimo configurado.';
+      return;
+    }
     const sugestao = this.sugestaoCashbackCentral();
     if (Number(valor) > sugestao && sugestao >= 0) {
-      this.mensagem = 'Valor maior que o Cashback Central disponível para esta venda.';
+      this.mensagem = 'Valor maior que o Cashback disponível para esta venda.';
       return;
     }
     this.vendaSession.adicionarPagamentoCashbackOnline(venda.uuid, valor).subscribe((resultado) => {
@@ -1856,10 +1795,10 @@ export class PdvPageComponent implements OnInit, OnDestroy {
         this.pagamentoCashbackCentralSelecionado = false;
         this.carregarBeneficiosCliente();
         this.consultarCashbackCentralSeAplicavel();
-        this.mensagem = 'Cashback Central adicionado.';
+        this.mensagem = 'Cashback adicionado.';
         return;
       }
-      this.mensagem = resultado.detail || 'Falha ao adicionar Cashback Central.';
+      this.mensagem = resultado.detail || 'Falha ao adicionar Cashback.';
     });
   }
 
@@ -2175,12 +2114,12 @@ export class PdvPageComponent implements OnInit, OnDestroy {
     this.carregandoFormasPagamento = true;
     this.vendaSession.listarFormasPagamento().subscribe({
       next: (response) => {
-        this.formasPagamento = response.formas;
+        this.formasPagamento = response.formas.filter((forma) => forma.tipo.toUpperCase() !== 'CASHBACK');
         this.prazosPagamento = response.prazos;
         this.carregandoFormasPagamento = false;
         if (this.pagamentoCreditoTrocaSelecionado) return;
-        const formas = filtro === 'TODAS' ? response.formas : this.formasPorCategoria(filtro);
-        this.formaPagamentoSelecionada = formas[0] || response.formas[0] || null;
+        const formas = filtro === 'TODAS' ? this.formasPagamento : this.formasPorCategoria(filtro);
+        this.formaPagamentoSelecionada = formas[0] || this.formasPagamento[0] || null;
         this.condicaoPagamentoSelecionada = this.condicaoPadraoForma(this.formaPagamentoSelecionada);
         this.valorPagamento = this.venda()?.pendente || '';
       },

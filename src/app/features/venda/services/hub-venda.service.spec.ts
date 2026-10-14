@@ -174,15 +174,11 @@ describe('HubVendaService', () => {
     });
     pagamento.flush({ venda: null });
 
-    service.adicionarPagamentoCashback('venda', 'op-cbk', '30.00').subscribe();
-    const cashback = httpMock.expectOne('/api/terminal/venda/pagamento/cashback/');
-    expect(cashback.request.method).toBe('POST');
-    expect(cashback.request.body).toEqual({
-      venda_uuid: 'venda',
-      operacao_uuid: 'op-cbk',
-      valor: '30.00',
+    service.adicionarPagamentoCashback('venda', 'op-cbk', '30.00').subscribe({
+      next: () => fail('Cashback LOCAL não pode iniciar pagamento.'),
+      error: (erro: Error) => expect(erro.message).toContain('autorização online da Central'),
     });
-    cashback.flush({ venda: null });
+    httpMock.expectNone('/api/terminal/venda/pagamento/cashback/');
 
     service.consultarCashbackOnline('venda uuid').subscribe((response) => {
       expect(response.cashback.saldoOficial).toBe('120.00');
